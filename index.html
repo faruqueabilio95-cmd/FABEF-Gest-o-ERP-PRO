@@ -56,6 +56,10 @@ header#topo select#select-idioma { background: #1e293b; color: #fff; border: 1px
   padding: 10px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; margin-bottom: 2px; }
 .sidebar button:hover { background: #1e293b; }
 .sidebar button.active { background: #10b981; color: #fff; font-weight: 700; }
+.sidebar details summary { list-style: none; }
+.sidebar details summary::-webkit-details-marker { display: none; }
+.sidebar details summary::before { content: "▸ "; }
+.sidebar details[open] summary::before { content: "▾ "; }
 
 main#conteudo { margin-left: 220px; margin-top: 56px; padding: 20px; width: 100%; transition: margin-left .2s; }
 body.menu-fechado main#conteudo { margin-left: 0; }
@@ -252,33 +256,49 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
     <div class="lado">
       <span id="indicador-ligacao" style="font-size:11px;font-weight:700;"></span>
-      <span id="header-user" style="font-size:12px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <span id="header-user" style="font-size:12px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-decoration:underline;" title="Toque para alterar a senha"></span>
       <button id="btn-logout" style="flex-shrink:0;">Sair</button>
     </div>
   </header>
 
   <nav class="sidebar" id="sidebar">
     <button data-sec="inicio" class="active">🏠 Início</button>
-    <button data-sec="pos">🛒 Vender</button>
-    <button data-sec="vendas">💵 Vendas</button>
-    <button data-sec="produtos">📦 Produtos</button>
-    <button data-sec="inventario">📊 Inventário</button>
-    <button data-sec="compras">🚚 Compras</button>
-    <button data-sec="fornecedores">🏭 Fornecedores</button>
-    <button data-sec="clientes">👥 Clientes</button>
-    <button data-sec="dividas">🧾 Fiado / Dívidas</button>
-    <button data-sec="encomendas">📋 Encomendas</button>
-    <button data-sec="caixa">💰 Caixa / Turnos</button>
-    <button data-sec="despesas">📉 Despesas</button>
-    <button data-sec="relatorios">📈 Relatórios</button>
-    <button data-sec="metas">🎯 Metas</button>
-    <button data-sec="desempenho">👤 Desempenho</button>
-    <button data-sec="sugestoes">💡 Sugestões</button>
-    <button data-sec="funcionarios">🧑‍💼 Funcionários</button>
-    <button data-sec="ramos">🏷️ Ramos</button>
-    <button data-sec="auditoria">📝 Auditoria</button>
-    <button data-sec="subscricao">💳 Subscrição</button>
-    <button data-sec="config">⚙️ Configurações</button>
+
+    <details open style="margin-top:6px;">
+      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Comercial</summary>
+      <button data-sec="pos">🛒 Vender</button>
+      <button data-sec="vendas">💵 Vendas</button>
+      <button data-sec="clientes">👥 Clientes</button>
+      <button data-sec="dividas">🧾 Fiado / Dívidas</button>
+      <button data-sec="encomendas">📋 Encomendas</button>
+    </details>
+
+    <details style="margin-top:6px;">
+      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Stock</summary>
+      <button data-sec="produtos">📦 Produtos</button>
+      <button data-sec="inventario">📊 Inventário</button>
+      <button data-sec="compras">🚚 Compras</button>
+      <button data-sec="fornecedores">🏭 Fornecedores</button>
+    </details>
+
+    <details style="margin-top:6px;">
+      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Gestão</summary>
+      <button data-sec="caixa">💰 Caixa / Turnos</button>
+      <button data-sec="despesas">📉 Despesas</button>
+      <button data-sec="relatorios">📈 Relatórios</button>
+      <button data-sec="metas">🎯 Metas</button>
+      <button data-sec="desempenho">👤 Desempenho</button>
+      <button data-sec="sugestoes">💡 Sugestões</button>
+    </details>
+
+    <details style="margin-top:6px;">
+      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Configurações</summary>
+      <button data-sec="funcionarios">🧑‍💼 Funcionários</button>
+      <button data-sec="ramos">🏷️ Ramos</button>
+      <button data-sec="auditoria">📝 Auditoria</button>
+      <button data-sec="subscricao">💳 Subscrição</button>
+      <button data-sec="config">⚙️ Configurações</button>
+    </details>
 
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;gap:8px;align-items:center;">
       <select id="select-idioma" style="flex:1;background:#1e293b;color:#fff;border:1px solid #334155;border-radius:6px;padding:6px;font-size:12px;">
@@ -312,6 +332,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <section class="secao" id="sec-pos">
       <h2>Vender</h2>
       <div id="aviso-pos-caixa" class="alert alert-warn hidden">⚠️ O caixa está fechado. Abra o turno na secção "Caixa / Turnos" para poder vender.</div>
+      <div id="aviso-pos-offline"></div>
       <div class="pos-layout">
         <div class="card">
           <div style="display:flex;gap:8px;margin-bottom:12px;">
@@ -360,6 +381,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             <div class="form-group"><label for="pos-valor-emola">E-Mola</label><input type="number" id="pos-valor-emola" min="0" step="0.01" value="0"></div>
             <div class="form-group"><label for="pos-valor-cartao">Cartão</label><input type="number" id="pos-valor-cartao" min="0" step="0.01" value="0"></div>
             <div class="form-group"><label for="pos-valor-credito">Crédito / Fiado (requer nome do cliente acima)</label><input type="number" id="pos-valor-credito" min="0" step="0.01" value="0"></div>
+            <p style="font-weight:700;margin-top:6px;">Restante a atribuir: <span id="pos-pagamento-restante">MT 0,00</span></p>
           </div>
           <div style="display:flex;gap:8px;">
             <button id="btn-limpar-carrinho" class="btn btn-light" style="flex:1;">Limpar</button>
@@ -481,7 +503,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="card">
         <div class="grid">
           <div class="form-group"><label for="compra-produto">Produto</label><select id="compra-produto"></select></div>
-          <div class="form-group"><label for="compra-fornecedor">Fornecedor</label><input type="text" id="compra-fornecedor" placeholder="Nome do fornecedor"></div>
+          <div class="form-group"><label for="compra-fornecedor">Fornecedor</label><input type="text" id="compra-fornecedor" list="lista-fornecedores-compra" placeholder="Nome do fornecedor"><datalist id="lista-fornecedores-compra"></datalist></div>
           <div class="form-group"><label for="compra-quantidade">Quantidade</label><input type="number" id="compra-quantidade" min="0"></div>
           <div class="form-group"><label for="compra-custo">Custo unitário</label><input type="number" id="compra-custo" min="0" step="0.01"></div>
           <div class="form-group">
@@ -638,12 +660,16 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             <option value="30">Últimos 30 dias</option>
           </select>
           <button id="btn-atualizar-relatorio" class="btn btn-primary">Atualizar</button>
+          <button class="btn btn-success" type="button" style="background-color:#25d366;" onclick="enviarRelatorioWhatsApp()">📱 WhatsApp</button>
+          <button class="btn btn-light" type="button" onclick="exportarRelatorioPDF()">🖨️ PDF</button>
+          <button class="btn btn-light" type="button" onclick="exportarRelatorioWord()">📄 Word</button>
         </div>
       </div>
       <div class="grid" style="margin-bottom:16px;">
         <div class="kpi"><div class="rotulo">Faturamento</div><div class="valor" id="rel-faturamento">MT 0,00</div></div>
         <div class="kpi"><div class="rotulo">Despesas</div><div class="valor" id="rel-despesas">MT 0,00</div></div>
         <div class="kpi"><div class="rotulo">Resultado</div><div class="valor" id="rel-resultado">MT 0,00</div></div>
+        <div class="kpi"><div class="rotulo">Kg/Litros vendidos</div><div class="valor" id="rel-kg-vendidos" style="font-size:18px;">0 kg</div></div>
       </div>
       <div class="card">
         <h3 style="margin-bottom:10px;">Curva ABC de produtos</h3>
@@ -732,6 +758,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- RAMOS -->
     <section class="secao" id="sec-ramos">
       <h2>Ramos de atividade</h2>
+      <div id="visao-geral-ramos"></div>
       <div class="card">
         <div class="form-group" style="max-width:320px;"><label for="ramo-pagina">Ramo ativo</label><select id="ramo-pagina">
           <option value="Mercearia / Minimercado">Mercearia / Minimercado</option>
@@ -968,6 +995,20 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
   </div>
 
+  <div class="modal-overlay" id="modal-alterar-senha">
+    <div class="modal-box">
+      <h3>Alterar senha</h3>
+      <div class="form-group"><label for="senha-atual">Senha atual</label><input type="password" id="senha-atual"></div>
+      <div class="form-group"><label for="senha-nova">Nova senha</label><input type="password" id="senha-nova" placeholder="Mínimo 6 caracteres"></div>
+      <div class="form-group"><label for="senha-nova-confirmar">Confirmar nova senha</label><input type="password" id="senha-nova-confirmar"></div>
+      <div id="senha-status" class="status-msg"></div>
+      <div class="modal-acoes">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-alterar-senha')" style="flex:1;">Cancelar</button>
+        <button id="btn-guardar-nova-senha" class="btn btn-entrar" style="flex:1;">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-editar-funcionario">
     <div class="modal-box">
       <h3>Editar funcionário</h3>
@@ -1012,3 +1053,4 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 </script>
 </body>
 </html>
+
