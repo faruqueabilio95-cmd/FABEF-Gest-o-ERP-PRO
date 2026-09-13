@@ -1,4 +1,3 @@
-
 import {
     initializeApp,
     deleteApp
@@ -2498,8 +2497,8 @@ function atualizarRestantePagamentoMisto() {
 
 
 async function finalizarVenda() {
-    if (FABEF_LICENCA_BLOQUEADA) {
-        alert("A subscriÃ§Ã£o da empresa estÃ¡ expirada. NÃ£o Ã© possÃ­vel registar novas vendas atÃ© regularizar o pagamento (pÃ¡gina SubscriÃ§Ã£o). Os seus dados continuam disponÃ­veis para consulta.");
+    if (limiteVendasDiariasAtingido()) {
+        avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.vendasDiarias} vendas do plano grÃ¡tis.`);
         return;
     }
 
@@ -3198,6 +3197,11 @@ document.getElementById("btn-registar-encomenda").addEventListener("click", regi
 
 
 async function registarEncomenda() {
+    if (limiteEncomendasDiariasAtingido()) {
+        avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.encomendasDiarias} encomendas do plano grÃ¡tis.`);
+        return;
+    }
+
     const cliente = document.getElementById("encomenda-cliente").value.trim();
     const telefone = document.getElementById("encomenda-telefone").value.trim();
     const produto = document.getElementById("encomenda-produto").value.trim();
@@ -3776,11 +3780,21 @@ function renderRelatorios() {
         numVendas: vendasFiltradas.length
     };
 
-    // Invoca o motor matemÃ¡tico da Curva ABC de produtos baseado nas vendas filtradas
-    renderABC(vendasFiltradas);
-
-    // AnÃ¡lise inteligente adicional
-    renderAnaliseInteligente(vendasFiltradas, despesasFiltradas);
+    // Curva ABC e AnÃ¡lise Inteligente sÃ£o funcionalidades avanÃ§adas â€”
+    // sÃ³ disponÃ­veis no Plano Pago (ou durante o perÃ­odo de teste).
+    const planoRelatorios = obterPlanoAtual();
+    const avisoAvancado = document.getElementById("aviso-relatorios-avancados");
+    if (planoRelatorios === "GRATIS") {
+        if (avisoAvancado) avisoAvancado.innerHTML = `<div class="alert alert-warning">ðŸ”’ A Curva ABC e a AnÃ¡lise Inteligente sÃ£o funcionalidades do Plano Pago. <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')">â­ Atualizar por 250 MT</button></div>`;
+        document.getElementById("tabela-abc").innerHTML = `<tr><td colspan="5" style="text-align:center;color:#64748b;">DisponÃ­vel no Plano Pago.</td></tr>`;
+        document.getElementById("analise-inteligente").innerHTML = "";
+    } else {
+        if (avisoAvancado) avisoAvancado.innerHTML = "";
+        // Invoca o motor matemÃ¡tico da Curva ABC de produtos baseado nas vendas filtradas
+        renderABC(vendasFiltradas);
+        // AnÃ¡lise inteligente adicional
+        renderAnaliseInteligente(vendasFiltradas, despesasFiltradas);
+    }
 }
 
 let FABEF_RELATORIO_ATUAL = null;
@@ -4064,13 +4078,21 @@ async function guardarConfiguracoes() {
 async function cadastrarNovoFuncionario() {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") { alert("Apenas o gerente pode cadastrar funcionÃ¡rios."); return; }
 
-    // Limite do plano: 3 utilizadores no total (1 gerente + 2 funcionÃ¡rios).
-    // A partir do 3Âº funcionÃ¡rio (4Âº utilizador), Ã© preciso pagar uma taxa
-    // extra de 20% da subscriÃ§Ã£o por cada funcionÃ¡rio adicional.
+    // Limite depende do plano: GrÃ¡tis = 1 funcionÃ¡rio; Pago/Teste = 2 funcionÃ¡rios
+    // (3 utilizadores no total, incluindo o gerente). A partir do 3Âº
+    // funcionÃ¡rio, Ã© preciso pagar uma taxa extra de 20% por cada um.
+    const plano = obterPlanoAtual();
+    const limiteBase = plano === "GRATIS" ? LIMITES_PLANO_GRATIS.funcionarios : 2;
     const funcionariosAtivos = (FABEF.funcionarios || []).filter(f => (f.estado || "ATIVO") === "ATIVO").length;
-    if (funcionariosAtivos >= 2) {
+
+    if (plano === "GRATIS" && funcionariosAtivos >= limiteBase) {
+        avisoLimiteAtingido(`O Plano GrÃ¡tis inclui apenas ${limiteBase} funcionÃ¡rio.`);
+        return;
+    }
+
+    if (funcionariosAtivos >= limiteBase) {
         alert(
-            "O seu plano atual inclui atÃ© 2 funcionÃ¡rios (3 utilizadores no total, incluindo o gerente).\n\n" +
+            `O seu plano atual inclui atÃ© ${limiteBase} funcionÃ¡rios (${limiteBase + 1} utilizadores no total, incluindo o gerente).\n\n` +
             "Para adicionar mais um funcionÃ¡rio, Ã© necessÃ¡ria uma taxa adicional de 20% do valor da subscriÃ§Ã£o por cada funcionÃ¡rio extra.\n\n" +
             "Contacte o suporte para ativar esta funcionÃ¡rio extra na sua subscriÃ§Ã£o antes de continuar."
         );
@@ -4197,6 +4219,79 @@ window.alternarEstadoFuncionario = async function(id) {
 
 /* CONTROLO DE SUBSCRIÃ‡ÃƒO */
 
+/* =====================================================
+   MÃ“DULO LÃ“GICO: PLANO GRÃTIS COM LIMITES (FREEMIUM)
+   Dias 1-7: acesso total (teste). A partir do dia 8, sem
+   pagamento, passa a Plano GrÃ¡tis com limites â€” em vez de
+   ficar totalmente bloqueado. Pagando 250 MT, os limites
+   desaparecem.
+===================================================== */
+const LIMITES_PLANO_GRATIS = {
+    vendasDiarias: 5,
+    encomendasDiarias: 3,
+    funcionarios: 1
+};
+
+function obterPlanoAtual() {
+    if (!FABEF.empresa) return "GRATIS";
+    const estado = FABEF.empresa.estado_licenca || "TESTE";
+    const validade = FABEF.empresa.validade_subscricao;
+    const expirada = validade ? new Date() > new Date(validade) : false;
+
+    if (estado === "ACTIVO" && !expirada) return "PAGO";
+
+    if (estado === "TESTE") {
+        const origem = FABEF.empresa.data_registo || FABEF.empresa.criadoEm;
+        const d = origem && typeof origem.toDate === "function" ? origem.toDate() : new Date(origem || Date.now());
+        const fim = new Date(d);
+        fim.setDate(fim.getDate() + 7);
+        if (new Date() <= fim) return "TRIAL";
+    }
+
+    return "GRATIS";
+}
+
+function avisoLimiteAtingido(mensagem) {
+    alert((mensagem || "Atingiu o limite diÃ¡rio do plano grÃ¡tis.") + "\n\nAtualize para o plano premium por apenas 250 MT para continuar!");
+    mostrarSecao("subscricao");
+}
+
+function limiteVendasDiariasAtingido() {
+    if (obterPlanoAtual() !== "GRATIS") return false;
+    const hoje = dataHoje();
+    const vendasHoje = FABEF.vendas.filter(v => new Date(v.data || 0) >= hoje).length;
+    return vendasHoje >= LIMITES_PLANO_GRATIS.vendasDiarias;
+}
+
+function limiteEncomendasDiariasAtingido() {
+    if (obterPlanoAtual() !== "GRATIS") return false;
+    const hoje = dataHoje();
+    const encomendasHoje = FABEF.encomendas.filter(e => new Date(e.data || 0) >= hoje).length;
+    return encomendasHoje >= LIMITES_PLANO_GRATIS.encomendasDiarias;
+}
+
+function renderAvisoPlano() {
+    const container = document.getElementById("aviso-plano-gratis");
+    if (!container) return;
+    const plano = obterPlanoAtual();
+
+    if (plano !== "GRATIS") { container.innerHTML = ""; return; }
+
+    const hoje = dataHoje();
+    const vendasHoje = FABEF.vendas.filter(v => new Date(v.data || 0) >= hoje).length;
+    const encomendasHoje = FABEF.encomendas.filter(e => new Date(e.data || 0) >= hoje).length;
+
+    container.innerHTML = `
+        <div class="alert alert-warning">
+            <strong>ðŸ†“ Plano GrÃ¡tis</strong> â€” Vendas hoje: ${vendasHoje}/${LIMITES_PLANO_GRATIS.vendasDiarias} Â·
+            Encomendas hoje: ${encomendasHoje}/${LIMITES_PLANO_GRATIS.encomendasDiarias} Â·
+            FuncionÃ¡rios: ${LIMITES_PLANO_GRATIS.funcionarios} mÃ¡x.
+            <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')" style="margin-left:8px;">â­ Passar a Premium (250 MT)</button>
+        </div>
+    `;
+}
+
+
 function verificarSubscricao(){
     const aviso = document.getElementById("aviso-licenca");
     const bloqueio = document.getElementById("bloqueio-licenca");
@@ -4252,39 +4347,38 @@ function verificarSubscricao(){
         }
     } else {
         if (aviso) {
-            aviso.className = "alert alert-danger";
-            aviso.textContent = "âŒ SubscriÃ§Ã£o Expirada. Por favor, regularize o pagamento mensal. Pode continuar a consultar os seus dados, mas nÃ£o pode registar novas vendas atÃ© regularizar.";
+            aviso.className = "alert alert-warning";
+            aviso.textContent = "ðŸ†“ EstÃ¡ no Plano GrÃ¡tis (limites diÃ¡rios de vendas/encomendas e 1 funcionÃ¡rio). Pague 250 MT para desbloquear tudo.";
         }
         if (estadoSpan) {
-            estadoSpan.className = "alert alert-danger";
-            estadoSpan.textContent = "Acesso Bloqueado por falta de pagamento.";
+            estadoSpan.className = "alert alert-warning";
+            estadoSpan.textContent = "Plano GrÃ¡tis â€” com limites diÃ¡rios.";
         }
-        // JÃ¡ nÃ£o usamos um ecrÃ£ de bloqueio total: o gerente continua a poder
-        // consultar produtos, relatÃ³rios, clientes, etc. SÃ³ ficam bloqueadas
-        // as NOVAS vendas (ver finalizarVenda), para nÃ£o perder acesso aos
-        // seus prÃ³prios dados por atraso no pagamento.
         if (bloqueio) {
             bloqueio.classList.remove("show");
             bloqueio.style.display = "none";
         }
     }
 
-    FABEF_LICENCA_BLOQUEADA = !ativa && !(estado === "TESTE" && !testeExpirado);
+    FABEF_LICENCA_BLOQUEADA = false; // o plano grÃ¡tis nunca bloqueia tudo, sÃ³ limita
+    renderAvisoPlano();
 }
 
 let FABEF_LICENCA_BLOQUEADA = false;
 
+// Cole aqui o link completo do Workflow 1 do Pipedream (o "URL exclusivo para
+// acionar este fluxo de trabalho" que apareceu ao criar o gatilho).
+const FABEF_PIPEDREAM_COBRANCA_URL = "https://eoworwel5cr2z9j.m.pipedream.net";
+
 async function solicitarPagamentoBackend(operadora, telefone) {
-    if (!FABEF_API_BASE) return null;
+    if (!FABEF_PIPEDREAM_COBRANCA_URL || FABEF_PIPEDREAM_COBRANCA_URL.includes("SEU-LINK-AQUI")) {
+        throw new Error("O endereÃ§o do servidor de pagamentos ainda nÃ£o foi configurado.");
+    }
 
     const token = await auth.currentUser?.getIdToken();
     if (!token) throw new Error("SessÃ£o Firebase invÃ¡lida.");
 
-    const rota = operadora === "MPESA"
-        ? "/api/pagamentos/mpesa"
-        : "/api/pagamentos/emola";
-
-    const resposta = await fetch(FABEF_API_BASE + rota, {
+    const resposta = await fetch(FABEF_PIPEDREAM_COBRANCA_URL, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -4292,13 +4386,14 @@ async function solicitarPagamentoBackend(operadora, telefone) {
         },
         body: JSON.stringify({
             empresaId: FABEF.empresaId,
-            telefone,
-            valor: 250
+            telefone: telefone,
+            valor: 250,
+            metodo: operadora // "MPESA" ou "EMOLA"
         })
     });
 
     const dados = await resposta.json().catch(() => ({}));
-    if (!resposta.ok) throw new Error(dados.mensagem || dados.erro || "Falha no servidor de pagamentos.");
+    if (!resposta.ok) throw new Error(dados.erro || dados.mensagem || "Falha no servidor de pagamentos.");
     return dados;
 }
 
@@ -4317,21 +4412,11 @@ async function solicitarSubscricaoMovel(){
         if (botao) botao.disabled = true;
         const backendResult = await solicitarPagamentoBackend(operadora, telefone);
 
-        const payload = {
-            transacaoId: backendResult?.transacaoId || backendResult?.transactionId || null,
-            referenciaGateway: backendResult?.referencia || backendResult?.reference || null,
-            operadora,
-            contacto: telefone,
-            valor: 250,
-            estado: "AGUARDANDO_GATEWAY",
-            data: new Date().toISOString(),
-            criadoPor: FABEF.user.uid
-        };
-        const ref = await addDoc(subRef("pagamentos"), payload);
-        FABEF.pagamentos.push({ id: ref.id, ...payload });
+        // O prÃ³prio servidor (Pipedream) jÃ¡ regista o pedido em "pagamentos" â€”
+        // aqui sÃ³ mostramos o estado, sem duplicar o registo.
         if (resultado) {
             resultado.className = "alert alert-warning";
-            resultado.innerHTML = `â³ Pedido enviado. ReferÃªncia: <strong>${escapeHTML(payload.referenciaGateway || ref.id)}</strong><br><small>A licenÃ§a sÃ³ serÃ¡ activada apÃ³s confirmaÃ§Ã£o real do gateway/backend.</small>`;
+            resultado.innerHTML = `â³ Pedido enviado. Confirme o PIN no seu telemÃ³vel.<br>ReferÃªncia: <strong>${escapeHTML(backendResult?.referencia || backendResult?.sourceId || "â€”")}</strong><br><small>A licenÃ§a Ã© activada automaticamente assim que o pagamento for confirmado.</small>`;
         }
         await gravarAuditoria("Solicitou subscriÃ§Ã£o mensal via " + operadora, "INFO");
     } catch (error) {
