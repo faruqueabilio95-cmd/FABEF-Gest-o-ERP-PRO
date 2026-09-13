@@ -316,6 +316,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <h2>Painel Principal</h2>
       <div id="aviso-licenca"></div>
       <div id="aviso-reconciliacao-stock"></div>
+      <div id="aviso-plano-gratis"></div>
       <div class="grid">
         <div class="kpi"><div class="rotulo">Negócio</div><div class="valor" id="inicio-nome-negocio">—</div></div>
         <div class="kpi"><div class="rotulo">ID da empresa</div><div class="valor" id="inicio-id-empresa" style="font-size:12px;">—</div></div>
@@ -665,6 +666,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <button class="btn btn-light" type="button" onclick="exportarRelatorioWord()">📄 Word</button>
         </div>
       </div>
+      <div id="aviso-relatorios-avancados"></div>
       <div class="grid" style="margin-bottom:16px;">
         <div class="kpi"><div class="rotulo">Faturamento</div><div class="valor" id="rel-faturamento">MT 0,00</div></div>
         <div class="kpi"><div class="rotulo">Despesas</div><div class="valor" id="rel-despesas">MT 0,00</div></div>
@@ -846,8 +848,8 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <div class="form-group">
             <label for="pagamento-operadora">Operadora de pagamento</label>
             <select id="pagamento-operadora">
-              <option value="M-Pesa">M-Pesa</option>
-              <option value="E-Mola">E-Mola</option>
+              <option value="MPESA">M-Pesa</option>
+              <option value="EMOLA">E-Mola</option>
             </select>
           </div>
           <div class="form-group"><label for="pagamento-telefone">Número de telefone</label><input type="text" id="pagamento-telefone" placeholder="8xx xxx xxx"></div>
@@ -1053,4 +1055,3 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 </script>
 </body>
 </html>
-
