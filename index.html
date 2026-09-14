@@ -95,6 +95,52 @@
       .sidebar { position: fixed; height: 100%; left: 0; }
       .pos-layout { grid-template-columns: 1fr; }
     }
+  
+    /* TEMA CLARO */
+    body.theme-light {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+    }
+    body.theme-light .top-header,
+    body.theme-light .sidebar,
+    body.theme-light .auth-card,
+    body.theme-light .modal-card {
+      background: #ffffff;
+      color: #0f172a;
+    }
+    body.theme-light .kpi,
+    body.theme-light .produto-pos,
+    body.theme-light th,
+    body.theme-light .auth-container,
+    body.theme-light .main-content {
+      background: #f1f5f9;
+    }
+    body.theme-light input,
+    body.theme-light select,
+    body.theme-light textarea {
+      background: #ffffff !important;
+      color: #0f172a !important;
+      border-color: #cbd5e1 !important;
+    }
+    body.theme-light .kpi .valor,
+    body.theme-light .produto-pos strong,
+    body.theme-light th,
+    body.theme-light td {
+      color: #0f172a;
+    }
+    body.theme-light .sidebar-nav button.active,
+    body.theme-light .sidebar-nav button:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    body.theme-light .btn-light {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
   </style>
 </head>
 <body>
@@ -166,7 +212,7 @@
   <div id="app" class="hidden">
     
     <!-- BARRA LATERAL -->
-    <aside id="sidebar" class="sidebar">
+    <aside id="sidebar" class="sidebar closed">
       <div class="sidebar-header">
         <span>FABEF ERP</span>
         <button id="btn-fechar-menu" class="btn-icon" style="display:none;">✕</button>
@@ -195,14 +241,24 @@
     <!-- ÁREA PRINCIPAL -->
     <div class="main-content">
       <header class="top-header">
-        <div class="left">
-          <button id="btn-menu" class="btn-icon">☰</button>
+        <div class="left" style="display:flex;align-items:center;gap:10px;">
+          <button id="btn-menu" class="btn-icon" type="button" title="Menu principal">☰</button>
           <span id="indicador-ligacao" style="font-size:0.8rem;font-weight:700;">🟢 Online</span>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <select id="select-ramo" style="background:#0f172a;color:#fff;border:1px solid var(--border);padding:4px 8px;border-radius:4px;"></select>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <!-- TROCA DE IDIOMA -->
+          <select id="select-idioma" title="Trocar Idioma" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:5px 8px;border-radius:6px;font-size:0.8rem;cursor:pointer;">
+            <option value="pt">🇲🇿 PT</option>
+            <option value="en">🇬🇧 EN</option>
+            <option value="xch">🇲🇿 XCH</option>
+            <option value="emw">🇲🇿 EMW</option>
+          </select>
+          <!-- TROCA DE LUZ (TEMA CLARO / ESCURO) -->
+          <button id="btn-toggle-tema" class="btn-icon" type="button" title="Alternar Modo Claro/Escuro" style="padding:5px 8px;font-size:0.95rem;">☀️</button>
+          <!-- RAMO ATIVO -->
+          <select id="select-ramo" title="Ramo Ativo" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:5px 8px;border-radius:6px;font-size:0.8rem;max-width:140px;"></select>
           <span id="header-user" style="font-size:0.85rem;cursor:pointer;" title="Clique para alterar a sua senha">Utilizador</span>
-          <button id="btn-logout" class="btn btn-danger btn-small">Sair</button>
+          <button id="btn-logout" class="btn btn-danger btn-small" type="button">Sair</button>
         </div>
       </header>
 
@@ -737,9 +793,47 @@
         <!-- SEÇÃO: SUBSCIÇÃO E LICENÇA -->
         <section id="sec-subscricao" class="secao">
           <div class="card">
-            <h3>Estado da Subscrição Comercial</h3>
+            <h3>Subscrição Comercial por Ramo (e-Mola / M-Pesa)</h3>
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-top:4px;margin-bottom:12px;">
+              Cada gerente pode gerir até 3 ramos com regras independentes. Cada ramo conta com 7 dias grátis de teste completo. Após os 7 dias, o uso de vendas fica restrito até a regularização da subscrição de 250 MT/mês.
+            </p>
             <div id="aviso-licenca" style="margin:12px 0;"></div>
-            <p id="estado-subscricao" style="font-size:0.9rem;color:var(--text-muted);"></p>
+            <p id="estado-subscricao" style="font-size:0.9rem;color:var(--text-muted);margin-bottom:16px;"></p>
+
+            <!-- GESTÃO DOS ATÉ 3 RAMOS -->
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;">
+              <h4 style="color:var(--primary);margin-bottom:8px;font-size:0.95rem;">Estado dos Seus Ramos Activos:</h4>
+              <div id="lista-status-ramos" style="display:flex;flex-direction:column;gap:8px;"></div>
+            </div>
+
+            <!-- FORMULÁRIO DE PAGAMENTO MÓVEL -->
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;">
+              <h4 style="color:#fff;margin-bottom:10px;font-size:1rem;">Ativar ou Renovar Ramo Comercial (250 MT / mês)</h4>
+              
+              <div class="form-group" style="margin-bottom:10px;">
+                <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">Selecione o Ramo a Pagar:</label>
+                <select id="pagamento-ramo-alvo" style="width:100%;padding:8px;background:var(--card);color:#fff;border:1px solid var(--border);border-radius:6px;"></select>
+              </div>
+
+              <div class="form-group" style="margin-bottom:10px;">
+                <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">Método de Pagamento:</label>
+                <select id="pagamento-operadora" style="width:100%;padding:8px;background:var(--card);color:#fff;border:1px solid var(--border);border-radius:6px;">
+                  <option value="EMOLA">e-Mola (Movitel - Inicia com 86 ou 87)</option>
+                  <option value="MPESA">M-Pesa (Vodacom - Inicia com 84 ou 85)</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom:12px;">
+                <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">Número de Telemóvel (9 dígitos):</label>
+                <input type="tel" id="pagamento-telefone" placeholder="Ex: 861234567 ou 841234567" maxlength="9" style="width:100%;padding:8px;background:var(--card);color:#fff;border:1px solid var(--border);border-radius:6px;">
+              </div>
+
+              <button id="btn-solicitar-pagamento" class="btn btn-success" type="button" style="width:100%;padding:10px;font-weight:700;">
+                💳 Pagar Subscrição (250 MT)
+              </button>
+
+              <div id="resultado-pagamento" style="margin-top:12px;"></div>
+            </div>
           </div>
         </section>
 
@@ -907,6 +1001,34 @@
 
   <!-- IMPORTAÇÃO DO MÓDULO LÓGICO COMPLETO -->
   <script type="module" src="app.js"></script>
+
+
+  <!-- MODAL: RECIBO PÓS-VENDA & WHATSAPP -->
+  <div id="modal-pos-venda" class="modal">
+    <div class="modal-card" style="text-align: center; max-width: 440px;">
+      <div style="font-size: 2.8rem; margin-bottom: 6px;">✅</div>
+      <h3 style="color: var(--primary); margin-bottom: 4px;">Venda Concluída!</h3>
+      <p id="pos-venda-total" style="font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 14px;">MT 0,00</p>
+      
+      <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: left;">
+        <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Enviar Recibo ao Cliente via WhatsApp:</label>
+        <div style="display: flex; gap: 6px;">
+          <input type="tel" id="pos-venda-telefone" placeholder="Ex: 84... ou 82..." style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: #fff;">
+          <button id="btn-pos-venda-whatsapp" class="btn btn-success" type="button" style="background-color: #25d366; white-space: nowrap;">
+            📱 WhatsApp
+          </button>
+        </div>
+        <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 4px;">
+          O recibo completo detalhado com itens e valor será enviado na hora.
+        </small>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+        <button id="btn-pos-venda-imprimir" class="btn btn-light" type="button">🖨️ Imprimir Recibo</button>
+        <button id="btn-pos-venda-continuar" class="btn btn-primary" type="button">➕ Nova Venda</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
