@@ -1,1057 +1,913 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#10b981">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>FABEF Gestão ERP PRO V9.9 Comercial</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-body { background: #f1f5f9; min-height: 100vh; color: #0f172a; }
-.hidden { display: none !important; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>FABEF Gestão ERP PRO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
-/* ---------- LOGIN ---------- */
-#tela-login { width: 100%; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px;
-  background: radial-gradient(circle at top right, #1e3a8a, #0f172a 60%); }
-.card-login { background: #fff; width: 100%; max-width: 400px; padding: 35px 25px; border-radius: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0,0,0,.3), 0 10px 10px -5px rgba(0,0,0,.04); text-align: center; }
-.card-login h1 { font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -.5px; }
-.card-login p.subtitulo { font-size: 13px; color: #64748b; margin-bottom: 25px; }
-.form-group { text-align: left; margin-bottom: 16px; }
-.form-group label { display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px; }
-.form-group input, .form-group select, .form-group textarea {
-  width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; transition: border-color .2s; background: #fff; color: #0f172a; }
-.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #10b981; }
-.btn { border: none; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: opacity .2s; }
-.btn:hover { opacity: .88; }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-entrar, .btn-success { width: 100%; background: #10b981; color: #fff; margin-top: 6px; }
-.btn-primary { background: #2563eb; color: #fff; }
-.btn-light { background: #e2e8f0; color: #0f172a; }
-.btn-danger { background: #ef4444; color: #fff; }
-.btn-secondary { background: #94a3b8; color: #fff; }
-.btn-small { padding: 6px 10px; font-size: 12px; }
-.status-msg { font-size: 12px; color: #2563eb; margin-top: 15px; font-weight: 500; min-height: 18px; }
-.rodape-criar-conta { font-size: 13px; color: #64748b; margin-top: 20px; }
-.rodape-criar-conta a, .link-voltar { color: #2563eb; font-weight: 700; text-decoration: none; cursor: pointer; }
-.rodape-criar-conta a:hover, .link-voltar:hover { text-decoration: underline; }
+  <style>
+    :root {
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --sidebar-width: 260px;
+    }
 
-/* ---------- APP SHELL ---------- */
-#app { min-height: 100vh; display: flex; }
-header#topo { position: fixed; top: 0; left: 0; right: 0; height: 56px; background: #0f172a; color: #fff;
-  display: flex; align-items: center; justify-content: space-between; padding: 0 15px; z-index: 500; }
-header#topo .lado { display: flex; align-items: center; gap: 10px; }
-header#topo button#btn-menu { background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; }
-header#topo select#select-idioma { background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; font-size: 12px; }
-#header-user { font-size: 13px; font-weight: 600; }
-#btn-logout { background: #ef4444; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
-#btn-toggle-dark { background: none; border: 1px solid #334155; color: #fff; border-radius: 6px; padding: 6px 9px; cursor: pointer; font-size: 13px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    
+    .hidden { display: none !important; }
 
-.sidebar { position: fixed; top: 56px; left: 0; bottom: 0; width: 220px; background: #0f172a; padding: 10px; overflow-y: auto;
-  transition: transform .2s; z-index: 400; }
-.sidebar.closed { transform: translateX(-100%); }
-.sidebar button { display: block; width: 100%; text-align: left; background: none; border: none; color: #cbd5e1;
-  padding: 10px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; margin-bottom: 2px; }
-.sidebar button:hover { background: #1e293b; }
-.sidebar button.active { background: #10b981; color: #fff; font-weight: 700; }
-.sidebar details summary { list-style: none; }
-.sidebar details summary::-webkit-details-marker { display: none; }
-.sidebar details summary::before { content: "▸ "; }
-.sidebar details[open] summary::before { content: "▾ "; }
+    /* TELAS DE ENTRADA (LOGIN E PIN) */
+    .auth-container { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 20px; background: #0f172a; }
+    .auth-card { background: #1e293b; border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 100%; max-width: 400px; }
+    .auth-card h2 { font-size: 1.4rem; margin-bottom: 12px; text-align: center; color: var(--primary); }
+    .auth-card .form-group { margin-bottom: 12px; }
+    .auth-card label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px; }
+    .auth-card input, .auth-card select { width: 100%; background: #0f172a; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 6px; outline: none; }
+    .auth-card button { width: 100%; padding: 12px; border-radius: 6px; border: none; font-weight: 700; cursor: pointer; margin-top: 8px; }
+    .status-msg { font-size: 0.85rem; text-align: center; margin-top: 10px; min-height: 20px; }
 
-main#conteudo { margin-left: 220px; margin-top: 56px; padding: 20px; width: 100%; transition: margin-left .2s; }
-body.menu-fechado main#conteudo { margin-left: 0; }
-body.menu-fechado .sidebar { transform: translateX(-100%); }
+    /* ESTRUTURA PRINCIPAL */
+    #app { display: flex; min-height: 100vh; }
+    .sidebar { width: var(--sidebar-width); background: #1e293b; border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: transform 0.3s ease; z-index: 99; }
+    .sidebar.closed { transform: translateX(-100%); position: absolute; height: 100%; }
+    .sidebar-header { padding: 16px; font-weight: 800; font-size: 1.2rem; color: var(--primary); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 12px 8px; }
+    .sidebar-nav button { width: 100%; text-align: left; background: none; border: none; color: var(--text-muted); padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95rem; display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .sidebar-nav button.active, .sidebar-nav button:hover { background: #334155; color: #fff; }
+    .sidebar-nav button.active { border-left: 3px solid var(--primary); }
 
-.secao { display: none; }
-.secao.active { display: block; }
-.secao h2 { margin-bottom: 15px; font-size: 20px; }
+    .main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #0f172a; }
+    .top-header { background: #1e293b; border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 90; }
+    .top-header .left { display: flex; align-items: center; gap: 12px; }
+    .btn-icon { background: none; border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 
-.card { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 18px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-.kpi { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-.kpi .rotulo { font-size: 12px; color: #64748b; font-weight: 600; }
-.kpi .valor { font-size: 24px; font-weight: 800; margin-top: 4px; }
+    .content-body { padding: 16px; flex: 1; overflow-y: auto; }
+    .secao { display: none; }
+    .secao.active { display: block; }
 
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-table th { text-align: left; background: #f1f5f9; padding: 8px; font-size: 11px; text-transform: uppercase; color: #475569; }
-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
-.table-wrap { overflow-x: auto; }
+    /* COMPONENTES DE UI */
+    .card { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .kpi { background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .kpi .rotulo { font-size: 0.8rem; color: var(--text-muted); }
+    .kpi .valor { font-size: 1.3rem; font-weight: 800; color: #fff; margin-top: 4px; }
 
-.badge { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.badge-green { background: #dcfce7; color: #15803d; }
-.badge-red { background: #fee2e2; color: #b91c1c; }
-.badge-yellow { background: #fef9c3; color: #92400e; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+    th { color: var(--text-muted); font-weight: 600; background: #0f172a; }
 
-.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
-.alert-info { background: #dbeafe; color: #1e40af; }
-.alert-warn { background: #fef3c7; color: #92400e; }
+    .btn { padding: 8px 14px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-primary { background: var(--primary); color: #022c22; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-success { background: #10b981; color: #fff; }
+    .btn-light { background: #334155; color: #fff; }
+    .btn-small { padding: 4px 8px; font-size: 0.75rem; }
 
-/* Modais */
-.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.6); display: none; align-items: center; justify-content: center; z-index: 700; padding: 15px; }
-.modal-overlay.show { display: flex; }
-.modal-box { background: #fff; border-radius: 12px; padding: 20px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
-.modal-box h3 { margin-bottom: 14px; }
-.modal-acoes { display: flex; gap: 8px; margin-top: 10px; }
+    .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+    .badge-green { background: #064e3b; color: #6ee7b7; }
+    .badge-red { background: #7f1d1d; color: #fca5a5; }
+    .badge-yellow { background: #78350f; color: #fde68a; }
 
-#bloqueio-licenca { position: fixed; inset: 0; background: rgba(15,23,42,.95); display: flex; justify-content: center; align-items: center; z-index: 9999; }
-#bloqueio-licenca:not(.show) { display: none; }
-.license-box { background: #fff; padding: 30px; border-radius: 12px; max-width: 400px; text-align: center; }
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+    .modal.show { display: flex; }
+    .modal-card { background: #1e293b; border: 1px solid var(--border); border-radius: 10px; padding: 20px; width: 100%; max-width: 550px; max-height: 90vh; overflow-y: auto; }
 
-/* POS */
-#produtos-pos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-.produto-pos { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 3px; }
-.produto-pos:hover:not(:disabled) { border-color: #10b981; }
-.produto-pos:disabled { opacity: .4; cursor: not-allowed; }
-.produto-pos small { color: #64748b; }
-.pos-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
-.cart-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
-.cart-info { flex: 1; }
-#cart-total { font-size: 20px; font-weight: 800; color: #10b981; }
+    /* ESTILOS DO PDV / POS */
+    .pos-layout { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+    .produtos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+    .produto-pos { background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; color: #fff; }
+    .produto-pos strong { display: block; font-size: 0.9rem; margin-bottom: 4px; }
+    .produto-pos small { display: block; color: var(--text-muted); font-size: 0.75rem; }
+    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 
-body.dark { background: #0f172a; color: #e2e8f0; }
-body.dark .card, body.dark .kpi, body.dark table th { background: #1e293b; color: #e2e8f0; }
-body.dark table td { border-color: #334155; }
-body.dark .produto-pos { background: #1e293b; border-color: #334155; }
-body.dark .form-group input, body.dark .form-group select, body.dark .form-group textarea { background: #0f172a; color: #e2e8f0; border-color: #334155; }
-
-@media (max-width: 850px) {
-  .sidebar { transform: translateX(-100%); }
-  .sidebar.closed { transform: translateX(-100%); }
-  .sidebar:not(.closed) { transform: translateX(0); }
-  main#conteudo { margin-left: 0; }
-  .pos-layout { grid-template-columns: 1fr; }
-}
-</style>
+    @media (max-width: 850px) {
+      .sidebar { position: fixed; height: 100%; left: 0; }
+      .pos-layout { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
 
-<!-- ================= LOGIN / REGISTO ================= -->
-<div id="tela-login">
-  <div class="card-login">
-    <h1>FABEF</h1>
-    <p class="subtitulo">Gestão ERP PRO V9.9 Comercial</p>
+  <!-- TELA 1: LOGIN -->
+  <div id="tela-login" class="auth-container">
+    <div class="auth-card">
+      <h2>FABEF ERP PRO</h2>
+      <div id="login-form">
+        <div class="form-group">
+          <label>E-mail de acesso</label>
+          <input type="email" id="login-email" placeholder="seu@email.com">
+        </div>
+        <div class="form-group">
+          <label>Senha</label>
+          <input type="password" id="login-senha" placeholder="••••••">
+        </div>
+        <button id="btn-login" class="btn-primary">Entrar no Sistema</button>
+        <button id="btn-esqueci-senha" class="btn-light" style="margin-top:6px;">Esqueci a senha</button>
+        <button id="btn-mostrar-registo" class="btn-light" style="margin-top:6px;">Criar Nova Conta de Empresa</button>
+        <div id="login-status" class="status-msg"></div>
+      </div>
 
-    <form id="login-form" onsubmit="return false;">
-      <div class="form-group">
-        <label for="login-email">E-mail</label>
-        <input type="email" id="login-email" placeholder="seu@email.com" required>
+      <div id="registo-form" class="hidden">
+        <div class="form-group">
+          <label>Nome do Estabelecimento / Empresa</label>
+          <input type="text" id="reg-empresa" placeholder="Ex: Mercearia Central">
+        </div>
+        <div class="form-group">
+          <label>Nome do Gerente / Proprietário</label>
+          <input type="text" id="reg-gerente">
+        </div>
+        <div class="form-group">
+          <label>Telefone (M-Pesa / Contacto)</label>
+          <input type="tel" id="reg-telefone">
+        </div>
+        <div class="form-group">
+          <label>Ramo de Negócio Principal</label>
+          <input type="text" id="reg-ramo" value="Mercearia / Minimercado">
+        </div>
+        <div class="form-group">
+          <label>E-mail Oficial</label>
+          <input type="email" id="reg-email">
+        </div>
+        <div class="form-group">
+          <label>Criar Senha (mínimo 6 dígitos)</label>
+          <input type="password" id="reg-senha">
+        </div>
+        <button id="btn-registar" class="btn-primary">Criar Minha Conta</button>
+        <button id="btn-voltar-login" class="btn-light" style="margin-top:6px;">Voltar ao Login</button>
+        <div id="reg-status" class="status-msg"></div>
       </div>
-      <div class="form-group">
-        <label for="login-senha">Senha</label>
-        <input type="password" id="login-senha" placeholder="Senha (mínimo 6 caracteres)" required>
-      </div>
-      <button type="button" id="btn-login" class="btn btn-entrar">🔐 Entrar</button>
-      <p class="rodape-criar-conta">Ainda não tem conta? <a id="btn-mostrar-registo">Criar conta</a></p>
-      <p class="rodape-criar-conta"><a id="btn-esqueci-senha">Esqueci a senha</a></p>
-    </form>
-
-    <form id="registo-form" class="hidden" onsubmit="return false;">
-      <div class="form-group">
-        <label for="reg-empresa">Nome do negócio</label>
-        <input type="text" id="reg-empresa" placeholder="Ex: Mercearia Central" required>
-      </div>
-      <div class="form-group">
-        <label for="reg-gerente">Nome do gerente</label>
-        <input type="text" id="reg-gerente" placeholder="O seu nome completo" required>
-      </div>
-      <div class="form-group">
-        <label for="reg-telefone">Telefone</label>
-        <input type="text" id="reg-telefone" placeholder="8xx xxx xxx">
-      </div>
-      <div class="form-group">
-        <label for="reg-ramo">Ramo de atividade</label>
-        <select id="reg-ramo">
-          <option value="Mercearia / Minimercado">Mercearia / Minimercado</option>
-          <option value="Supermercado">Supermercado</option>
-          <option value="Boutique / Moda">Boutique / Moda</option>
-          <option value="Calçados">Calçados</option>
-          <option value="Salão de Beleza">Salão de Beleza</option>
-          <option value="Barbearia">Barbearia</option>
-          <option value="Restaurante">Restaurante</option>
-          <option value="Lanchonete">Lanchonete</option>
-          <option value="Bar / Bebidas">Bar / Bebidas</option>
-          <option value="Pastelaria">Pastelaria</option>
-          <option value="Padaria">Padaria</option>
-          <option value="Talho / Açougue">Talho / Açougue</option>
-          <option value="Peixaria">Peixaria</option>
-          <option value="Frutaria">Frutaria</option>
-          <option value="Hortícola">Hortícola</option>
-          <option value="Farmácia / Perfumaria">Farmácia / Perfumaria</option>
-          <option value="Cosméticos">Cosméticos</option>
-          <option value="Material de Construção">Material de Construção</option>
-          <option value="Ferragem">Ferragem</option>
-          <option value="Elétrica">Elétrica</option>
-          <option value="Canalização">Canalização</option>
-          <option value="Informática">Informática</option>
-          <option value="Telemóveis e Acessórios">Telemóveis e Acessórios</option>
-          <option value="Electrónica">Electrónica</option>
-          <option value="Papelaria">Papelaria</option>
-          <option value="Livraria">Livraria</option>
-          <option value="Móveis">Móveis</option>
-          <option value="Electrodomésticos">Electrodomésticos</option>
-          <option value="Oficina Auto">Oficina Auto</option>
-          <option value="Peças Auto">Peças Auto</option>
-          <option value="Mecânica">Mecânica</option>
-          <option value="Motorizadas">Motorizadas</option>
-          <option value="Aluguer de Equipamentos">Aluguer de Equipamentos</option>
-          <option value="Hotel / Hospedagem">Hotel / Hospedagem</option>
-          <option value="Agência de Viagens">Agência de Viagens</option>
-          <option value="Transporte">Transporte</option>
-          <option value="Taxi / Moto-Taxi">Taxi / Moto-Taxi</option>
-          <option value="Serviços de Limpeza">Serviços de Limpeza</option>
-          <option value="Serviços de Impressão">Serviços de Impressão</option>
-          <option value="Gráfica">Gráfica</option>
-          <option value="Fotografia">Fotografia</option>
-          <option value="Florista">Florista</option>
-          <option value="Pet Shop">Pet Shop</option>
-          <option value="Agropecuária">Agropecuária</option>
-          <option value="Loja de Sementes">Loja de Sementes</option>
-          <option value="Restaurante / Catering">Restaurante / Catering</option>
-          <option value="Comércio Geral">Comércio Geral</option>
-          <option value="Outro">Outro</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="reg-email">E-mail</label>
-        <input type="email" id="reg-email" placeholder="seu@email.com" required>
-      </div>
-      <div class="form-group">
-        <label for="reg-senha">Senha</label>
-        <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres" required>
-      </div>
-      <button type="button" id="btn-registar" class="btn btn-entrar" style="background:#2563eb;">✅ Criar conta</button>
-      <p class="rodape-criar-conta">Já tem conta? <a id="btn-voltar-login">Voltar ao login</a></p>
-      <div id="reg-status" class="status-msg"></div>
-    </form>
-
-    <div id="login-status" class="status-msg">Aguardando autenticação...</div>
+    </div>
   </div>
-</div>
 
-<!-- ================= ECRÃ DE PIN (desbloqueio rápido, funciona offline) ================= -->
-<div id="tela-pin" style="display:none;width:100%;min-height:100vh;justify-content:center;align-items:center;padding:20px;background:radial-gradient(circle at top right, #1e3a8a, #0f172a 60%);">
-  <div class="card-login">
-    <h1>FABEF</h1>
-    <p class="subtitulo">Introduza o seu PIN para continuar</p>
-    <div class="form-group">
-      <label for="pin-input">PIN</label>
-      <input type="password" id="pin-input" inputmode="numeric" maxlength="6" placeholder="••••" style="text-align:center;font-size:22px;letter-spacing:6px;">
+  <!-- TELA 2: DESBLOQUEIO POR PIN RÁPIDO (OFFLINE) -->
+  <div id="tela-pin" class="auth-container" style="display:none;">
+    <div class="auth-card" style="text-align: center;">
+      <h2>Desbloqueio Rápido</h2>
+      <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">Introduza o seu PIN de 4 a 6 dígitos</p>
+      <input type="password" id="pin-input" maxlength="6" style="text-align:center;font-size:1.5rem;letter-spacing:8px;">
+      <button id="btn-pin-entrar" class="btn-primary" style="margin-top:12px;">Desbloquear</button>
+      <button id="btn-pin-sair" class="btn-danger" style="margin-top:6px;">Sair da Conta</button>
+      <div id="pin-status" class="status-msg"></div>
     </div>
-    <button type="button" id="btn-pin-entrar" class="btn btn-entrar">🔓 Desbloquear</button>
-    <div id="pin-status" class="status-msg"></div>
-    <p class="rodape-criar-conta"><a id="btn-pin-sair">Não é você? Sair e usar outra conta</a></p>
   </div>
-</div>
 
-<!-- ================= APLICAÇÃO ================= -->
-<div id="app" class="hidden">
-
-  <header id="topo">
-    <div class="lado">
-      <button id="btn-menu" title="Menu">☰</button>
-      <strong>FABEF ERP</strong>
-    </div>
-    <div class="lado">
-      <span id="indicador-ligacao" style="font-size:11px;font-weight:700;"></span>
-      <span id="header-user" style="font-size:12px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-decoration:underline;" title="Toque para alterar a senha"></span>
-      <button id="btn-logout" style="flex-shrink:0;">Sair</button>
-    </div>
-  </header>
-
-  <nav class="sidebar" id="sidebar">
-    <button data-sec="inicio" class="active">🏠 Início</button>
-
-    <details open style="margin-top:6px;">
-      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Comercial</summary>
-      <button data-sec="pos">🛒 Vender</button>
-      <button data-sec="vendas">💵 Vendas</button>
-      <button data-sec="clientes">👥 Clientes</button>
-      <button data-sec="dividas">🧾 Fiado / Dívidas</button>
-      <button data-sec="encomendas">📋 Encomendas</button>
-    </details>
-
-    <details style="margin-top:6px;">
-      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Stock</summary>
-      <button data-sec="produtos">📦 Produtos</button>
-      <button data-sec="inventario">📊 Inventário</button>
-      <button data-sec="compras">🚚 Compras</button>
-      <button data-sec="fornecedores">🏭 Fornecedores</button>
-    </details>
-
-    <details style="margin-top:6px;">
-      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Gestão</summary>
-      <button data-sec="caixa">💰 Caixa / Turnos</button>
-      <button data-sec="despesas">📉 Despesas</button>
-      <button data-sec="relatorios">📈 Relatórios</button>
-      <button data-sec="metas">🎯 Metas</button>
-      <button data-sec="desempenho">👤 Desempenho</button>
-      <button data-sec="sugestoes">💡 Sugestões</button>
-    </details>
-
-    <details style="margin-top:6px;">
-      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Configurações</summary>
-      <button data-sec="funcionarios">🧑‍💼 Funcionários</button>
-      <button data-sec="ramos">🏷️ Ramos</button>
-      <button data-sec="auditoria">📝 Auditoria</button>
-      <button data-sec="subscricao">💳 Subscrição</button>
-      <button data-sec="config">⚙️ Configurações</button>
-    </details>
-
-    <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;gap:8px;align-items:center;">
-      <select id="select-idioma" style="flex:1;background:#1e293b;color:#fff;border:1px solid #334155;border-radius:6px;padding:6px;font-size:12px;">
-        <option value="pt">Português</option>
-        <option value="en">English</option>
-      </select>
-      <button id="btn-toggle-dark" title="Modo escuro" style="background:none;border:1px solid #334155;color:#fff;border-radius:6px;padding:6px 9px;cursor:pointer;font-size:13px;">🌙</button>
-    </div>
-  </nav>
-
-  <main id="conteudo">
-
-    <!-- INÍCIO -->
-    <section class="secao active" id="sec-inicio">
-      <h2>Painel Principal</h2>
-      <div id="aviso-licenca"></div>
-      <div id="aviso-reconciliacao-stock"></div>
-      <div id="aviso-plano-gratis"></div>
-      <div class="grid">
-        <div class="kpi"><div class="rotulo">Negócio</div><div class="valor" id="inicio-nome-negocio">—</div></div>
-        <div class="kpi"><div class="rotulo">ID da empresa</div><div class="valor" id="inicio-id-empresa" style="font-size:12px;">—</div></div>
-        <div class="kpi"><div class="rotulo">Utilizador</div><div class="valor" id="inicio-utilizador" style="font-size:14px;">—</div></div>
-        <div class="kpi"><div class="rotulo">Ramo ativo</div><div class="valor" id="inicio-ramo" style="font-size:14px;">—</div></div>
-        <div class="kpi"><div class="rotulo">Vendas de hoje</div><div class="valor" id="inicio-vendas">MT 0,00</div></div>
-        <div class="kpi"><div class="rotulo">Kg/Litros vendidos hoje</div><div class="valor" id="inicio-kg-vendidos" style="font-size:18px;">0 kg</div></div>
-        <div class="kpi"><div class="rotulo">Produtos em stock baixo</div><div class="valor" id="inicio-stock-baixo">0</div></div>
+  <!-- APLICAÇÃO COMPLETA -->
+  <div id="app" class="hidden">
+    
+    <!-- BARRA LATERAL -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <span>FABEF ERP</span>
+        <button id="btn-fechar-menu" class="btn-icon" style="display:none;">✕</button>
       </div>
-      <div class="hidden"><span id="inicio-empresa"></span></div>
-    </section>
+      <div class="sidebar-nav">
+        <button data-sec="inicio" class="active">🏠 Início</button>
+        <button data-sec="pos">🛒 Vender (POS)</button>
+        <button data-sec="vendas">📜 Histórico Vendas</button>
+        <button data-sec="produtos">📦 Produtos / Catálogo</button>
+        <button data-sec="inventario">📊 Inventário</button>
+        <button data-sec="compras">🚚 Compras / Lotes</button>
+        <button data-sec="fornecedores">🏢 Fornecedores</button>
+        <button data-sec="clientes">👥 Clientes</button>
+        <button data-sec="dividas">📓 Fiado / Dívidas</button>
+        <button data-sec="encomendas">📦 Encomendas</button>
+        <button data-sec="caixa">💰 Caixa / Turnos</button>
+        <button data-sec="despesas">💸 Despesas</button>
+        <button data-sec="relatorios">📈 Relatórios & Lucro</button>
+        <button data-sec="funcionarios">👔 Funcionários</button>
+        <button data-sec="ramos">🌿 Ramos de Actividade</button>
+        <button data-sec="config">⚙️ Configurações</button>
+        <button data-sec="subscricao">⭐ Subscrição</button>
+      </div>
+    </aside>
 
-    <!-- POS -->
-    <section class="secao" id="sec-pos">
-      <h2>Vender</h2>
-      <div id="aviso-pos-caixa" class="alert alert-warn hidden">⚠️ O caixa está fechado. Abra o turno na secção "Caixa / Turnos" para poder vender.</div>
-      <div id="aviso-pos-offline"></div>
-      <div class="pos-layout">
-        <div class="card">
-          <div style="display:flex;gap:8px;margin-bottom:12px;">
-            <input type="text" id="pos-pesquisa" placeholder="🔍 Pesquisar produto..." style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-            <button id="btn-ler-codigo-barras" class="btn btn-primary" type="button" style="width:auto;white-space:nowrap;">📷 Ler código</button>
-          </div>
-          <div id="pos-sugestoes-rapidas"></div>
-          <div id="produtos-pos"></div>
+    <!-- ÁREA PRINCIPAL -->
+    <div class="main-content">
+      <header class="top-header">
+        <div class="left">
+          <button id="btn-menu" class="btn-icon">☰</button>
+          <span id="indicador-ligacao" style="font-size:0.8rem;font-weight:700;">🟢 Online</span>
         </div>
-        <div class="card">
-          <h3 style="margin-bottom:10px;">Carrinho</h3>
-          <div id="carrinho-corpo"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0;">
-            <span>Total</span><span id="cart-total">MT 0,00</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <select id="select-ramo" style="background:#0f172a;color:#fff;border:1px solid var(--border);padding:4px 8px;border-radius:4px;"></select>
+          <span id="header-user" style="font-size:0.85rem;cursor:pointer;" title="Clique para alterar a sua senha">Utilizador</span>
+          <button id="btn-logout" class="btn btn-danger btn-small">Sair</button>
+        </div>
+      </header>
+
+      <div class="content-body">
+
+        <!-- SEÇÃO: DASHBOARD INICIAL -->
+        <section id="sec-inicio" class="secao active">
+          <div class="card">
+            <h2 id="inicio-nome-negocio" style="color:var(--primary);">Estabelecimento</h2>
+            <p style="color:var(--text-muted);font-size:0.85rem;">Ramo ativo: <span id="inicio-ramo">Mercearia</span></p>
           </div>
-          <div class="form-group">
-            <label for="pos-cliente-nome">Cliente (opcional — para histórico)</label>
-            <input type="text" id="pos-cliente-nome" list="lista-clientes-pos" placeholder="Nome do cliente">
-            <datalist id="lista-clientes-pos"></datalist>
+          <div class="grid">
+            <div class="kpi">
+              <div class="rotulo">Vendas de Hoje</div>
+              <div class="valor" id="inicio-vendas">MT 0,00</div>
+            </div>
+            <div class="kpi">
+              <div class="rotulo">Artigos com Stock Baixo</div>
+              <div class="valor" id="inicio-stock-baixo" style="color:var(--danger);">0</div>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="pos-nuit-cliente">NUIT do cliente (opcional)</label>
-            <input type="text" id="pos-nuit-cliente" placeholder="9 dígitos ou vazio">
+          <div id="visao-geral-ramos" style="margin-top:16px;"></div>
+        </section>
+
+        <!-- SEÇÃO: VENDER (POS / BALCÃO) -->
+        <section id="sec-pos" class="secao">
+          <div id="aviso-pos-caixa" class="hidden" style="background:rgba(239,68,68,0.2);border:1px solid var(--danger);padding:10px;border-radius:6px;margin-bottom:12px;">
+            ⚠️ O caixa encontra-se fechado. Abra um turno para poder efetuar vendas.
           </div>
-          <div class="form-group">
-            <label for="pos-desconto">Desconto (MT, opcional)</label>
-            <input type="number" id="pos-desconto" min="0" step="0.01" value="0">
+          <div id="aviso-pos-offline"></div>
+          <div class="pos-layout">
+            <div>
+              <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <input type="text" id="pos-pesquisa" placeholder="Pesquisar produto ou código..." style="flex:1;background:#1e293b;border:1px solid var(--border);color:#fff;padding:8px;border-radius:6px;">
+                <button id="btn-ler-codigo-barras" class="btn btn-light">📷 Barras</button>
+              </div>
+              <div id="pos-sugestoes-rapidas"></div>
+              <div id="produtos-pos" class="produtos-grid"></div>
+            </div>
+
+            <!-- CARRINHO LATERAL -->
+            <div class="card" style="margin-bottom:0;">
+              <h3>Carrinho de Venda</h3>
+              <div id="carrinho-corpo" style="min-height:150px;max-height:300px;overflow-y:auto;margin:10px 0;"></div>
+              
+              <div style="border-top:1px solid var(--border);padding-top:10px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                  <span>Total Bruto:</span>
+                  <span id="cart-total" style="font-weight:800;font-size:1.1rem;color:var(--primary);">MT 0,00</span>
+                </div>
+                <div style="margin-bottom:8px;">
+                  <label style="font-size:0.75rem;color:var(--text-muted);">Desconto (MT):</label>
+                  <input type="number" id="pos-desconto" value="0" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:6px;border-radius:4px;">
+                </div>
+                <div style="margin-bottom:8px;">
+                  <label style="font-size:0.75rem;color:var(--text-muted);">Cliente (Opcional):</label>
+                  <input type="text" id="pos-cliente-nome" list="lista-clientes-pos" placeholder="Nome do cliente" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:6px;border-radius:4px;">
+                  <datalist id="lista-clientes-pos"></datalist>
+                </div>
+                <div style="margin-bottom:8px;">
+                  <label style="font-size:0.75rem;color:var(--text-muted);">NUIT do Cliente:</label>
+                  <input type="text" id="pos-nuit-cliente" placeholder="Isento" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:6px;border-radius:4px;">
+                </div>
+                <div style="margin-bottom:8px;">
+                  <label style="font-size:0.75rem;color:var(--text-muted);">Forma de Pagamento:</label>
+                  <select id="forma-pagamento" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:6px;border-radius:4px;">
+                    <option value="Numerário">Numerário (Dinheiro)</option>
+                    <option value="M-Pesa">M-Pesa</option>
+                    <option value="e-Mola">e-Mola</option>
+                    <option value="Cartão">Cartão POS</option>
+                    <option value="Crédito">A Crédito (Fiado)</option>
+                  </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                  <label style="font-size:0.75rem;cursor:pointer;"><input type="checkbox" id="pos-pagamento-misto"> Pagamento Misto / Dividido</label>
+                </div>
+                <div id="pos-pagamento-misto-campos" class="hidden" style="background:#0f172a;padding:8px;border-radius:6px;margin-bottom:8px;border:1px solid var(--border);">
+                  <input type="number" id="pos-valor-dinheiro" placeholder="Dinheiro" style="width:100%;margin-bottom:4px;background:#1e293b;border:1px solid var(--border);color:#fff;padding:4px;">
+                  <input type="number" id="pos-valor-mpesa" placeholder="M-Pesa" style="width:100%;margin-bottom:4px;background:#1e293b;border:1px solid var(--border);color:#fff;padding:4px;">
+                  <input type="number" id="pos-valor-emola" placeholder="e-Mola" style="width:100%;margin-bottom:4px;background:#1e293b;border:1px solid var(--border);color:#fff;padding:4px;">
+                  <input type="number" id="pos-valor-cartao" placeholder="Cartão" style="width:100%;margin-bottom:4px;background:#1e293b;border:1px solid var(--border);color:#fff;padding:4px;">
+                  <input type="number" id="pos-valor-credito" placeholder="Crédito" style="width:100%;margin-bottom:4px;background:#1e293b;border:1px solid var(--border);color:#fff;padding:4px;">
+                  <div style="font-size:0.75rem;">Restante: <span id="pos-pagamento-restante">MT 0,00</span></div>
+                </div>
+                <button id="btn-finalizar-venda" class="btn btn-primary" style="width:100%;margin-top:6px;">Finalizar Venda</button>
+                <button id="btn-limpar-carrinho" class="btn btn-danger btn-small" style="width:100%;margin-top:6px;">Limpar Carrinho</button>
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="forma-pagamento">Forma de pagamento</label>
-            <select id="forma-pagamento">
-              <option value="Numerário">Numerário</option>
-              <option value="M-Pesa">M-Pesa</option>
-              <option value="E-Mola">E-Mola</option>
-              <option value="Cartão">Cartão</option>
-              <option value="Transferência">Transferência</option>
+        </section>
+
+        <!-- SEÇÃO: PRODUTOS E CATÁLOGO -->
+        <section id="sec-produtos" class="secao">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <input type="text" id="produto-pesquisa" placeholder="Pesquisar catálogo..." style="background:#1e293b;border:1px solid var(--border);color:#fff;padding:8px;border-radius:6px;width:250px;">
+            <button id="btn-novo-produto" class="btn btn-primary">+ Novo Produto</button>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Código</th>
+                  <th>Custo</th>
+                  <th>Preço Venda</th>
+                  <th>Stock</th>
+                  <th>Mínimo</th>
+                  <th>Ramo</th>
+                  <th>Estado</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-produtos"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: INVENTÁRIO -->
+        <section id="sec-inventario" class="secao">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <h2>Inventário Físico</h2>
+            <button id="btn-exportar-inventario" class="btn btn-light">📥 Exportar CSV</button>
+          </div>
+          <div class="grid" style="margin-bottom:12px;">
+            <div class="kpi"><div class="rotulo">Total Artigos</div><div class="valor" id="inv-total-artigos">0</div></div>
+            <div class="kpi"><div class="rotulo">Unidades em Stock</div><div class="valor" id="inv-total-unidades">0</div></div>
+            <div class="kpi"><div class="rotulo">Valor em Custo</div><div class="valor" id="inv-valor-custo">MT 0,00</div></div>
+            <div class="kpi"><div class="rotulo">Esgotados</div><div class="valor" id="inv-esgotados" style="color:var(--danger);">0</div></div>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Artigo</th>
+                  <th>Categoria</th>
+                  <th>Stock Atual</th>
+                  <th>Mínimo</th>
+                  <th>Custo Unit.</th>
+                  <th>Valor Total</th>
+                  <th>Estado</th>
+                  <th>Ajuste</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-inventario"></tbody>
+            </table>
+          </div>
+        </section>
+<!-- SEÇÃO: COMPRAS / ENTRADAS DE STOCK -->
+        <section id="sec-compras" class="secao">
+          <div class="card">
+            <h3>Registar Entrada / Compra</h3>
+            <div class="grid" style="margin-top:12px;">
+              <div>
+                <label style="font-size:0.8rem;color:var(--text-muted);">Produto</label>
+                <select id="compra-produto" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;"></select>
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:var(--text-muted);">Fornecedor</label>
+                <input type="text" id="compra-fornecedor" list="lista-fornecedores-compra" placeholder="Nome do fornecedor" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+                <datalist id="lista-fornecedores-compra"></datalist>
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:var(--text-muted);">Quantidade</label>
+                <input type="number" id="compra-quantidade" placeholder="0" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:var(--text-muted);">Custo Unitário (MT)</label>
+                <input type="number" id="compra-custo" placeholder="0.00" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:var(--text-muted);">Pagamento</label>
+                <select id="compra-pagamento" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+                  <option value="Dinheiro">Pronto Pagamento</option>
+                  <option value="Credito">A Crédito (Dívida)</option>
+                </select>
+              </div>
+            </div>
+            <button id="btn-registar-compra" class="btn btn-primary" style="margin-top:12px;">Guardar Entrada no Stock</button>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <h3>Histórico de Compras Realizadas</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Produto</th>
+                  <th>Fornecedor</th>
+                  <th>Qtd.</th>
+                  <th>Custo Unit.</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-compras"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: FORNECEDORES -->
+        <section id="sec-fornecedores" class="secao">
+          <div class="card">
+            <h3>Registar Novo Fornecedor</h3>
+            <div class="grid" style="margin-top:12px;">
+              <input type="text" id="fornecedor-nome" placeholder="Nome / Empresa" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="tel" id="fornecedor-telefone" placeholder="Telefone" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="number" id="fornecedor-divida" placeholder="Dívida Inicial (se houver)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="text" id="fornecedor-observacao" placeholder="Observações" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+            </div>
+            <button id="btn-adicionar-fornecedor" class="btn btn-primary" style="margin-top:12px;">Guardar Fornecedor</button>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Contacto</th>
+                  <th>Obs.</th>
+                  <th>Dívida Atual</th>
+                  <th>Compras</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-fornecedores"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: CLIENTES -->
+        <section id="sec-clientes" class="secao">
+          <div class="card">
+            <h3>Registar Novo Cliente</h3>
+            <div class="grid" style="margin-top:12px;">
+              <input type="text" id="cliente-nome" placeholder="Nome Completo" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="tel" id="cliente-telefone" placeholder="Telefone" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="text" id="cliente-endereco" placeholder="Endereço / Bairro" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="text" id="cliente-observacao" placeholder="Observações" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+            </div>
+            <button id="btn-adicionar-cliente" class="btn btn-primary" style="margin-top:12px;">Guardar Cliente</button>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Telefone</th>
+                  <th>Endereço</th>
+                  <th>Dívida Ativa</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-clientes"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: FIADO / DÍVIDAS -->
+        <section id="sec-dividas" class="secao">
+          <div class="card">
+            <h3>Caderno de Fiado / Dívidas de Clientes</h3>
+            <div class="grid" style="margin-top:12px;">
+              <input type="text" id="divida-cliente" placeholder="Nome do Cliente" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="tel" id="divida-telefone" placeholder="Telefone (com WhatsApp)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="number" id="divida-valor" placeholder="Valor da Dívida (MT)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="number" id="divida-limite" placeholder="Limite de Fiado Permitido" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+            </div>
+            <button id="btn-registar-divida" class="btn btn-primary" style="margin-top:12px;">Registar Fiado</button>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Contacto</th>
+                  <th>Saldo Devedor</th>
+                  <th>Limite</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-dividas"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: ENCOMENDAS -->
+        <section id="sec-encomendas" class="secao">
+          <div class="card">
+            <h3>Registar Nova Encomenda</h3>
+            <div class="grid" style="margin-top:12px;">
+              <input type="text" id="encomenda-cliente" placeholder="Nome do Cliente" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="tel" id="encomenda-telefone" placeholder="Telefone" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="text" id="encomenda-produto" placeholder="Artigo / Descrição" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="number" id="encomenda-quantidade" placeholder="Quantidade" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="date" id="encomenda-data-prevista" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="number" id="encomenda-valor-total" placeholder="Valor Total (MT)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="number" id="encomenda-valor-pago" placeholder="Sinal / Entrada Paga" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+            </div>
+            <button id="btn-registar-encomenda" class="btn btn-primary" style="margin-top:12px;">Gravar Encomenda</button>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Artigo</th>
+                  <th>Qtd.</th>
+                  <th>Entrega</th>
+                  <th>Total</th>
+                  <th>A Receber</th>
+                  <th>Estado</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-encomendas"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: CAIXA E TURNOS -->
+        <section id="sec-caixa" class="secao">
+          <div class="grid" style="margin-bottom:12px;">
+            <div class="kpi"><div class="rotulo">Estado do Caixa</div><div class="valor" id="caixa-status">FECHADO</div></div>
+            <div class="kpi"><div class="rotulo">Vendas no Turno</div><div class="valor" id="caixa-total-vendas">MT 0,00</div></div>
+            <div class="kpi"><div class="rotulo">Dinheiro Físico Esperado</div><div class="valor" id="caixa-saldo-esperado">MT 0,00</div></div>
+          </div>
+
+          <div id="aviso-caixa-funcionario" style="display:none;" class="card">
+            <p style="color:var(--warning);">Apenas o gerente possui autorização para abrir ou encerrar o turno de caixa.</p>
+          </div>
+
+          <div id="caixa-abertura" class="card">
+            <h3>Abertura de Turno de Caixa</h3>
+            <div style="margin:12px 0;">
+              <label style="font-size:0.8rem;color:var(--text-muted);">Fundo de Troco Inicial (MT):</label>
+              <input type="number" id="caixa-valor-inicial" value="0" style="width:100%;max-width:300px;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+            </div>
+            <button id="btn-abrir-caixa" class="btn btn-primary">Abrir Caixa</button>
+          </div>
+
+          <div id="caixa-fecho" class="card hidden">
+            <h3>Operações de Caixa</h3>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+              <button id="btn-sangria" class="btn btn-danger">📉 Registar Sangria (Retirada)</button>
+              <button id="btn-reforco" class="btn btn-light">📈 Registar Reforço (Entrada)</button>
+              <button id="btn-fechar-caixa" class="btn btn-primary">🔒 Fechar Caixa do Turno</button>
+            </div>
+            <div style="margin-top:16px;">
+              <h4>Movimentos no Turno</h4>
+              <div id="caixa-movimentos" style="margin-top:8px;"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: DESPESAS OPERACIONAIS -->
+        <section id="sec-despesas" class="secao">
+          <div class="card">
+            <h3>Registar Nova Despesa</h3>
+            <div class="grid" style="margin-top:12px;">
+              <input type="text" id="despesa-descricao" placeholder="Descrição (Ex: Luz, Água, Transporte)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="number" id="despesa-valor" placeholder="Valor (MT)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+            </div>
+            <button id="btn-registar-despesa" class="btn btn-danger" style="margin-top:12px;">Lançar Despesa</button>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Descrição</th>
+                  <th>Valor</th>
+                  <th>Responsável</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-despesas"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: RELATÓRIOS E CURVA ABC -->
+        <section id="sec-relatorios" class="secao">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <select id="relatorio-periodo" style="background:#1e293b;border:1px solid var(--border);color:#fff;padding:8px;border-radius:6px;">
+              <option value="hoje">Hoje</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="todos">Todo o período</option>
+            </select>
+            <div style="display:flex;gap:6px;">
+              <button id="btn-atualizar-relatorio" class="btn btn-light">🔄 Atualizar</button>
+              <button onclick="enviarRelatorioWhatsApp()" class="btn btn-success" style="background-color:#25d366;">📱 WhatsApp</button>
+              <button onclick="exportarRelatorioPDF()" class="btn btn-light">📄 Imprimir/PDF</button>
+              <button onclick="exportarRelatorioWord()" class="btn btn-light">📝 Word</button>
+            </div>
+          </div>
+
+          <div class="grid" style="margin-bottom:16px;">
+            <div class="kpi"><div class="rotulo">Faturamento Bruto</div><div class="valor" id="rel-faturamento">MT 0,00</div></div>
+            <div class="kpi"><div class="rotulo">Despesas Totais</div><div class="valor" id="rel-despesas" style="color:var(--danger);">MT 0,00</div></div>
+            <div class="kpi"><div class="rotulo">Resultado Líquido</div><div class="valor" id="rel-resultado" style="color:var(--primary);">MT 0,00</div></div>
+            <div class="kpi"><div class="rotulo">Volume Vendido (Kg / L)</div><div class="valor" id="rel-kg-vendidos">0</div></div>
+          </div>
+
+          <div class="card" style="margin-bottom:16px;">
+            <h3>📊 Análise Inteligente de Vendas</h3>
+            <div id="analise-inteligente" style="margin-top:10px;font-size:0.9rem;"></div>
+          </div>
+
+          <div class="card" style="overflow-x:auto;">
+            <h3>Curva ABC de Artigos (Regra de Pareto)</h3>
+            <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:10px;">Classe A (80% da receita), Classe B (15%), Classe C (5%)</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Artigo</th>
+                  <th>Qtd. Vendida</th>
+                  <th>Receita Gerada</th>
+                  <th>Classificação</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-abc"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SEÇÃO: HISTÓRICO GERAL DE VENDAS -->
+        <section id="sec-vendas" class="secao">
+          <div style="display:flex;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <input type="text" id="vendas-pesquisa" placeholder="Pesquisar venda ou cliente..." style="background:#1e293b;border:1px solid var(--border);color:#fff;padding:8px;border-radius:6px;width:250px;">
+            <select id="vendas-periodo" style="background:#1e293b;border:1px solid var(--border);color:#fff;padding:8px;border-radius:6px;">
+              <option value="hoje">Hoje</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="todos">Todas as vendas</option>
             </select>
           </div>
-          <div class="form-group" style="display:flex;align-items:center;gap:8px;">
-            <input type="checkbox" id="pos-pagamento-misto" style="width:auto;">
-            <label for="pos-pagamento-misto" style="margin:0;">Dividir pagamento (dinheiro + M-Pesa + crédito, etc.)</label>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>Operador</th>
+                  <th>Itens Vendidos</th>
+                  <th>Total</th>
+                  <th>Método</th>
+                  <th>NUIT</th>
+                  <th>Ramo</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-vendas"></tbody>
+            </table>
           </div>
-          <div id="pos-pagamento-misto-campos" class="hidden" style="background:#f1f5f9;padding:10px;border-radius:8px;margin-bottom:12px;">
-            <div class="form-group"><label for="pos-valor-dinheiro">Dinheiro</label><input type="number" id="pos-valor-dinheiro" min="0" step="0.01" value="0"></div>
-            <div class="form-group"><label for="pos-valor-mpesa">M-Pesa</label><input type="number" id="pos-valor-mpesa" min="0" step="0.01" value="0"></div>
-            <div class="form-group"><label for="pos-valor-emola">E-Mola</label><input type="number" id="pos-valor-emola" min="0" step="0.01" value="0"></div>
-            <div class="form-group"><label for="pos-valor-cartao">Cartão</label><input type="number" id="pos-valor-cartao" min="0" step="0.01" value="0"></div>
-            <div class="form-group"><label for="pos-valor-credito">Crédito / Fiado (requer nome do cliente acima)</label><input type="number" id="pos-valor-credito" min="0" step="0.01" value="0"></div>
-            <p style="font-weight:700;margin-top:6px;">Restante a atribuir: <span id="pos-pagamento-restante">MT 0,00</span></p>
+        </section>
+
+        <!-- SEÇÃO: FUNCIONÁRIOS E EQUIPE -->
+        <section id="sec-funcionarios" class="secao">
+          <div class="card">
+            <h3>Cadastrar Novo Funcionário (Operador de Caixa)</h3>
+            <div class="grid" style="margin-top:12px;">
+              <input type="text" id="func-nome" placeholder="Nome Completo" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="email" id="func-email" placeholder="E-mail de Acesso" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="tel" id="func-telefone" placeholder="Telefone" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="password" id="func-senha" placeholder="Senha Inicial (mínimo 6 caracteres)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              <input type="text" id="func-foto" placeholder="Link da Foto (Opcional)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+            </div>
+            <button onclick="cadastrarNovoFuncionario()" class="btn btn-primary" style="margin-top:12px;">Adicionar Funcionário</button>
           </div>
-          <div style="display:flex;gap:8px;">
-            <button id="btn-limpar-carrinho" class="btn btn-light" style="flex:1;">Limpar</button>
-            <button id="btn-finalizar-venda" class="btn btn-entrar" style="flex:2;">Finalizar venda</button>
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>E-mail</th>
+                  <th>Telefone</th>
+                  <th>Função</th>
+                  <th>Estado</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-funcionarios"></tbody>
+            </table>
           </div>
-        </div>
-      </div>
-    </section>
+        </section>
 
-    <!-- VENDAS -->
-    <section class="secao" id="sec-vendas">
-      <h2>Histórico de Vendas</h2>
-      <div class="card">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-          <input type="text" id="vendas-pesquisa" placeholder="🔍 Pesquisar venda..." style="flex:1;min-width:180px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-          <select id="vendas-periodo" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-            <option value="todos">Todo o período</option>
-            <option value="hoje">Hoje</option>
-            <option value="7">Últimos 7 dias</option>
-            <option value="30">Últimos 30 dias</option>
-          </select>
-        </div>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Operador</th><th>Itens</th><th>Total</th><th>Pagamento</th><th>NUIT</th><th>Ramo</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-vendas"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- PRODUTOS -->
-    <section class="secao" id="sec-produtos">
-      <h2>Produtos</h2>
-      <div class="card">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-          <input type="text" id="produto-pesquisa" placeholder="🔍 Pesquisar produto..." style="flex:1;min-width:180px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-          <select id="select-ramo" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-          <option value="Mercearia / Minimercado">Mercearia / Minimercado</option>
-          <option value="Supermercado">Supermercado</option>
-          <option value="Boutique / Moda">Boutique / Moda</option>
-          <option value="Calçados">Calçados</option>
-          <option value="Salão de Beleza">Salão de Beleza</option>
-          <option value="Barbearia">Barbearia</option>
-          <option value="Restaurante">Restaurante</option>
-          <option value="Lanchonete">Lanchonete</option>
-          <option value="Bar / Bebidas">Bar / Bebidas</option>
-          <option value="Pastelaria">Pastelaria</option>
-          <option value="Padaria">Padaria</option>
-          <option value="Talho / Açougue">Talho / Açougue</option>
-          <option value="Peixaria">Peixaria</option>
-          <option value="Frutaria">Frutaria</option>
-          <option value="Hortícola">Hortícola</option>
-          <option value="Farmácia / Perfumaria">Farmácia / Perfumaria</option>
-          <option value="Cosméticos">Cosméticos</option>
-          <option value="Material de Construção">Material de Construção</option>
-          <option value="Ferragem">Ferragem</option>
-          <option value="Elétrica">Elétrica</option>
-          <option value="Canalização">Canalização</option>
-          <option value="Informática">Informática</option>
-          <option value="Telemóveis e Acessórios">Telemóveis e Acessórios</option>
-          <option value="Electrónica">Electrónica</option>
-          <option value="Papelaria">Papelaria</option>
-          <option value="Livraria">Livraria</option>
-          <option value="Móveis">Móveis</option>
-          <option value="Electrodomésticos">Electrodomésticos</option>
-          <option value="Oficina Auto">Oficina Auto</option>
-          <option value="Peças Auto">Peças Auto</option>
-          <option value="Mecânica">Mecânica</option>
-          <option value="Motorizadas">Motorizadas</option>
-          <option value="Aluguer de Equipamentos">Aluguer de Equipamentos</option>
-          <option value="Hotel / Hospedagem">Hotel / Hospedagem</option>
-          <option value="Agência de Viagens">Agência de Viagens</option>
-          <option value="Transporte">Transporte</option>
-          <option value="Taxi / Moto-Taxi">Taxi / Moto-Taxi</option>
-          <option value="Serviços de Limpeza">Serviços de Limpeza</option>
-          <option value="Serviços de Impressão">Serviços de Impressão</option>
-          <option value="Gráfica">Gráfica</option>
-          <option value="Fotografia">Fotografia</option>
-          <option value="Florista">Florista</option>
-          <option value="Pet Shop">Pet Shop</option>
-          <option value="Agropecuária">Agropecuária</option>
-          <option value="Loja de Sementes">Loja de Sementes</option>
-          <option value="Restaurante / Catering">Restaurante / Catering</option>
-          <option value="Comércio Geral">Comércio Geral</option>
-          <option value="Outro">Outro</option>
-        </select>
-          <button id="btn-novo-produto" class="btn btn-primary">+ Novo produto</button>
-        </div>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Código</th><th>Custo</th><th>Preço</th><th>Stock</th><th>Mínimo</th><th>Ramo</th><th>Estado</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-produtos"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- INVENTÁRIO -->
-    <section class="secao" id="sec-inventario">
-      <h2>Inventário</h2>
-      <div class="grid" style="margin-bottom:16px;">
-        <div class="kpi"><div class="rotulo">Total de artigos</div><div class="valor" id="inv-total-artigos">0</div></div>
-        <div class="kpi"><div class="rotulo">Total de unidades</div><div class="valor" id="inv-total-unidades">0</div></div>
-        <div class="kpi"><div class="rotulo">Stock baixo</div><div class="valor" id="inv-stock-baixo">0</div></div>
-        <div class="kpi"><div class="rotulo">Esgotados</div><div class="valor" id="inv-esgotados">0</div></div>
-        <div class="kpi"><div class="rotulo">Valor em custo</div><div class="valor" id="inv-valor-custo">MT 0,00</div></div>
-      </div>
-      <div class="card">
-        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-          <button id="btn-exportar-inventario" class="btn btn-light">⬇️ Exportar inventário</button>
-        </div>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Categoria</th><th>Stock</th><th>Mínimo</th><th>Custo unit.</th><th>Valor total</th><th>Estado</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-inventario"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- COMPRAS -->
-    <section class="secao" id="sec-compras">
-      <h2>Compras / Entradas</h2>
-      <div class="card">
-        <div class="grid">
-          <div class="form-group"><label for="compra-produto">Produto</label><select id="compra-produto"></select></div>
-          <div class="form-group"><label for="compra-fornecedor">Fornecedor</label><input type="text" id="compra-fornecedor" list="lista-fornecedores-compra" placeholder="Nome do fornecedor"><datalist id="lista-fornecedores-compra"></datalist></div>
-          <div class="form-group"><label for="compra-quantidade">Quantidade</label><input type="number" id="compra-quantidade" min="0"></div>
-          <div class="form-group"><label for="compra-custo">Custo unitário</label><input type="number" id="compra-custo" min="0" step="0.01"></div>
-          <div class="form-group">
-            <label for="compra-pagamento">Forma de pagamento</label>
-            <select id="compra-pagamento">
-              <option value="Dinheiro">Pago (dinheiro/M-Pesa/etc.)</option>
-              <option value="Credito">A crédito (fica a dever ao fornecedor)</option>
-            </select>
+        <!-- SEÇÃO: RAMOS DE ATIVIDADE -->
+        <section id="sec-ramos" class="secao">
+          <div class="card">
+            <h3>Gerir Ramo de Negócio Ativo</h3>
+            <div style="margin:12px 0;">
+              <label style="font-size:0.8rem;color:var(--text-muted);">Mudar Ramo de Atividade:</label>
+              <select id="ramo-pagina" style="width:100%;max-width:320px;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;"></select>
+            </div>
+            <div style="margin-top:16px;">
+              <h4>Adicionar Ramo Personalizado</h4>
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <input type="text" id="novo-ramo-nome" placeholder="Nome do novo ramo" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;flex:1;">
+                <button id="btn-adicionar-ramo" class="btn btn-primary">Adicionar</button>
+              </div>
+            </div>
           </div>
-        </div>
-        <button id="btn-registar-compra" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar compra</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Produto</th><th>Fornecedor</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th></tr></thead>
-          <tbody id="tabela-compras"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- FORNECEDORES -->
-    <section class="secao" id="sec-fornecedores">
-      <h2>Fornecedores</h2>
-      <div class="card">
-        <div class="grid">
-          <div class="form-group"><label for="fornecedor-nome">Nome</label><input type="text" id="fornecedor-nome"></div>
-          <div class="form-group"><label for="fornecedor-telefone">Telefone (WhatsApp)</label><input type="text" id="fornecedor-telefone"></div>
-          <div class="form-group"><label for="fornecedor-divida">Dívida inicial (se houver)</label><input type="number" id="fornecedor-divida" min="0" step="0.01" value="0"></div>
-          <div class="form-group"><label for="fornecedor-observacao">Observação</label><input type="text" id="fornecedor-observacao"></div>
-        </div>
-        <button id="btn-adicionar-fornecedor" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Adicionar fornecedor</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Telefone</th><th>Observação</th><th>Dívida atual</th><th>Compras</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-fornecedores"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- CLIENTES -->
-    <section class="secao" id="sec-clientes">
-      <h2>Clientes</h2>
-      <div class="card">
-        <div class="grid">
-          <div class="form-group"><label for="cliente-nome">Nome</label><input type="text" id="cliente-nome"></div>
-          <div class="form-group"><label for="cliente-telefone">Telefone (WhatsApp)</label><input type="text" id="cliente-telefone"></div>
-          <div class="form-group"><label for="cliente-endereco">Endereço / localização</label><input type="text" id="cliente-endereco"></div>
-          <div class="form-group"><label for="cliente-observacao">Observação</label><input type="text" id="cliente-observacao"></div>
-        </div>
-        <button id="btn-adicionar-cliente" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Adicionar cliente</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Telefone</th><th>Endereço</th><th>Dívida atual</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-clientes"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- DÍVIDAS -->
-    <section class="secao" id="sec-dividas">
-      <h2>Fiado / Dívidas</h2>
-      <div class="card">
-        <div class="grid">
-          <div class="form-group"><label for="divida-cliente">Cliente</label><input type="text" id="divida-cliente"></div>
-          <div class="form-group"><label for="divida-telefone">Telefone</label><input type="text" id="divida-telefone"></div>
-          <div class="form-group"><label for="divida-valor">Valor</label><input type="number" id="divida-valor" min="0" step="0.01"></div>
-          <div class="form-group"><label for="divida-limite">Limite de crédito</label><input type="number" id="divida-limite" min="0" step="0.01"></div>
-        </div>
-        <button id="btn-registar-divida" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar dívida</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Cliente</th><th>Telefone</th><th>Saldo</th><th>Limite</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-dividas"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- ENCOMENDAS -->
-    <section class="secao" id="sec-encomendas">
-      <h2>Encomendas</h2>
-      <div class="card">
-        <div class="grid">
-          <div class="form-group"><label for="encomenda-cliente">Cliente</label><input type="text" id="encomenda-cliente" list="lista-clientes-pos"></div>
-          <div class="form-group"><label for="encomenda-telefone">Telefone (WhatsApp)</label><input type="text" id="encomenda-telefone" placeholder="8xx xxx xxx"></div>
-          <div class="form-group"><label for="encomenda-produto">Produto / Serviço</label><input type="text" id="encomenda-produto"></div>
-          <div class="form-group"><label for="encomenda-quantidade">Quantidade</label><input type="number" id="encomenda-quantidade" min="0"></div>
-          <div class="form-group"><label for="encomenda-data-prevista">Data prevista de entrega</label><input type="date" id="encomenda-data-prevista"></div>
-          <div class="form-group"><label for="encomenda-valor-total">Valor total</label><input type="number" id="encomenda-valor-total" min="0" step="0.01" value="0"></div>
-          <div class="form-group"><label for="encomenda-valor-pago">Valor já pago (sinal)</label><input type="number" id="encomenda-valor-pago" min="0" step="0.01" value="0"></div>
-        </div>
-        <button id="btn-registar-encomenda" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar encomenda</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Cliente</th><th>Produto/Serviço</th><th>Qtd.</th><th>Previsão</th><th>Valor total</th><th>Restante</th><th>Estado</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-encomendas"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- CAIXA -->
-    <section class="secao" id="sec-caixa">
-      <h2>Caixa / Turnos</h2>
-      <div class="card">
-        <p style="margin-bottom:10px;">Estado do caixa: <strong id="caixa-status">FECHADO</strong></p>
-        <div id="aviso-caixa-funcionario" class="alert alert-warn" style="display:none;">⏳ O caixa ainda não foi aberto. Peça ao gerente para abrir o turno antes de começar a vender.</div>
-        <div id="caixa-abertura">
-          <div class="form-group" style="max-width:260px;"><label for="caixa-valor-inicial">Valor inicial (fundo de troco)</label><input type="number" id="caixa-valor-inicial" min="0" step="0.01" value="0"></div>
-          <button id="btn-abrir-caixa" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Abrir caixa</button>
-        </div>
-        <div id="caixa-fecho" class="hidden">
-          <p style="margin-bottom:6px;">Total vendido no turno (todas as formas): <strong id="caixa-total-vendas">MT 0,00</strong></p>
-          <p style="margin-bottom:10px;">Saldo esperado em dinheiro na gaveta: <strong id="caixa-saldo-esperado">MT 0,00</strong></p>
-          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-            <button id="btn-sangria" class="btn btn-light" type="button" style="width:auto;">💸 Sangria (retirar)</button>
-            <button id="btn-reforco" class="btn btn-light" type="button" style="width:auto;">💰 Reforço (adicionar)</button>
+          <div class="card">
+            <h3>💡 Artigos Sugeridos para Este Ramo</h3>
+            <div id="sugestoes-ramo" style="margin-top:12px;"></div>
           </div>
-          <div id="caixa-movimentos" style="margin-bottom:14px;"></div>
-          <button id="btn-fechar-caixa" class="btn btn-danger" style="width:auto;padding:10px 20px;">Fechar caixa (só gerente)</button>
-        </div>
-      </div>
-    </section>
+        </section>
 
-    <!-- DESPESAS -->
-    <section class="secao" id="sec-despesas">
-      <h2>Despesas</h2>
-      <div class="card">
-        <div class="grid">
-          <div class="form-group"><label for="despesa-descricao">Descrição</label><input type="text" id="despesa-descricao"></div>
-          <div class="form-group"><label for="despesa-valor">Valor</label><input type="number" id="despesa-valor" min="0" step="0.01"></div>
-        </div>
-        <button id="btn-registar-despesa" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar despesa</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Utilizador</th></tr></thead>
-          <tbody id="tabela-despesas"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- RELATÓRIOS -->
-    <section class="secao" id="sec-relatorios">
-      <h2>Relatórios</h2>
-      <div class="card">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <select id="relatorio-periodo" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-            <option value="todos">Todo o período</option>
-            <option value="hoje">Hoje</option>
-            <option value="7">Últimos 7 dias</option>
-            <option value="30">Últimos 30 dias</option>
-          </select>
-          <button id="btn-atualizar-relatorio" class="btn btn-primary">Atualizar</button>
-          <button class="btn btn-success" type="button" style="background-color:#25d366;" onclick="enviarRelatorioWhatsApp()">📱 WhatsApp</button>
-          <button class="btn btn-light" type="button" onclick="exportarRelatorioPDF()">🖨️ PDF</button>
-          <button class="btn btn-light" type="button" onclick="exportarRelatorioWord()">📄 Word</button>
-        </div>
-      </div>
-      <div id="aviso-relatorios-avancados"></div>
-      <div class="grid" style="margin-bottom:16px;">
-        <div class="kpi"><div class="rotulo">Faturamento</div><div class="valor" id="rel-faturamento">MT 0,00</div></div>
-        <div class="kpi"><div class="rotulo">Despesas</div><div class="valor" id="rel-despesas">MT 0,00</div></div>
-        <div class="kpi"><div class="rotulo">Resultado</div><div class="valor" id="rel-resultado">MT 0,00</div></div>
-        <div class="kpi"><div class="rotulo">Kg/Litros vendidos</div><div class="valor" id="rel-kg-vendidos" style="font-size:18px;">0 kg</div></div>
-      </div>
-      <div class="card">
-        <h3 style="margin-bottom:10px;">Curva ABC de produtos</h3>
-        <div class="table-wrap"><table>
-          <thead><tr><th>#</th><th>Produto</th><th>Qtd. vendida</th><th>Faturamento</th><th>Classe</th></tr></thead>
-          <tbody id="tabela-abc"></tbody>
-        </table></div>
-      </div>
-      <div class="card">
-        <h3 style="margin-bottom:10px;">Análise inteligente</h3>
-        <div id="analise-inteligente"></div>
-      </div>
-    </section>
-
-    <!-- METAS -->
-    <section class="secao" id="sec-metas">
-      <h2>Metas</h2>
-      <div class="grid" id="metas-progresso-loja" style="margin-bottom:16px;"></div>
-      <div class="card">
-        <h3 style="margin-bottom:10px;">Metas gerais da loja (só o gerente edita)</h3>
-        <div class="grid">
-          <div class="form-group"><label for="metas-input-diaria">Meta diária (MT)</label><input type="number" id="metas-input-diaria" min="0" step="0.01"></div>
-          <div class="form-group"><label for="metas-input-semanal">Meta semanal (MT)</label><input type="number" id="metas-input-semanal" min="0" step="0.01"></div>
-          <div class="form-group"><label for="metas-input-mensal">Meta mensal (MT)</label><input type="number" id="metas-input-mensal" min="0" step="0.01"></div>
-        </div>
-        <button id="btn-guardar-metas-loja" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Guardar metas da loja</button>
-      </div>
-      <div class="card">
-        <h3 style="margin-bottom:10px;">Metas por funcionário (mensal)</h3>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Funcionário</th><th>Meta mensal (MT)</th><th>Progresso este mês</th></tr></thead>
-          <tbody id="tabela-metas-funcionarios"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- DESEMPENHO -->
-    <section class="secao" id="sec-desempenho">
-      <h2>Desempenho da equipa</h2>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Pessoa</th><th>Vendas</th><th>Valor vendido</th><th>Descontos</th><th>Encomendas</th><th>Dívidas registadas</th><th>Sugestões</th></tr></thead>
-          <tbody id="tabela-desempenho"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- SUGESTÕES DO FUNCIONÁRIO -->
-    <section class="secao" id="sec-sugestoes">
-      <h2>Sugestões</h2>
-      <div class="card">
-        <div class="form-group"><label for="sugestao-texto">A sua sugestão (ex: um produto que os clientes têm pedido)</label>
-          <textarea id="sugestao-texto" rows="3" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;"></textarea>
-        </div>
-        <button id="btn-enviar-sugestao" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Enviar sugestão ao gerente</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>De</th><th>Sugestão</th><th>Estado</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-sugestoes"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- FUNCIONÁRIOS -->
-    <section class="secao" id="sec-funcionarios">
-      <h2>Funcionários</h2>
-      <div class="card">
-        <div class="grid">
-          <div class="form-group"><label for="func-nome">Nome</label><input type="text" id="func-nome"></div>
-          <div class="form-group"><label for="func-email">E-mail</label><input type="email" id="func-email"></div>
-          <div class="form-group"><label for="func-telefone">Telefone</label><input type="text" id="func-telefone"></div>
-          <div class="form-group"><label for="func-senha">Senha</label><input type="password" id="func-senha" placeholder="Mínimo 6 caracteres"></div>
-          <div class="form-group"><label for="func-foto">Foto (link/URL, opcional)</label><input type="text" id="func-foto" placeholder="https://..."></div>
-        </div>
-        <button id="btn-cadastrar-funcionario" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Cadastrar funcionário</button>
-      </div>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Função</th><th>Estado</th><th>Ações</th></tr></thead>
-          <tbody id="tabela-funcionarios"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- RAMOS -->
-    <section class="secao" id="sec-ramos">
-      <h2>Ramos de atividade</h2>
-      <div id="visao-geral-ramos"></div>
-      <div class="card">
-        <div class="form-group" style="max-width:320px;"><label for="ramo-pagina">Ramo ativo</label><select id="ramo-pagina">
-          <option value="Mercearia / Minimercado">Mercearia / Minimercado</option>
-          <option value="Supermercado">Supermercado</option>
-          <option value="Boutique / Moda">Boutique / Moda</option>
-          <option value="Calçados">Calçados</option>
-          <option value="Salão de Beleza">Salão de Beleza</option>
-          <option value="Barbearia">Barbearia</option>
-          <option value="Restaurante">Restaurante</option>
-          <option value="Lanchonete">Lanchonete</option>
-          <option value="Bar / Bebidas">Bar / Bebidas</option>
-          <option value="Pastelaria">Pastelaria</option>
-          <option value="Padaria">Padaria</option>
-          <option value="Talho / Açougue">Talho / Açougue</option>
-          <option value="Peixaria">Peixaria</option>
-          <option value="Frutaria">Frutaria</option>
-          <option value="Hortícola">Hortícola</option>
-          <option value="Farmácia / Perfumaria">Farmácia / Perfumaria</option>
-          <option value="Cosméticos">Cosméticos</option>
-          <option value="Material de Construção">Material de Construção</option>
-          <option value="Ferragem">Ferragem</option>
-          <option value="Elétrica">Elétrica</option>
-          <option value="Canalização">Canalização</option>
-          <option value="Informática">Informática</option>
-          <option value="Telemóveis e Acessórios">Telemóveis e Acessórios</option>
-          <option value="Electrónica">Electrónica</option>
-          <option value="Papelaria">Papelaria</option>
-          <option value="Livraria">Livraria</option>
-          <option value="Móveis">Móveis</option>
-          <option value="Electrodomésticos">Electrodomésticos</option>
-          <option value="Oficina Auto">Oficina Auto</option>
-          <option value="Peças Auto">Peças Auto</option>
-          <option value="Mecânica">Mecânica</option>
-          <option value="Motorizadas">Motorizadas</option>
-          <option value="Aluguer de Equipamentos">Aluguer de Equipamentos</option>
-          <option value="Hotel / Hospedagem">Hotel / Hospedagem</option>
-          <option value="Agência de Viagens">Agência de Viagens</option>
-          <option value="Transporte">Transporte</option>
-          <option value="Taxi / Moto-Taxi">Taxi / Moto-Taxi</option>
-          <option value="Serviços de Limpeza">Serviços de Limpeza</option>
-          <option value="Serviços de Impressão">Serviços de Impressão</option>
-          <option value="Gráfica">Gráfica</option>
-          <option value="Fotografia">Fotografia</option>
-          <option value="Florista">Florista</option>
-          <option value="Pet Shop">Pet Shop</option>
-          <option value="Agropecuária">Agropecuária</option>
-          <option value="Loja de Sementes">Loja de Sementes</option>
-          <option value="Restaurante / Catering">Restaurante / Catering</option>
-          <option value="Comércio Geral">Comércio Geral</option>
-          <option value="Outro">Outro</option>
-        </select></div>
-        <p style="margin:10px 0;color:#64748b;font-size:13px;">Sugestões rápidas de produtos para este ramo:</p>
-        <div id="sugestoes-ramo"></div>
-      </div>
-      <div class="card">
-        <h3 style="margin-bottom:10px;">Adicionar ramo personalizado</h3>
-        <p style="margin-bottom:10px;color:#64748b;font-size:13px;">Não encontrou o seu tipo de negócio na lista? Crie o seu próprio ramo (apenas o gerente pode fazer isto).</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="text" id="novo-ramo-nome" placeholder="Nome do novo ramo" style="flex:1;min-width:200px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-          <button id="btn-adicionar-ramo" class="btn btn-primary">+ Adicionar ramo</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- AUDITORIA -->
-    <section class="secao" id="sec-auditoria">
-      <h2>Histórico de Auditoria</h2>
-      <div class="card">
-        <input type="text" id="auditoria-pesquisa" placeholder="🔍 Pesquisar por mensagem ou pessoa..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:12px;">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Data/Hora</th><th>Quem</th><th>O que aconteceu</th><th>Nível</th></tr></thead>
-          <tbody id="tabela-auditoria"></tbody>
-        </table></div>
-      </div>
-    </section>
-
-    <!-- SUBSCRIÇÃO -->
-    <section class="secao" id="sec-subscricao">
-      <h2>Subscrição</h2>
-      <div class="card">
-        <p>Estado atual: <strong id="estado-subscricao">—</strong></p>
-      </div>
-      <div class="card">
-        <div class="grid">
-          <div class="form-group">
-            <label for="pagamento-operadora">Operadora de pagamento</label>
-            <select id="pagamento-operadora">
-              <option value="MPESA">M-Pesa</option>
-              <option value="EMOLA">E-Mola</option>
-            </select>
+        <!-- SEÇÃO: CONFIGURAÇÕES -->
+        <section id="sec-config" class="secao">
+          <div class="card">
+            <h3>Definições da Empresa</h3>
+            <div class="grid" style="margin-top:12px;">
+              <div>
+                <label style="font-size:0.8rem;color:var(--text-muted);">Nome Comercial</label>
+                <input type="text" id="config-nome" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:var(--text-muted);">Telefone</label>
+                <input type="tel" id="config-telefone" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:var(--text-muted);">Endereço / Localização</label>
+                <input type="text" id="config-endereco" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+              </div>
+            </div>
+            <button id="btn-guardar-config" class="btn btn-primary" style="margin-top:12px;">Guardar Alterações</button>
           </div>
-          <div class="form-group"><label for="pagamento-telefone">Número de telefone</label><input type="text" id="pagamento-telefone" placeholder="8xx xxx xxx"></div>
-        </div>
-        <button id="btn-solicitar-pagamento" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Pagar subscrição (250 MT)</button>
-        <div id="resultado-pagamento" class="status-msg"></div>
-      </div>
-    </section>
+          <div class="card">
+            <h3>Segurança Local</h3>
+            <button id="btn-alterar-pin" class="btn btn-light">🔑 Redefinir PIN de Desbloqueio Rápido</button>
+          </div>
+        </section>
 
-    <!-- CONFIGURAÇÕES -->
-    <section class="secao" id="sec-config">
-      <h2>Configurações</h2>
-      <div class="card">
-        <div class="form-group"><label for="config-nome">Nome do negócio</label><input type="text" id="config-nome"></div>
-        <div class="form-group"><label for="config-telefone">Telefone</label><input type="text" id="config-telefone"></div>
-        <div class="form-group"><label for="config-endereco">Endereço</label><input type="text" id="config-endereco"></div>
-        <button id="btn-guardar-config" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Guardar configurações</button>
-      </div>
-      <div class="card">
-        <h3 style="margin-bottom:10px;">Segurança</h3>
-        <p style="font-size:13px;color:#64748b;margin-bottom:10px;">O PIN é usado para desbloquear a aplicação rapidamente neste dispositivo, mesmo sem internet.</p>
-        <button id="btn-alterar-pin" class="btn btn-light" type="button" style="width:auto;padding:10px 20px;">🔑 Definir/Alterar PIN deste dispositivo</button>
-      </div>
-    </section>
+        <!-- SEÇÃO: SUBSCIÇÃO E LICENÇA -->
+        <section id="sec-subscricao" class="secao">
+          <div class="card">
+            <h3>Estado da Subscrição Comercial</h3>
+            <div id="aviso-licenca" style="margin:12px 0;"></div>
+            <p id="estado-subscricao" style="font-size:0.9rem;color:var(--text-muted);"></p>
+          </div>
+        </section>
 
-  </main>
+      </div>
+    </div>
+  </div>
 
-  <!-- ===== MODAIS ===== -->
-  <div class="modal-overlay" id="modal-produto">
-    <div class="modal-box">
-      <h3>Novo produto</h3>
-      <div class="form-group"><label for="novo-produto-nome">Nome</label><input type="text" id="novo-produto-nome"></div>
-      <div class="form-group"><label for="novo-produto-categoria">Categoria</label><input type="text" id="novo-produto-categoria"></div>
-      <div class="form-group"><label for="novo-produto-codigo">Código</label><input type="text" id="novo-produto-codigo"></div>
-      <div class="form-group"><label for="novo-produto-custo">Custo</label><input type="number" id="novo-produto-custo" min="0" step="0.01"></div>
-      <div class="form-group"><label for="novo-produto-preco">Preço</label><input type="number" id="novo-produto-preco" min="0" step="0.01"></div>
-      <div class="form-group"><label for="novo-produto-stock">Stock inicial</label><input type="number" id="novo-produto-stock" min="0"></div>
-      <div class="form-group"><label for="novo-produto-minimo">Stock mínimo</label><input type="number" id="novo-produto-minimo" min="0" value="5"></div>
-      <div class="form-group"><label for="novo-produto-unidade">Unidade de venda</label>
-        <select id="novo-produto-unidade">
-          <option value="unidade">Unidade</option>
+  <!-- MODAL: NOVO PRODUTO -->
+  <div id="modal-produto" class="modal">
+    <div class="modal-card">
+      <h3>Novo Artigo no Catálogo</h3>
+      <div class="grid" style="margin-top:12px;">
+        <input type="text" id="novo-produto-nome" placeholder="Nome do Artigo" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <input type="text" id="novo-produto-categoria" placeholder="Categoria" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <input type="text" id="novo-produto-codigo" placeholder="Código de Barras" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <input type="number" id="novo-produto-custo" placeholder="Preço de Custo (MT)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <input type="number" id="novo-produto-preco" placeholder="Preço de Venda (MT)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <input type="number" id="novo-produto-stock" placeholder="Quantidade Inicial" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <input type="number" id="novo-produto-minimo" value="5" placeholder="Stock Mínimo de Alerta" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <select id="novo-produto-unidade" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+          <option value="unidade">Unidade (un)</option>
           <option value="kg">Quilograma (kg)</option>
-          <option value="litro">Litro</option>
-          <option value="pessoa">Pessoa / Atendimento (serviços — ex: salão)</option>
+          <option value="litro">Litro (L)</option>
         </select>
+        <input type="text" id="novo-produto-foto" placeholder="Link da Imagem (Opcional)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <input type="text" id="novo-produto-tamanho" placeholder="Tamanho (Opcional)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
+        <input type="text" id="novo-produto-cor" placeholder="Cor (Opcional)" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;border-radius:4px;">
       </div>
-      <div class="form-group"><label for="novo-produto-tamanho">Tamanho (opcional, ex: roupa/calçado)</label><input type="text" id="novo-produto-tamanho" placeholder="Ex: M, 42, Único"></div>
-      <div class="form-group"><label for="novo-produto-cor">Cor (opcional)</label><input type="text" id="novo-produto-cor" placeholder="Ex: Azul"></div>
-      <div class="form-group"><label for="novo-produto-foto">Foto (link/URL da imagem, opcional)</label><input type="text" id="novo-produto-foto" placeholder="https://..."></div>
-      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="novo-produto-destaque" style="width:auto;">
-        <label for="novo-produto-destaque" style="margin:0;">⭐ Mostrar como sugestão rápida na página Vender</label>
+      <div style="margin-top:10px;">
+        <label><input type="checkbox" id="novo-produto-destaque"> Artigo em Destaque (Acesso Rápido no POS)</label>
       </div>
-      <div class="modal-acoes">
-        <button class="btn btn-light" type="button" onclick="fecharModal('modal-produto')" style="flex:1;">Cancelar</button>
-        <button id="btn-salvar-produto" class="btn btn-entrar" style="flex:1;">Guardar</button>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+        <button class="btn btn-light" onclick="fecharModal('modal-produto')">Cancelar</button>
+        <button id="btn-salvar-produto" class="btn btn-primary">Guardar Produto</button>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-editar-produto">
-    <div class="modal-box">
-      <h3>Editar produto</h3>
+  <!-- MODAL: EDITAR PRODUTO -->
+  <div id="modal-editar-produto" class="modal">
+    <div class="modal-card">
+      <h3>Editar Produto</h3>
       <input type="hidden" id="edit-produto-id">
-      <div class="form-group"><label for="edit-produto-nome">Nome</label><input type="text" id="edit-produto-nome"></div>
-      <div class="form-group"><label for="edit-produto-categoria">Categoria</label><input type="text" id="edit-produto-categoria"></div>
-      <div class="form-group"><label for="edit-produto-codigo">Código</label><input type="text" id="edit-produto-codigo"></div>
-      <div class="form-group"><label for="edit-produto-custo">Custo</label><input type="number" id="edit-produto-custo" min="0" step="0.01"></div>
-      <div class="form-group"><label for="edit-produto-preco">Preço</label><input type="number" id="edit-produto-preco" min="0" step="0.01"></div>
-      <div class="form-group"><label for="edit-produto-stock">Stock</label><input type="number" id="edit-produto-stock" min="0"></div>
-      <div class="form-group"><label for="edit-produto-minimo">Stock mínimo</label><input type="number" id="edit-produto-minimo" min="0"></div>
-      <div class="form-group"><label for="edit-produto-unidade">Unidade de venda</label>
-        <select id="edit-produto-unidade">
-          <option value="unidade">Unidade</option>
+      <div class="grid" style="margin-top:12px;">
+        <input type="text" id="edit-produto-nome" placeholder="Nome" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="text" id="edit-produto-categoria" placeholder="Categoria" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="text" id="edit-produto-codigo" placeholder="Código de Barras" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="number" id="edit-produto-custo" placeholder="Custo" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="number" id="edit-produto-preco" placeholder="Preço Venda" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="number" id="edit-produto-stock" placeholder="Stock" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="number" id="edit-produto-minimo" placeholder="Stock Mínimo" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <select id="edit-produto-unidade" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+          <option value="unidade">Unidade (un)</option>
           <option value="kg">Quilograma (kg)</option>
-          <option value="litro">Litro</option>
-          <option value="pessoa">Pessoa / Atendimento (serviços — ex: salão)</option>
+          <option value="litro">Litro (L)</option>
         </select>
+        <input type="text" id="edit-produto-foto" placeholder="Foto URL" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="text" id="edit-produto-tamanho" placeholder="Tamanho" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="text" id="edit-produto-cor" placeholder="Cor" style="background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
       </div>
-      <div class="form-group"><label for="edit-produto-tamanho">Tamanho (opcional)</label><input type="text" id="edit-produto-tamanho" placeholder="Ex: M, 42, Único"></div>
-      <div class="form-group"><label for="edit-produto-cor">Cor (opcional)</label><input type="text" id="edit-produto-cor" placeholder="Ex: Azul"></div>
-      <div class="form-group"><label for="edit-produto-foto">Foto (link/URL da imagem, opcional)</label><input type="text" id="edit-produto-foto" placeholder="https://..."></div>
-      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="edit-produto-destaque" style="width:auto;">
-        <label for="edit-produto-destaque" style="margin:0;">⭐ Mostrar como sugestão rápida na página Vender</label>
+      <div style="margin-top:10px;">
+        <label><input type="checkbox" id="edit-produto-destaque"> Destacar no Balcão</label>
       </div>
-      <div class="modal-acoes">
-        <button class="btn btn-light" type="button" onclick="fecharModal('modal-editar-produto')" style="flex:1;">Cancelar</button>
-        <button id="btn-eliminar-produto" class="btn btn-danger" type="button" style="flex:1;">🗑️ Eliminar</button>
-        <button id="btn-salvar-edicao-produto" class="btn btn-entrar" style="flex:1;">Guardar</button>
+      <div style="display:flex;justify-content:space-between;margin-top:16px;">
+        <button id="btn-eliminar-produto" class="btn btn-danger">Eliminar</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-light" onclick="fecharModal('modal-editar-produto')">Cancelar</button>
+          <button id="btn-salvar-edicao-produto" class="btn btn-primary">Salvar</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-detalhe-stock">
-    <div class="modal-box" style="max-width:600px;">
-      <h3 id="md-titulo-produto">Histórico de lotes</h3>
-      <p id="md-resumo-stock" style="margin:10px 0;color:#64748b;font-size:13px;"></p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Data</th><th>Fornecedor</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th></tr></thead>
-        <tbody id="md-tabela-lotes-corpo"></tbody>
-      </table></div>
-      <div class="modal-acoes"><button class="btn btn-light" type="button" onclick="fecharModal('modal-detalhe-stock')" style="flex:1;">Fechar</button></div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="modal-ajuste-stock">
-    <div class="modal-box">
-      <h3>Ajustar stock</h3>
-      <p id="ajuste-produto-nome" style="margin-bottom:10px;color:#64748b;font-size:13px;"></p>
+  <!-- MODAL: AJUSTE DE STOCK -->
+  <div id="modal-ajuste-stock" class="modal">
+    <div class="modal-card">
+      <h3>Ajuste Manual de Inventário</h3>
       <input type="hidden" id="ajuste-produto-id">
-      <div class="form-group">
-        <label for="ajuste-tipo">Tipo de ajuste</label>
-        <select id="ajuste-tipo">
-          <option value="entrada">➕ Entrada manual (correção para mais)</option>
-          <option value="saida">➖ Saída manual (correção para menos)</option>
-          <option value="perda">⚠️ Perda / Avaria</option>
+      <p id="ajuste-produto-nome" style="color:var(--primary);margin:8px 0;"></p>
+      <div style="margin-bottom:8px;">
+        <label style="font-size:0.8rem;">Tipo de Ajuste:</label>
+        <select id="ajuste-tipo" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+          <option value="entrada">Entrada (+)</option>
+          <option value="saida">Saída (-)</option>
+          <option value="perda">Perda / Avaria (-)</option>
         </select>
       </div>
-      <div class="form-group"><label for="ajuste-quantidade">Quantidade</label><input type="number" id="ajuste-quantidade" min="1"></div>
-      <div class="form-group"><label for="ajuste-motivo">Motivo / observação</label><input type="text" id="ajuste-motivo" placeholder="Ex: contagem física, produto partido..."></div>
-      <div class="modal-acoes">
-        <button class="btn btn-light" type="button" onclick="fecharModal('modal-ajuste-stock')" style="flex:1;">Cancelar</button>
-        <button id="btn-confirmar-ajuste-stock" class="btn btn-entrar" style="flex:1;">Confirmar ajuste</button>
+      <div style="margin-bottom:8px;">
+        <label style="font-size:0.8rem;">Quantidade:</label>
+        <input type="number" id="ajuste-quantidade" placeholder="0" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:0.8rem;">Motivo do Ajuste:</label>
+        <input type="text" id="ajuste-motivo" placeholder="Ex: Contagem física anual" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button class="btn btn-light" onclick="fecharModal('modal-ajuste-stock')">Cancelar</button>
+        <button id="btn-confirmar-ajuste-stock" class="btn btn-primary">Confirmar</button>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-detalhe-cliente">
-    <div class="modal-box">
-      <h3 id="dc-titulo">Detalhes do cliente</h3>
-      <div id="dc-corpo" style="font-size:13px;"></div>
-      <div class="modal-acoes"><button class="btn btn-light" type="button" onclick="fecharModal('modal-detalhe-cliente')" style="flex:1;">Fechar</button></div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="modal-leitor-codigo">
-    <div class="modal-box" style="max-width:420px;">
-      <h3>Ler código de barras</h3>
-      <div id="leitor-codigo-camera" style="width:100%;border-radius:8px;overflow:hidden;background:#0f172a;"></div>
-      <p id="leitor-codigo-status" style="font-size:12px;color:#64748b;margin-top:8px;">A iniciar a câmara...</p>
-      <div class="modal-acoes">
-        <button class="btn btn-light" type="button" onclick="fecharLeitorCodigoBarras()" style="flex:1;">Fechar</button>
+  <!-- MODAL: RASTREAMENTO DE LOTES -->
+  <div id="modal-detalhe-stock" class="modal">
+    <div class="modal-card">
+      <h3 id="md-titulo-produto">Histórico de Lotes</h3>
+      <p id="md-resumo-stock" style="margin:8px 0;color:var(--text-muted);font-size:0.85rem;"></p>
+      <div style="max-height:250px;overflow-y:auto;margin:12px 0;">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Fornecedor</th>
+              <th>Qtd.</th>
+              <th>Custo Unit.</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="md-tabela-lotes-corpo"></tbody>
+        </table>
+      </div>
+      <div style="text-align:right;">
+        <button class="btn btn-light" onclick="fecharModal('modal-detalhe-stock')">Fechar</button>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-alterar-senha">
-    <div class="modal-box">
-      <h3>Alterar senha</h3>
-      <div class="form-group"><label for="senha-atual">Senha atual</label><input type="password" id="senha-atual"></div>
-      <div class="form-group"><label for="senha-nova">Nova senha</label><input type="password" id="senha-nova" placeholder="Mínimo 6 caracteres"></div>
-      <div class="form-group"><label for="senha-nova-confirmar">Confirmar nova senha</label><input type="password" id="senha-nova-confirmar"></div>
+  <!-- MODAL: LEITOR DE CÓDIGO DE BARRAS (CÂMARA) -->
+  <div id="modal-leitor-codigo" class="modal">
+    <div class="modal-card" style="text-align:center;">
+      <h3>Leitor de Código de Barras</h3>
+      <div id="leitor-codigo-camera" style="width:100%;max-width:320px;margin:12px auto;min-height:200px;background:#000;"></div>
+      <div id="leitor-codigo-status" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">Aponte a câmara para o código...</div>
+      <button class="btn btn-danger" onclick="fecharLeitorCodigoBarras()">Fechar Câmara</button>
+    </div>
+  </div>
+
+  <!-- MODAL: ALTERAR SENHA -->
+  <div id="modal-alterar-senha" class="modal">
+    <div class="modal-card">
+      <h3>Alterar a Minha Senha</h3>
+      <div style="margin:12px 0;">
+        <input type="password" id="senha-atual" placeholder="Senha Atual" style="width:100%;margin-bottom:8px;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="password" id="senha-nova" placeholder="Nova Senha" style="width:100%;margin-bottom:8px;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+        <input type="password" id="senha-nova-confirmar" placeholder="Confirmar Nova Senha" style="width:100%;background:#0f172a;border:1px solid var(--border);color:#fff;padding:8px;">
+      </div>
       <div id="senha-status" class="status-msg"></div>
-      <div class="modal-acoes">
-        <button class="btn btn-light" type="button" onclick="fecharModal('modal-alterar-senha')" style="flex:1;">Cancelar</button>
-        <button id="btn-guardar-nova-senha" class="btn btn-entrar" style="flex:1;">Guardar</button>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
+        <button class="btn btn-light" onclick="fecharModal('modal-alterar-senha')">Cancelar</button>
+        <button id="btn-guardar-nova-senha" class="btn btn-primary">Salvar Nova Senha</button>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-editar-funcionario">
-    <div class="modal-box">
-      <h3>Editar funcionário</h3>
-      <input type="hidden" id="edit-func-id">
-      <div class="form-group"><label for="edit-func-nome">Nome</label><input type="text" id="edit-func-nome"></div>
-      <div class="form-group"><label for="edit-func-telefone">Telefone</label><input type="text" id="edit-func-telefone"></div>
-      <p style="font-size:12px;color:#64748b;">O e-mail de acesso não pode ser alterado aqui. Para desativar o acesso, use o botão "Desativar" na lista.</p>
-      <div class="modal-acoes">
-        <button class="btn btn-light" type="button" onclick="fecharModal('modal-editar-funcionario')" style="flex:1;">Cancelar</button>
-        <button id="btn-salvar-edicao-funcionario" class="btn btn-entrar" style="flex:1;">Guardar</button>
+  <!-- MODAL: DETALHES DO CLIENTE -->
+  <div id="modal-detalhe-cliente" class="modal">
+    <div class="modal-card">
+      <h3 id="dc-titulo">Cliente</h3>
+      <div id="dc-corpo" style="margin:12px 0;font-size:0.9rem;"></div>
+      <div style="text-align:right;">
+        <button class="btn btn-light" onclick="fecharModal('modal-detalhe-cliente')">Fechar</button>
       </div>
     </div>
   </div>
 
-</div>
+  <!-- IMPORTAÇÃO DO MÓDULO LÓGICO COMPLETO -->
+  <script type="module" src="app.js"></script>
 
-<!-- ===== BLOQUEIO DE LICENÇA ===== -->
-<div id="bloqueio-licenca">
-  <div class="license-box">
-    <h2 style="color:#ef4444;">🔒 Licença Inativa</h2>
-    <p style="margin:15px 0;color:#475569;">A sua subscrição mensal precisa de renovação para continuar a operar.</p>
-    <button id="btn-pagar-licenca" class="btn btn-entrar" onclick="document.getElementById('bloqueio-licenca').classList.remove('show'); mostrarSecao('subscricao');">Ir para Subscrição</button>
-  </div>
-</div>
-
-<script>
-function fecharModal(id){ document.getElementById(id)?.classList.remove('show'); }
-document.getElementById('btn-toggle-dark')?.addEventListener('click', () => document.body.classList.toggle('dark'));
-</script>
-<!-- Biblioteca de leitura de código de barras/QR por câmara — funciona em Chrome, Safari (iOS) e Firefox, porque faz a descodificação em JavaScript puro, sem depender de nenhuma função nativa do navegador -->
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script type="module" src="./app.js"></script>
-
-<!-- Regista o Service Worker: é isto que permite abrir a aplicação sem internet -->
-<script>
-    if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-            navigator.serviceWorker.register("./service-worker.js")
-                .catch((erro) => console.error("Falha ao registar o service worker (a app pode não funcionar totalmente offline):", erro));
-        });
-    }
-</script>
 </body>
 </html>
+        
