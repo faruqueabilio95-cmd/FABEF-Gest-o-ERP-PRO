@@ -4864,3 +4864,51 @@ if (selectIdiomaElement) {
  A interface da aplicaÃ§Ã£o permanece totalmente oculta (.hidden) atÃ© que o 
  gatilho onAuthStateChanged confirme o token do utilizador junto Ã  nuvem.
 */
+
+// ============================================================
+// SISTEMA DE SEGURANÇA E CONTROLO DOS 3 PONTOS (FABEF)
+// ============================================================
+
+// 1. Lógica para Abrir/Fechar os 3 Pontos ao Clicar
+const botaoTresPontos = document.querySelector('.botao-tres-pontos');
+const caixaInformacoes = document.querySelector('.conteudo-tres-pontos');
+
+if (botaoTresPontos && caixaInformacoes) {
+  botaoTresPontos.addEventListener('click', function() {
+    caixaInformacoes.classList.toggle('aberto');
+  });
+}
+
+// 2. Lógica de Segurança (Inatividade = PIN | Sair do App = Senha)
+let tempoInatividade;
+
+function reiniciarTemporizadorPIN() {
+  clearTimeout(tempoInatividade);
+  // Bloqueia e pede o PIN após 5 minutos de inatividade (300000 milissegundos)
+  tempoInatividade = setTimeout(function() {
+    exibirTelaBloqueioPIN();
+  }, 300000); 
+}
+
+// Deteta movimentos para reiniciar o tempo do PIN (o utilizador está ativo)
+window.addEventListener('mousemove', reiniciarTemporizadorPIN);
+window.addEventListener('keypress', reiniciarTemporizadorPIN);
+window.addEventListener('touchstart', reiniciarTemporizadorPIN);
+
+// Deteta se o utilizador SAIU do aplicativo (Mudou de aba, minimizou ou fechou)
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    // Se saiu, apaga a sessão e força o pedido de SENHA completa no regresso
+    forcarLoginPorSenha();
+  }
+});
+
+function exibirTelaBloqueioPIN() {
+  console.log("Sistema bloqueado: Pedir PIN rápido.");
+  // Aqui o seu sistema deve mostrar a tela do PIN que o Claude desenhou
+}
+
+function forcarLoginPorSenha() {
+  console.log("Utilizador saiu do app: Encerrar sessão e pedir Senha.");
+  // Aqui o seu sistema deve deslogar e mandar o utilizador para a tela de login
+}
