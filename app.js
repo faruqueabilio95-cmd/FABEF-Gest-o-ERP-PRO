@@ -93,6 +93,8 @@ const FABEF_API_BASE = window.FABEF_API_BASE || "";
    ESTADO GLOBAL DA APLICAÃ‡ÃƒO (FABEF GLOBAL MEMORY)
 ===================================================== */
 
+const FABEF_STOCK_NEGATIVO_ALERTADO = new Set();
+
 window.FABEF = {
     user: null,
     userData: null,
@@ -1090,6 +1092,9 @@ function abrirAplicacao() {
     elAuth("tela-login")?.style && (elAuth("tela-login").style.display = "none");
     esconderEcraPin();
     elAuth("app")?.classList.remove("hidden");
+    document.getElementById("sidebar")?.classList.add("closed");
+    mostrarSecao("inicio");
+
 
     const headerUser = elAuth("header-user");
     if (headerUser) {
@@ -1232,9 +1237,18 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
 });
 
 
-document.getElementById("btn-logout").addEventListener("click", async () => {
+document.getElementById("btn-logout")?.addEventListener("click", async () => {
     try {
+        const user = auth.currentUser;
+        if (user) {
+            localStorage.removeItem(chavePinLocal(user.uid));
+        }
+        await limparEstadoFABEF();
         await signOut(auth);
+        esconderEcraPin();
+        if (elAuth("app")) elAuth("app").classList.add("hidden");
+        if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
+        alert("Sessão terminada. Introduza o seu e-mail e palavra-passe para voltar a entrar.");
     } catch (error) {
         console.error("Erro ao efetuar logout seguro:", error);
     }
@@ -1420,6 +1434,11 @@ async function adicionarRamoPersonalizado() {
     const input = document.getElementById("novo-ramo-nome");
     const nome = input?.value.trim();
     if (!nome) { alert("Introduza o nome do novo ramo."); return; }
+    const ramosAtuais = FABEF.empresa?.ramos_atividade || [FABEF.ramo];
+    if (ramosAtuais.length >= 3) {
+        alert("Limite de Ramos Atingido: Cada gerente pode gerir até 3 ramos de atividade em simultâneo.");
+        return;
+    }
     if (RAMOS.some(r => r.toLowerCase() === nome.toLowerCase())) {
         alert("Este ramo jÃ¡ existe na lista.");
         return;
@@ -1444,6 +1463,44 @@ async function adicionarRamoPersonalizado() {
     }
 }
 
+
+
+/* =====================================================
+   MÓDULO DE REGRAS INDEPENDENTES POR RAMO (ATÉ 3 RAMOS)
+===================================================== */
+function obterInfoRamo(ramoNome) {
+    if (!FABEF.empresa) return { estado: "TESTE", diasRestantes: 7 };
+    const regras = FABEF.empresa.ramos_regras || {};
+    const info = regras[ramoNome] || {};
+    
+    if (info.estado === "ACTIVO") {
+        if (info.validade && new Date() > new Date(info.validade)) {
+            return { estado: "EXPIRADO", diasRestantes: 0, validade: info.validade };
+        }
+        return { estado: "ACTIVO", validade: info.validade };
+    }
+
+    const inicio = info.dataInicio || FABEF.empresa.data_registo || FABEF.empresa.criadoEm || Date.now();
+    const d = inicio && typeof inicio.toDate === "function" ? inicio.toDate() : new Date(inicio);
+    const fim = new Date(d);
+    fim.setDate(fim.getDate() + 7);
+    
+    if (new Date() > fim) {
+        return { estado: "RESTRITO", diasRestantes: 0 };
+    }
+    const dias = Math.max(0, Math.ceil((fim - Date.now()) / 86400000));
+    return { estado: "TESTE", diasRestantes: dias };
+}
+
+function verificarBloqueioOperacaoRamo() {
+    const info = obterInfoRamo(FABEF.ramo);
+    if (info.estado === "RESTRITO" || info.estado === "EXPIRADO") {
+        alert(`⚠️ USO RESTRITO: O período de 7 dias de teste grátis para o ramo "${FABEF.ramo}" terminou.\n\nPara continuar a efetuar vendas e emitir faturas neste ramo, regularize a subscrição mensal de 250 MT (via e-Mola ou M-Pesa).`);
+        mostrarSecao("subscricao");
+        return true;
+    }
+    return false;
+}
 
 async function mudarRamo(ramo) {
     if (!RAMOS.includes(ramo)) return;
@@ -2497,6 +2554,8 @@ function atualizarRestantePagamentoMisto() {
 
 
 async function finalizarVenda() {
+    if (verificarBloqueioOperacaoRamo()) return;
+
     if (limiteVendasDiariasAtingido()) {
         avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.vendasDiarias} vendas do plano grÃ¡tis.`);
         return;
@@ -2650,6 +2709,8 @@ async function finalizarVenda() {
         renderTudo();
 
         // Insere o faturamento financeiro nos registos inalterÃ¡veis de auditoria
+        const idVendaCriada = vendaRef.id;
+        abrirModalPosVenda(idVendaCriada, totalComDesconto, nomeClienteVenda);
         await gravarAuditoria("Registou venda de mercadorias no valor de " + dinheiro(totalComDesconto) + (desconto > 0 ? ` (desconto de ${dinheiro(desconto)} aplicado)` : ""), "INFO");
         alert("Venda concluÃ­da com sucesso. Valor total: " + dinheiro(totalComDesconto));
 
@@ -2730,18 +2791,63 @@ window.imprimirReciboVenda = function(vendaId) {
     w.document.close();
 };
 
-window.enviarReciboWhatsApp = function(vendaId) {
+window.enviarReciboWhatsApp = function(vendaId, telefoneOpcional) {
     const v = FABEF.vendas.find(x => x.id === vendaId);
-    if (!v) { alert("Venda nÃ£o localizada."); return; }
+    if (!v) { alert("Venda não localizada."); return; }
     const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
-    const textoItens = (v.itens || []).map(item => `â€¢ ${item.nome} (x${item.quantidade}): ${dinheiro(item.subtotal)}`).join("\n");
-    const mensagem = encodeURIComponent(`*${nomeEmpresa.toUpperCase()} - RECIBO DIGITAL*\n----------------------------------------\n*CÃ³digo da Venda:* ${v.id}\n*Data:* ${dataTexto(v.data)}\n*Operador:* ${v.operadorNome || "BalcÃ£o"}\n*NUIT Cliente:* ${v.nuitCliente || "Isento"}\n----------------------------------------\n*ARTIGOS:*\n${textoItens}\n----------------------------------------\n*TOTAL:* ${dinheiro(v.total)}\n*Forma de Pagamento:* ${v.pagamento || "â€”"}\n\nObrigado pela preferÃªncia! ðŸŽ‰`);
-    window.open(`https://wa.me/?text=${mensagem}`, "_blank");
+    const textoItens = (v.itens || []).map(item => `• ${item.nome} (x${item.quantidade}): ${dinheiro(item.subtotal)}`).join("\n");
+    const mensagem = encodeURIComponent(`*${nomeEmpresa.toUpperCase()} - RECIBO DIGITAL*\n----------------------------------------\n*Código da Venda:* ${v.id}\n*Data:* ${dataTexto(v.data)}\n*Operador:* ${v.operadorNome || "Balcão"}\n*NUIT Cliente:* ${v.nuitCliente || "Isento"}\n----------------------------------------\n*ARTIGOS:*\n${textoItens}\n----------------------------------------\n*TOTAL:* ${dinheiro(v.total)}\n*Forma de Pagamento:* ${v.pagamento || "—"}\n\nObrigado pela preferência! 🎉`);
+    
+    let tel = (telefoneOpcional || "").replace(/[^0-9]/g, "");
+    if (tel && !tel.startsWith("258") && tel.length === 9) {
+        tel = "258" + tel;
+    }
+    const url = tel ? `https://wa.me/${tel}?text=${mensagem}` : `https://wa.me/?text=${mensagem}`;
+    window.open(url, "_blank");
 };
 
 /* =====================================================
    EXPORTAÃ‡ÃƒO DE INVENTÃRIO CSV
 ===================================================== */
+
+
+/* =====================================================
+   MÓDULO: MODAL PÓS-VENDA & WHATSAPP
+===================================================== */
+let FABEF_ULTIMA_VENDA_ID = null;
+
+function abrirModalPosVenda(vendaId, total, nomeCliente) {
+    FABEF_ULTIMA_VENDA_ID = vendaId;
+    const modal = document.getElementById("modal-pos-venda");
+    const totalEl = document.getElementById("pos-venda-total");
+    const telInput = document.getElementById("pos-venda-telefone");
+    
+    if (totalEl) totalEl.textContent = dinheiro(total);
+    
+    let telefoneCliente = "";
+    if (nomeCliente) {
+        const c = FABEF.clientes.find(x => x.nome.toLowerCase() === nomeCliente.toLowerCase());
+        if (c?.telefone) telefoneCliente = c.telefone;
+    }
+    if (telInput) telInput.value = telefoneCliente;
+    if (modal) modal.classList.add("show");
+}
+
+document.getElementById("btn-pos-venda-whatsapp")?.addEventListener("click", () => {
+    if (!FABEF_ULTIMA_VENDA_ID) return;
+    const tel = document.getElementById("pos-venda-telefone")?.value.trim() || "";
+    enviarReciboWhatsApp(FABEF_ULTIMA_VENDA_ID, tel);
+});
+
+document.getElementById("btn-pos-venda-imprimir")?.addEventListener("click", () => {
+    if (!FABEF_ULTIMA_VENDA_ID) return;
+    imprimirReciboVenda(FABEF_ULTIMA_VENDA_ID);
+});
+
+document.getElementById("btn-pos-venda-continuar")?.addEventListener("click", () => {
+    document.getElementById("modal-pos-venda")?.classList.remove("show");
+    FABEF_ULTIMA_VENDA_ID = null;
+});
 
 window.exportarInventarioCSV = function() {
     const produtosRamo = FABEF.produtos.filter(p => p.ramo === FABEF.ramo);
@@ -4292,7 +4398,47 @@ function renderAvisoPlano() {
 }
 
 
+
+function renderStatusRamosSubscricao() {
+    const lista = document.getElementById("lista-status-ramos");
+    const selectAlvo = document.getElementById("pagamento-ramo-alvo");
+    if (!lista) return;
+
+    const ramos = FABEF.empresa?.ramos_atividade || [FABEF.ramo];
+    
+    lista.innerHTML = ramos.map(r => {
+        const info = obterInfoRamo(r);
+        let badge = "";
+        let desc = "";
+        if (info.estado === "ACTIVO") {
+            badge = `<span class="badge badge-green">Activo</span>`;
+            desc = info.validade ? `Válido até ${new Date(info.validade).toLocaleDateString("pt-MZ")}` : "Subscrição regularizada";
+        } else if (info.estado === "RESTRITO" || info.estado === "EXPIRADO") {
+            badge = `<span class="badge badge-red">Uso Restrito (Expirado)</span>`;
+            desc = "Teste grátis de 7 dias terminou. Vendas bloqueadas neste ramo.";
+        } else {
+            badge = `<span class="badge badge-yellow">7 Dias Grátis</span>`;
+            desc = `Restam ${info.diasRestantes} dia(s) de teste completo.`;
+        }
+
+        return `
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border);">
+            <div>
+                <strong style="color:#fff;font-size:0.9rem;">${escapeHTML(r)}</strong>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">${desc}</p>
+            </div>
+            <div>${badge}</div>
+        </div>`;
+    }).join("");
+
+    if (selectAlvo) {
+        selectAlvo.innerHTML = ramos.map(r => `<option value="${escapeHTML(r)}">${escapeHTML(r)} (250 MT)</option>`).join("");
+    }
+}
+
 function verificarSubscricao(){
+    renderStatusRamosSubscricao();
+
     const aviso = document.getElementById("aviso-licenca");
     const bloqueio = document.getElementById("bloqueio-licenca");
     const estadoSpan = document.getElementById("estado-subscricao");
@@ -4386,6 +4532,7 @@ async function solicitarPagamentoBackend(operadora, telefone) {
         },
         body: JSON.stringify({
             empresaId: FABEF.empresaId,
+            ramo: document.getElementById("pagamento-ramo-alvo")?.value || FABEF.ramo,
             telefone: telefone,
             valor: 250,
             metodo: operadora // "MPESA" ou "EMOLA"
@@ -4451,7 +4598,7 @@ try{if(localStorage.getItem("FABEF_dark_mode")==="1"){document.body.classList.ad
    ficar negativo. Isto avisa o gerente para poder confirmar
    a quantidade fÃ­sica real e corrigir.
 ===================================================== */
-const FABEF_STOCK_NEGATIVO_ALERTADO = new Set();
+// (movido para o topo) const FABEF_STOCK_NEGATIVO_ALERTADO = new Set();
 
 function verificarReconciliacaoStock() {
     const negativos = FABEF.produtos.filter(p => numero(p.stock) < 0);
@@ -4911,4 +5058,57 @@ function exibirTelaBloqueioPIN() {
 function forcarLoginPorSenha() {
   console.log("Utilizador saiu do app: Encerrar sessão e pedir Senha.");
   // Aqui o seu sistema deve deslogar e mandar o utilizador para a tela de login
+}
+
+
+/* =====================================================
+   MÓDULO DE BLINDAGEM DE SESSÃO:
+   - Sair (Logout): Exige E-mail e Senha
+   - Minimizar / Trocar de Aba: Exige PIN
+===================================================== */
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden && FABEF.user && elAuth("app") && !elAuth("app").classList.contains("hidden")) {
+        mostrarEcraPin();
+    }
+});
+window.addEventListener("blur", () => {
+    if (FABEF.user && elAuth("app") && !elAuth("app").classList.contains("hidden")) {
+        mostrarEcraPin();
+    }
+});
+
+
+/* =====================================================
+   MÓDULO: CONTROLO DE LUZ (TEMA) E IDIOMA NO TOPO
+===================================================== */
+function aplicarTema(tema) {
+    const corpo = document.body;
+    const btn = document.getElementById("btn-toggle-tema");
+    if (tema === "light") {
+        corpo.classList.add("theme-light");
+        if (btn) btn.textContent = "🌙";
+    } else {
+        corpo.classList.remove("theme-light");
+        if (btn) btn.textContent = "☀️";
+    }
+    try { localStorage.setItem("FABEF_theme", tema); } catch (e) {}
+}
+
+document.getElementById("btn-toggle-tema")?.addEventListener("click", () => {
+    const temaAtual = document.body.classList.contains("theme-light") ? "dark" : "light";
+    aplicarTema(temaAtual);
+});
+
+const temaGuardado = localStorage.getItem("FABEF_theme") || "dark";
+aplicarTema(temaGuardado);
+
+document.getElementById("select-idioma")?.addEventListener("change", e => {
+    aplicarIdioma(e.target.value);
+    try { localStorage.setItem("FABEF_idioma", e.target.value); } catch (_) {}
+});
+
+const idiomaGuardado = localStorage.getItem("FABEF_idioma") || "pt";
+if (document.getElementById("select-idioma")) {
+    document.getElementById("select-idioma").value = idiomaGuardado;
+    aplicarIdioma(idiomaGuardado);
 }
