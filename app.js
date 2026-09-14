@@ -827,6 +827,8 @@ async function limparEstadoFABEF() {
 }
 
 async function iniciarSessaoFABEF(user) {
+    if (!user) return;
+    if (FABEF.carregado) return;
     if (FABEF_arranqueEmCurso) return;
     FABEF_arranqueEmCurso = true;
 
@@ -967,6 +969,7 @@ onAuthStateChanged(auth, async user => {
     // Durante o registo, o Auth pode emitir o utilizador antes dos documentos Firestore.
     // Esperamos a conclusão de criarConta() para evitar uma corrida de inicialização.
     if (FABEF_registoEmCurso) return;
+    if (FABEF.carregado) return;
 
     // Se já existe um PIN definido neste dispositivo para este utilizador, exige-o
     // em vez de abrir diretamente — isto substitui o pedido de e-mail/senha,
@@ -1167,10 +1170,14 @@ function abrirAplicacao() {
         headerUser.textContent = FABEF.userData?.nome || FABEF.user?.email || "Utilizador";
     }
 
-    aplicarRestricoesDeAcessoPorPapel();
-    renderTudo();
-    verificarSubscricao();
-    atualizarIndicadorLigacao();
+    try {
+        aplicarRestricoesDeAcessoPorPapel();
+        renderTudo();
+        verificarSubscricao();
+        atualizarIndicadorLigacao();
+    } catch (e) {
+        console.warn("Aviso ao renderizar estado inicial da aplicacao:", e);
+    }
 }
 
 
