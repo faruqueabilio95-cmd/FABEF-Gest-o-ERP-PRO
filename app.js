@@ -760,24 +760,35 @@ async function criarConta() {
             criadoEm: serverTimestamp()
         };
 
-        // Os dois documentos sÃ³ sÃ£o criados para o UID autenticado.
+        // Os dois documentos só são criados para o UID autenticado.
         await setDoc(doc(db, "empresas", empresaId), empresa);
         await setDoc(doc(db, "utilizadores", uidUser), utilizador);
 
-        if (status) status.textContent = "ðŸŸ¢ Conta criada com sucesso. A abrir o sistema...";
+        if (status) status.textContent = "🟢 Conta criada com sucesso. A abrir o sistema...";
 
-        // CORREÃ‡ÃƒO: o onAuthStateChanged jÃ¡ disparou (ignorado, porque
-        // FABEF_registoEmCurso estava ativo) e nÃ£o volta a disparar sozinho,
-        // porque o estado de autenticaÃ§Ã£o nÃ£o muda outra vez. Por isso,
-        // depois de os documentos existirem, arrancamos a sessÃ£o manualmente.
+        // Define os dados essenciais da empresa e do utilizador diretamente na memória
+        FABEF.user = credencial.user;
+        FABEF.userData = { uid: uidUser, ...utilizador };
+        FABEF.empresaId = empresaId;
+        FABEF.empresa = { id: empresaId, ...empresa };
+        FABEF.ramo = ramo;
         FABEF_registoEmCurso = false;
-        if (auth.currentUser) {
-            await iniciarSessaoFABEF(auth.currentUser);
-        }
+
+        // Abre a aplicação imediatamente sem bloquear a interface!
+        abrirAplicacao();
+        FABEF.carregado = true;
+
+        // Escuta coleções em segundo plano para preencher dados
+        carregarDados().then(() => {
+            renderTudo();
+        }).catch(err => {
+            console.error("Erro ao sincronizar dados em tempo real:", err);
+        });
+
         return;
     } catch (error) {
         console.error("Erro ao criar conta:", error);
-        if (status) status.textContent = "ðŸ”´ " + mensagemFirebase(error);
+        if (status) status.textContent = "🔴 " + mensagemFirebase(error);
     } finally {
         FABEF_registoEmCurso = false;
         if (btnRegistar) btnRegistar.disabled = false;
@@ -820,32 +831,41 @@ async function iniciarSessaoFABEF(user) {
     FABEF_arranqueEmCurso = true;
 
     const loginStatus = elAuth("login-status");
+    const regStatus = elAuth("reg-status");
     try {
         FABEF.user = user;
-        if (loginStatus) loginStatus.textContent = "â³ A carregar a empresa...";
+        if (loginStatus) loginStatus.textContent = "⏳ A carregar a empresa...";
+        if (regStatus) regStatus.textContent = "⏳ A carregar a empresa...";
 
-        // NÃƒO existe fallback para perfil inexistente.
         await carregarPerfil(user);
         await carregarEmpresa();
-        await carregarDados();
 
+        // Abre a aplicação imediatamente após perfil e empresa estarem carregados
         abrirAplicacao();
         FABEF.carregado = true;
-    } catch (error) {
-        console.error("Erro crÃ­tico ao iniciar a aplicaÃ§Ã£o:", error);
-        const mensagem = mensagemFirebase(error);
-        if (loginStatus) loginStatus.textContent = "ðŸ”´ NÃ£o foi possÃ­vel carregar a conta: " + mensagem;
 
-        const regStatus = elAuth("reg-status");
+        // Carrega as coleções em tempo real em segundo plano
+        carregarDados().then(() => {
+            renderTudo();
+        }).catch(err => {
+            console.error("Erro ao sincronizar dados da empresa:", err);
+        });
+    } catch (error) {
+        console.error("Erro crítico ao iniciar a aplicação:", error);
+        const mensagem = mensagemFirebase(error);
+        if (loginStatus) loginStatus.textContent = "🔴 Não foi possível carregar a conta: " + mensagem;
         if (regStatus && !FABEF_registoEmCurso) {
-            regStatus.textContent = "ðŸ”´ NÃ£o foi possÃ­vel carregar a empresa: " + mensagem;
+            regStatus.textContent = "🔴 Não foi possível carregar a empresa: " + mensagem;
         }
 
-        // MantÃ©m a sessÃ£o autenticada para permitir diagnÃ³stico/retry.
-        // NÃ£o usamos signOut() aqui, porque um erro do Firestore nÃ£o significa senha invÃ¡lida.
+        // Mantém a sessão autenticada para permitir diagnóstico/retry.
         FABEF.carregado = false;
         elAuth("app")?.classList.add("hidden");
-        if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
+        const tl = elAuth("tela-login");
+        if (tl) {
+            tl.style.display = "flex";
+            tl.classList.remove("hidden");
+        }
     } finally {
         FABEF_arranqueEmCurso = false;
     }
@@ -898,7 +918,7 @@ function esconderEcraPin() {
 }
 
 document.getElementById("btn-pin-entrar")?.addEventListener("click", async () => {
-    const user = auth.currentUser;
+    const user = auth.currentUser || FABEF.user;
     if (!user) { mostrarEcraPin(); return; }
 
     const pinDigitado = (document.getElementById("pin-input")?.value || "").trim();
@@ -910,14 +930,18 @@ document.getElementById("btn-pin-entrar")?.addEventListener("click", async () =>
     const hashDigitado = await calcularHashPin(pinDigitado);
     if (hashDigitado === hashGuardado) {
         esconderEcraPin();
-        await iniciarSessaoFABEF(user);
+        if (FABEF.carregado) {
+            abrirAplicacao();
+        } else {
+            await iniciarSessaoFABEF(user);
+        }
     } else {
-        if (statusPin) statusPin.textContent = "ðŸ”´ PIN incorreto. Tente novamente.";
+        if (statusPin) statusPin.textContent = "🔴 PIN incorreto. Tente novamente.";
     }
 });
 
 document.getElementById("btn-pin-sair")?.addEventListener("click", async () => {
-    const user = auth.currentUser;
+    const user = auth.currentUser || FABEF.user;
     if (user) localStorage.removeItem(chavePinLocal(user.uid));
     esconderEcraPin();
     await signOut(auth);
@@ -928,17 +952,24 @@ onAuthStateChanged(auth, async user => {
     if (!user) {
         await limparEstadoFABEF();
         esconderEcraPin();
-        if (elAuth("app")) elAuth("app").classList.add("hidden");
-        if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
+        if (elAuth("app")) {
+            elAuth("app").classList.add("hidden");
+            elAuth("app").style.display = "none";
+        }
+        const tl = elAuth("tela-login");
+        if (tl) {
+            tl.style.display = "flex";
+            tl.classList.remove("hidden");
+        }
         return;
     }
 
     // Durante o registo, o Auth pode emitir o utilizador antes dos documentos Firestore.
-    // Esperamos a conclusÃ£o de criarConta() para evitar uma corrida de inicializaÃ§Ã£o.
+    // Esperamos a conclusão de criarConta() para evitar uma corrida de inicialização.
     if (FABEF_registoEmCurso) return;
 
-    // Se jÃ¡ existe um PIN definido neste dispositivo para este utilizador, exige-o
-    // em vez de abrir diretamente â€” isto substitui o pedido de e-mail/senha,
+    // Se já existe um PIN definido neste dispositivo para este utilizador, exige-o
+    // em vez de abrir diretamente — isto substitui o pedido de e-mail/senha,
     // mas continua a funcionar sem internet.
     const temPinLocal = !!localStorage.getItem(chavePinLocal(user.uid));
     if (temPinLocal) {
@@ -1040,48 +1071,64 @@ function pedirRenderTudo() {
 ===================================================== */
 function escutarColecao(nome, estado) {
     return new Promise((resolve) => {
-        let primeiraVez = true;
-        const unsub = onSnapshot(
-            subRef(nome),
-            (snap) => {
-                FABEF[estado] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-                // A cada atualizaÃ§Ã£o de produtos, verifica se algum ficou com
-                // stock negativo (sinal de duas vendas offline em conflito).
-                if (estado === "produtos") {
-                    verificarReconciliacaoStock();
-                }
-
-                if (primeiraVez) {
-                    primeiraVez = false;
-                    resolve();
-                } else {
-                    pedirRenderTudo();
-                }
-            },
-            (erro) => {
-                console.error(`Erro ao escutar a coleÃ§Ã£o "${nome}" em tempo real:`, erro);
-                if (primeiraVez) { primeiraVez = false; resolve(); }
+        let finalizado = false;
+        const concluir = () => {
+            if (!finalizado) {
+                finalizado = true;
+                resolve();
             }
-        );
-        FABEF.listeners.push(unsub);
+        };
+        // Timeout de proteção: nunca bloqueia o arranque da aplicação
+        const timer = setTimeout(concluir, 2500);
+
+        try {
+            const unsub = onSnapshot(
+                subRef(nome),
+                (snap) => {
+                    clearTimeout(timer);
+                    FABEF[estado] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                    // A cada atualização de produtos, verifica se algum ficou com
+                    // stock negativo (sinal de duas vendas offline em conflito).
+                    if (estado === "produtos") {
+                        verificarReconciliacaoStock();
+                    }
+
+                    if (!finalizado) {
+                        concluir();
+                    } else {
+                        pedirRenderTudo();
+                    }
+                },
+                (erro) => {
+                    clearTimeout(timer);
+                    console.error(`Erro ao escutar a coleção "${nome}" em tempo real:`, erro);
+                    concluir();
+                }
+            );
+            FABEF.listeners.push(unsub);
+        } catch (erro) {
+            clearTimeout(timer);
+            console.error(`Falha ao iniciar escuta de "${nome}":`, erro);
+            concluir();
+        }
     });
 }
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: INDICADOR DE LIGAÃ‡ÃƒO / MODO OFFLINE
+   MÓDULO LÓGICO: INDICADOR DE LIGAÇÃO / MODO OFFLINE
 ===================================================== */
 function atualizarIndicadorLigacao() {
     const indicador = document.getElementById("indicador-ligacao");
     if (!indicador) return;
     if (navigator.onLine) {
-        indicador.textContent = "ðŸŸ¢ Online";
+        indicador.textContent = "🟢 Online";
         indicador.style.color = "#10b981";
-        indicador.title = "Ligado Ã  internet â€” os dados sincronizam em tempo real.";
+        indicador.title = "Ligado à internet — os dados sincronizam em tempo real.";
     } else {
-        indicador.textContent = "ðŸ”´ Offline";
+        indicador.textContent = "🔴 Offline";
         indicador.style.color = "#ef4444";
-        indicador.title = "Sem internet. Pode continuar a vender e a trabalhar â€” tudo serÃ¡ sincronizado assim que a ligaÃ§Ã£o voltar.";
+        indicador.title = "Sem internet. Pode continuar a vender e a trabalhar — tudo será sincronizado assim que a ligação voltar.";
     }
 }
 window.addEventListener("online", () => { atualizarIndicadorLigacao(); if (typeof renderPOS === "function" && FABEF.carregado) renderPOS(); });
@@ -1089,13 +1136,32 @@ window.addEventListener("offline", () => { atualizarIndicadorLigacao(); if (type
 
 
 function abrirAplicacao() {
-    elAuth("tela-login")?.style && (elAuth("tela-login").style.display = "none");
+    // 1. Esconde a tela de login/registo
+    const tl = elAuth("tela-login");
+    if (tl) {
+        tl.style.display = "none";
+        tl.classList.add("hidden");
+    }
+    elAuth("registo-form")?.classList.add("hidden");
+    elAuth("login-form")?.classList.remove("hidden");
+    if (elAuth("reg-status")) elAuth("reg-status").textContent = "";
+    if (elAuth("login-status")) elAuth("login-status").textContent = "";
+
+    // 2. Esconde o ecrã de PIN
     esconderEcraPin();
-    elAuth("app")?.classList.remove("hidden");
+
+    // 3. Mostra a interface principal
+    const appEl = elAuth("app");
+    if (appEl) {
+        appEl.classList.remove("hidden");
+        appEl.style.display = "block";
+    }
+
+    // 4. Menu lateral começa fechado e vai direto para a tela de início
     document.getElementById("sidebar")?.classList.add("closed");
     mostrarSecao("inicio");
 
-
+    // 5. Utilizador no cabeçalho
     const headerUser = elAuth("header-user");
     if (headerUser) {
         headerUser.textContent = FABEF.userData?.nome || FABEF.user?.email || "Utilizador";
@@ -1105,11 +1171,6 @@ function abrirAplicacao() {
     renderTudo();
     verificarSubscricao();
     atualizarIndicadorLigacao();
-
-    // Primeira vez neste dispositivo: sugere definir um PIN para acesso rÃ¡pido offline
-    if (FABEF.user?.uid && !localStorage.getItem(chavePinLocal(FABEF.user.uid))) {
-        setTimeout(() => configurarNovoPin(FABEF.user.uid), 600);
-    }
 }
 
 
@@ -3467,17 +3528,22 @@ let FABEF_UNSUB_CAIXA = null;
 
 function ouvirCaixa() {
     return new Promise((resolve) => {
-        // Se jÃ¡ havia uma escuta ativa (ex: estava a ouvir o caixa de outro
-        // ramo antes de trocar), termina-a primeiro â€” nunca ficam duas em
-        // simultÃ¢neo, senÃ£o o estado do caixa ficaria instÃ¡vel.
         if (FABEF_UNSUB_CAIXA) {
             try { FABEF_UNSUB_CAIXA(); } catch (_) {}
             FABEF_UNSUB_CAIXA = null;
         }
 
-        let primeiraVez = true;
+        let finalizado = false;
+        const concluir = () => {
+            if (!finalizado) {
+                finalizado = true;
+                resolve();
+            }
+        };
+        // Timeout de proteção de 2.5s para não travar inicialização
+        const timer = setTimeout(concluir, 2500);
+
         try {
-            // Query de seguranÃ§a: Busca se existe algum caixa com estado ativo aberto para este operador e ramo
             const q = query(
                 subRef("caixas_turnos"),
                 where("ramo", "==", FABEF.ramo),
@@ -3486,6 +3552,7 @@ function ouvirCaixa() {
             );
 
             FABEF_UNSUB_CAIXA = onSnapshot(q, (snap) => {
+                clearTimeout(timer);
                 if (snap.empty) {
                     FABEF.turnoId = null;
                     FABEF.turno = null;
@@ -3497,23 +3564,28 @@ function ouvirCaixa() {
 
                 atualizarTelaCaixa();
 
-                if (primeiraVez) { primeiraVez = false; resolve(); }
-                else pedirRenderTudo();
+                if (!finalizado) {
+                    concluir();
+                } else {
+                    pedirRenderTudo();
+                }
             }, (erro) => {
-                console.error("Erro crÃ­tico na escuta do estado do caixa:", erro);
+                clearTimeout(timer);
+                console.error("Erro na escuta do estado do caixa:", erro);
                 FABEF.turnoId = null;
                 FABEF.turno = null;
                 atualizarTelaCaixa();
-                if (primeiraVez) { primeiraVez = false; resolve(); }
+                concluir();
             });
 
             FABEF.listeners.push(FABEF_UNSUB_CAIXA);
         } catch (error) {
-            console.error("Erro crÃ­tico na escuta do estado do caixa:", error);
+            clearTimeout(timer);
+            console.error("Erro na escuta do estado do caixa:", error);
             FABEF.turnoId = null;
             FABEF.turno = null;
             atualizarTelaCaixa();
-            resolve();
+            concluir();
         }
     });
 }
@@ -5026,54 +5098,37 @@ if (botaoTresPontos && caixaInformacoes) {
   });
 }
 
-// 2. Lógica de Segurança (Inatividade = PIN | Sair do App = Senha)
-let tempoInatividade;
+/* =====================================================
+   MÓDULO DE BLINDAGEM DE SESSÃO:
+   - Sair (Logout): Exige E-mail e Senha (limpa PIN e desloga)
+   - Minimizar / Trocar de Aba: Exige PIN imediato (se configurado)
+   - Inatividade (5 minutos): Exige PIN imediato (se configurado)
+===================================================== */
+let tempoInatividade = null;
 
 function reiniciarTemporizadorPIN() {
-  clearTimeout(tempoInatividade);
-  // Bloqueia e pede o PIN após 5 minutos de inatividade (300000 milissegundos)
-  tempoInatividade = setTimeout(function() {
-    exibirTelaBloqueioPIN();
-  }, 300000); 
+    if (tempoInatividade) clearTimeout(tempoInatividade);
+    tempoInatividade = setTimeout(() => {
+        const user = auth.currentUser || FABEF.user;
+        if (user && elAuth("app") && !elAuth("app").classList.contains("hidden")) {
+            if (localStorage.getItem(chavePinLocal(user.uid))) {
+                mostrarEcraPin();
+            }
+        }
+    }, 300000); // 5 minutos de inatividade
 }
 
-// Deteta movimentos para reiniciar o tempo do PIN (o utilizador está ativo)
 window.addEventListener('mousemove', reiniciarTemporizadorPIN);
 window.addEventListener('keypress', reiniciarTemporizadorPIN);
 window.addEventListener('touchstart', reiniciarTemporizadorPIN);
 
-// Deteta se o utilizador SAIU do aplicativo (Mudou de aba, minimizou ou fechou)
-document.addEventListener('visibilitychange', function() {
-  if (document.hidden) {
-    // Se saiu, apaga a sessão e força o pedido de SENHA completa no regresso
-    forcarLoginPorSenha();
-  }
-});
-
-function exibirTelaBloqueioPIN() {
-  console.log("Sistema bloqueado: Pedir PIN rápido.");
-  // Aqui o seu sistema deve mostrar a tela do PIN que o Claude desenhou
-}
-
-function forcarLoginPorSenha() {
-  console.log("Utilizador saiu do app: Encerrar sessão e pedir Senha.");
-  // Aqui o seu sistema deve deslogar e mandar o utilizador para a tela de login
-}
-
-
-/* =====================================================
-   MÓDULO DE BLINDAGEM DE SESSÃO:
-   - Sair (Logout): Exige E-mail e Senha
-   - Minimizar / Trocar de Aba: Exige PIN
-===================================================== */
+// Ao minimizar a janela ou mudar de aba: exige PIN
 document.addEventListener("visibilitychange", () => {
     if (document.hidden && FABEF.user && elAuth("app") && !elAuth("app").classList.contains("hidden")) {
-        mostrarEcraPin();
-    }
-});
-window.addEventListener("blur", () => {
-    if (FABEF.user && elAuth("app") && !elAuth("app").classList.contains("hidden")) {
-        mostrarEcraPin();
+        const user = auth.currentUser || FABEF.user;
+        if (user && localStorage.getItem(chavePinLocal(user.uid))) {
+            mostrarEcraPin();
+        }
     }
 });
 
