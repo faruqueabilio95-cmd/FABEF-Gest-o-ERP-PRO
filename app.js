@@ -93,8 +93,6 @@ const FABEF_API_BASE = window.FABEF_API_BASE || "";
    ESTADO GLOBAL DA APLICAÃ‡ÃƒO (FABEF GLOBAL MEMORY)
 ===================================================== */
 
-const FABEF_STOCK_NEGATIVO_ALERTADO = new Set();
-
 window.FABEF = {
     user: null,
     userData: null,
@@ -760,35 +758,24 @@ async function criarConta() {
             criadoEm: serverTimestamp()
         };
 
-        // Os dois documentos só são criados para o UID autenticado.
+        // Os dois documentos sÃ³ sÃ£o criados para o UID autenticado.
         await setDoc(doc(db, "empresas", empresaId), empresa);
         await setDoc(doc(db, "utilizadores", uidUser), utilizador);
 
-        if (status) status.textContent = "🟢 Conta criada com sucesso. A abrir o sistema...";
+        if (status) status.textContent = "ðŸŸ¢ Conta criada com sucesso. A abrir o sistema...";
 
-        // Define os dados essenciais da empresa e do utilizador diretamente na memória
-        FABEF.user = credencial.user;
-        FABEF.userData = { uid: uidUser, ...utilizador };
-        FABEF.empresaId = empresaId;
-        FABEF.empresa = { id: empresaId, ...empresa };
-        FABEF.ramo = ramo;
+        // CORREÃ‡ÃƒO: o onAuthStateChanged jÃ¡ disparou (ignorado, porque
+        // FABEF_registoEmCurso estava ativo) e nÃ£o volta a disparar sozinho,
+        // porque o estado de autenticaÃ§Ã£o nÃ£o muda outra vez. Por isso,
+        // depois de os documentos existirem, arrancamos a sessÃ£o manualmente.
         FABEF_registoEmCurso = false;
-
-        // Abre a aplicação imediatamente sem bloquear a interface!
-        abrirAplicacao();
-        FABEF.carregado = true;
-
-        // Escuta coleções em segundo plano para preencher dados
-        carregarDados().then(() => {
-            renderTudo();
-        }).catch(err => {
-            console.error("Erro ao sincronizar dados em tempo real:", err);
-        });
-
+        if (auth.currentUser) {
+            await iniciarSessaoFABEF(auth.currentUser);
+        }
         return;
     } catch (error) {
         console.error("Erro ao criar conta:", error);
-        if (status) status.textContent = "🔴 " + mensagemFirebase(error);
+        if (status) status.textContent = "ðŸ”´ " + mensagemFirebase(error);
     } finally {
         FABEF_registoEmCurso = false;
         if (btnRegistar) btnRegistar.disabled = false;
@@ -827,47 +814,36 @@ async function limparEstadoFABEF() {
 }
 
 async function iniciarSessaoFABEF(user) {
-    if (!user) return;
-    if (FABEF.carregado) return;
     if (FABEF_arranqueEmCurso) return;
     FABEF_arranqueEmCurso = true;
 
     const loginStatus = elAuth("login-status");
-    const regStatus = elAuth("reg-status");
     try {
         FABEF.user = user;
-        if (loginStatus) loginStatus.textContent = "⏳ A carregar a empresa...";
-        if (regStatus) regStatus.textContent = "⏳ A carregar a empresa...";
+        if (loginStatus) loginStatus.textContent = "â³ A carregar a empresa...";
 
+        // NÃƒO existe fallback para perfil inexistente.
         await carregarPerfil(user);
         await carregarEmpresa();
+        await carregarDados();
 
-        // Abre a aplicação imediatamente após perfil e empresa estarem carregados
         abrirAplicacao();
         FABEF.carregado = true;
-
-        // Carrega as coleções em tempo real em segundo plano
-        carregarDados().then(() => {
-            renderTudo();
-        }).catch(err => {
-            console.error("Erro ao sincronizar dados da empresa:", err);
-        });
     } catch (error) {
-        console.error("Erro crítico ao iniciar a aplicação:", error);
+        console.error("Erro crÃ­tico ao iniciar a aplicaÃ§Ã£o:", error);
         const mensagem = mensagemFirebase(error);
-        if (loginStatus) loginStatus.textContent = "🔴 Não foi possível carregar a conta: " + mensagem;
+        if (loginStatus) loginStatus.textContent = "ðŸ”´ NÃ£o foi possÃ­vel carregar a conta: " + mensagem;
+
+        const regStatus = elAuth("reg-status");
         if (regStatus && !FABEF_registoEmCurso) {
-            regStatus.textContent = "🔴 Não foi possível carregar a empresa: " + mensagem;
+            regStatus.textContent = "ðŸ”´ NÃ£o foi possÃ­vel carregar a empresa: " + mensagem;
         }
 
-        // Mantém a sessão autenticada para permitir diagnóstico/retry.
+        // MantÃ©m a sessÃ£o autenticada para permitir diagnÃ³stico/retry.
+        // NÃ£o usamos signOut() aqui, porque um erro do Firestore nÃ£o significa senha invÃ¡lida.
         FABEF.carregado = false;
         elAuth("app")?.classList.add("hidden");
-        const tl = elAuth("tela-login");
-        if (tl) {
-            tl.style.display = "flex";
-            tl.classList.remove("hidden");
-        }
+        if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
     } finally {
         FABEF_arranqueEmCurso = false;
     }
@@ -920,7 +896,7 @@ function esconderEcraPin() {
 }
 
 document.getElementById("btn-pin-entrar")?.addEventListener("click", async () => {
-    const user = auth.currentUser || FABEF.user;
+    const user = auth.currentUser;
     if (!user) { mostrarEcraPin(); return; }
 
     const pinDigitado = (document.getElementById("pin-input")?.value || "").trim();
@@ -932,18 +908,14 @@ document.getElementById("btn-pin-entrar")?.addEventListener("click", async () =>
     const hashDigitado = await calcularHashPin(pinDigitado);
     if (hashDigitado === hashGuardado) {
         esconderEcraPin();
-        if (FABEF.carregado) {
-            abrirAplicacao();
-        } else {
-            await iniciarSessaoFABEF(user);
-        }
+        await iniciarSessaoFABEF(user);
     } else {
-        if (statusPin) statusPin.textContent = "🔴 PIN incorreto. Tente novamente.";
+        if (statusPin) statusPin.textContent = "ðŸ”´ PIN incorreto. Tente novamente.";
     }
 });
 
 document.getElementById("btn-pin-sair")?.addEventListener("click", async () => {
-    const user = auth.currentUser || FABEF.user;
+    const user = auth.currentUser;
     if (user) localStorage.removeItem(chavePinLocal(user.uid));
     esconderEcraPin();
     await signOut(auth);
@@ -954,25 +926,17 @@ onAuthStateChanged(auth, async user => {
     if (!user) {
         await limparEstadoFABEF();
         esconderEcraPin();
-        if (elAuth("app")) {
-            elAuth("app").classList.add("hidden");
-            elAuth("app").style.display = "none";
-        }
-        const tl = elAuth("tela-login");
-        if (tl) {
-            tl.style.display = "flex";
-            tl.classList.remove("hidden");
-        }
+        if (elAuth("app")) elAuth("app").classList.add("hidden");
+        if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
         return;
     }
 
     // Durante o registo, o Auth pode emitir o utilizador antes dos documentos Firestore.
-    // Esperamos a conclusão de criarConta() para evitar uma corrida de inicialização.
+    // Esperamos a conclusÃ£o de criarConta() para evitar uma corrida de inicializaÃ§Ã£o.
     if (FABEF_registoEmCurso) return;
-    if (FABEF.carregado) return;
 
-    // Se já existe um PIN definido neste dispositivo para este utilizador, exige-o
-    // em vez de abrir diretamente — isto substitui o pedido de e-mail/senha,
+    // Se jÃ¡ existe um PIN definido neste dispositivo para este utilizador, exige-o
+    // em vez de abrir diretamente â€” isto substitui o pedido de e-mail/senha,
     // mas continua a funcionar sem internet.
     const temPinLocal = !!localStorage.getItem(chavePinLocal(user.uid));
     if (temPinLocal) {
@@ -1074,64 +1038,48 @@ function pedirRenderTudo() {
 ===================================================== */
 function escutarColecao(nome, estado) {
     return new Promise((resolve) => {
-        let finalizado = false;
-        const concluir = () => {
-            if (!finalizado) {
-                finalizado = true;
-                resolve();
-            }
-        };
-        // Timeout de proteção: nunca bloqueia o arranque da aplicação
-        const timer = setTimeout(concluir, 2500);
+        let primeiraVez = true;
+        const unsub = onSnapshot(
+            subRef(nome),
+            (snap) => {
+                FABEF[estado] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        try {
-            const unsub = onSnapshot(
-                subRef(nome),
-                (snap) => {
-                    clearTimeout(timer);
-                    FABEF[estado] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-                    // A cada atualização de produtos, verifica se algum ficou com
-                    // stock negativo (sinal de duas vendas offline em conflito).
-                    if (estado === "produtos") {
-                        verificarReconciliacaoStock();
-                    }
-
-                    if (!finalizado) {
-                        concluir();
-                    } else {
-                        pedirRenderTudo();
-                    }
-                },
-                (erro) => {
-                    clearTimeout(timer);
-                    console.error(`Erro ao escutar a coleção "${nome}" em tempo real:`, erro);
-                    concluir();
+                // A cada atualizaÃ§Ã£o de produtos, verifica se algum ficou com
+                // stock negativo (sinal de duas vendas offline em conflito).
+                if (estado === "produtos") {
+                    verificarReconciliacaoStock();
                 }
-            );
-            FABEF.listeners.push(unsub);
-        } catch (erro) {
-            clearTimeout(timer);
-            console.error(`Falha ao iniciar escuta de "${nome}":`, erro);
-            concluir();
-        }
+
+                if (primeiraVez) {
+                    primeiraVez = false;
+                    resolve();
+                } else {
+                    pedirRenderTudo();
+                }
+            },
+            (erro) => {
+                console.error(`Erro ao escutar a coleÃ§Ã£o "${nome}" em tempo real:`, erro);
+                if (primeiraVez) { primeiraVez = false; resolve(); }
+            }
+        );
+        FABEF.listeners.push(unsub);
     });
 }
 
 /* =====================================================
-   MÓDULO LÓGICO: INDICADOR DE LIGAÇÃO / MODO OFFLINE
+   MÃ“DULO LÃ“GICO: INDICADOR DE LIGAÃ‡ÃƒO / MODO OFFLINE
 ===================================================== */
 function atualizarIndicadorLigacao() {
     const indicador = document.getElementById("indicador-ligacao");
     if (!indicador) return;
     if (navigator.onLine) {
-        indicador.textContent = "🟢 Online";
+        indicador.textContent = "ðŸŸ¢ Online";
         indicador.style.color = "#10b981";
-        indicador.title = "Ligado à internet — os dados sincronizam em tempo real.";
+        indicador.title = "Ligado Ã  internet â€” os dados sincronizam em tempo real.";
     } else {
-        indicador.textContent = "🔴 Offline";
+        indicador.textContent = "ðŸ”´ Offline";
         indicador.style.color = "#ef4444";
-        indicador.title = "Sem internet. Pode continuar a vender e a trabalhar — tudo será sincronizado assim que a ligação voltar.";
+        indicador.title = "Sem internet. Pode continuar a vender e a trabalhar â€” tudo serÃ¡ sincronizado assim que a ligaÃ§Ã£o voltar.";
     }
 }
 window.addEventListener("online", () => { atualizarIndicadorLigacao(); if (typeof renderPOS === "function" && FABEF.carregado) renderPOS(); });
@@ -1139,44 +1087,23 @@ window.addEventListener("offline", () => { atualizarIndicadorLigacao(); if (type
 
 
 function abrirAplicacao() {
-    // 1. Esconde a tela de login/registo
-    const tl = elAuth("tela-login");
-    if (tl) {
-        tl.style.display = "none";
-        tl.classList.add("hidden");
-    }
-    elAuth("registo-form")?.classList.add("hidden");
-    elAuth("login-form")?.classList.remove("hidden");
-    if (elAuth("reg-status")) elAuth("reg-status").textContent = "";
-    if (elAuth("login-status")) elAuth("login-status").textContent = "";
-
-    // 2. Esconde o ecrã de PIN
+    elAuth("tela-login")?.style && (elAuth("tela-login").style.display = "none");
     esconderEcraPin();
+    elAuth("app")?.classList.remove("hidden");
 
-    // 3. Mostra a interface principal
-    const appEl = elAuth("app");
-    if (appEl) {
-        appEl.classList.remove("hidden");
-        appEl.style.display = "block";
-    }
-
-    // 4. Menu lateral começa fechado e vai direto para a tela de início
-    document.getElementById("sidebar")?.classList.add("closed");
-    mostrarSecao("inicio");
-
-    // 5. Utilizador no cabeçalho
     const headerUser = elAuth("header-user");
     if (headerUser) {
         headerUser.textContent = FABEF.userData?.nome || FABEF.user?.email || "Utilizador";
     }
 
-    try {
-        aplicarRestricoesDeAcessoPorPapel();
-        renderTudo();
-        verificarSubscricao();
-        atualizarIndicadorLigacao();
-    } catch (e) {
-        console.warn("Aviso ao renderizar estado inicial da aplicacao:", e);
+    aplicarRestricoesDeAcessoPorPapel();
+    renderTudo();
+    verificarSubscricao();
+    atualizarIndicadorLigacao();
+
+    // Primeira vez neste dispositivo: sugere definir um PIN para acesso rÃ¡pido offline
+    if (FABEF.user?.uid && !localStorage.getItem(chavePinLocal(FABEF.user.uid))) {
+        setTimeout(() => configurarNovoPin(FABEF.user.uid), 600);
     }
 }
 
@@ -1305,18 +1232,9 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
 });
 
 
-document.getElementById("btn-logout")?.addEventListener("click", async () => {
+document.getElementById("btn-logout").addEventListener("click", async () => {
     try {
-        const user = auth.currentUser;
-        if (user) {
-            localStorage.removeItem(chavePinLocal(user.uid));
-        }
-        await limparEstadoFABEF();
         await signOut(auth);
-        esconderEcraPin();
-        if (elAuth("app")) elAuth("app").classList.add("hidden");
-        if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
-        alert("Sessão terminada. Introduza o seu e-mail e palavra-passe para voltar a entrar.");
     } catch (error) {
         console.error("Erro ao efetuar logout seguro:", error);
     }
@@ -1502,11 +1420,6 @@ async function adicionarRamoPersonalizado() {
     const input = document.getElementById("novo-ramo-nome");
     const nome = input?.value.trim();
     if (!nome) { alert("Introduza o nome do novo ramo."); return; }
-    const ramosAtuais = FABEF.empresa?.ramos_atividade || [FABEF.ramo];
-    if (ramosAtuais.length >= 3) {
-        alert("Limite de Ramos Atingido: Cada gerente pode gerir até 3 ramos de atividade em simultâneo.");
-        return;
-    }
     if (RAMOS.some(r => r.toLowerCase() === nome.toLowerCase())) {
         alert("Este ramo jÃ¡ existe na lista.");
         return;
@@ -1531,44 +1444,6 @@ async function adicionarRamoPersonalizado() {
     }
 }
 
-
-
-/* =====================================================
-   MÓDULO DE REGRAS INDEPENDENTES POR RAMO (ATÉ 3 RAMOS)
-===================================================== */
-function obterInfoRamo(ramoNome) {
-    if (!FABEF.empresa) return { estado: "TESTE", diasRestantes: 7 };
-    const regras = FABEF.empresa.ramos_regras || {};
-    const info = regras[ramoNome] || {};
-    
-    if (info.estado === "ACTIVO") {
-        if (info.validade && new Date() > new Date(info.validade)) {
-            return { estado: "EXPIRADO", diasRestantes: 0, validade: info.validade };
-        }
-        return { estado: "ACTIVO", validade: info.validade };
-    }
-
-    const inicio = info.dataInicio || FABEF.empresa.data_registo || FABEF.empresa.criadoEm || Date.now();
-    const d = inicio && typeof inicio.toDate === "function" ? inicio.toDate() : new Date(inicio);
-    const fim = new Date(d);
-    fim.setDate(fim.getDate() + 7);
-    
-    if (new Date() > fim) {
-        return { estado: "RESTRITO", diasRestantes: 0 };
-    }
-    const dias = Math.max(0, Math.ceil((fim - Date.now()) / 86400000));
-    return { estado: "TESTE", diasRestantes: dias };
-}
-
-function verificarBloqueioOperacaoRamo() {
-    const info = obterInfoRamo(FABEF.ramo);
-    if (info.estado === "RESTRITO" || info.estado === "EXPIRADO") {
-        alert(`⚠️ USO RESTRITO: O período de 7 dias de teste grátis para o ramo "${FABEF.ramo}" terminou.\n\nPara continuar a efetuar vendas e emitir faturas neste ramo, regularize a subscrição mensal de 250 MT (via e-Mola ou M-Pesa).`);
-        mostrarSecao("subscricao");
-        return true;
-    }
-    return false;
-}
 
 async function mudarRamo(ramo) {
     if (!RAMOS.includes(ramo)) return;
@@ -2622,8 +2497,6 @@ function atualizarRestantePagamentoMisto() {
 
 
 async function finalizarVenda() {
-    if (verificarBloqueioOperacaoRamo()) return;
-
     if (limiteVendasDiariasAtingido()) {
         avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.vendasDiarias} vendas do plano grÃ¡tis.`);
         return;
@@ -2777,8 +2650,6 @@ async function finalizarVenda() {
         renderTudo();
 
         // Insere o faturamento financeiro nos registos inalterÃ¡veis de auditoria
-        const idVendaCriada = vendaRef.id;
-        abrirModalPosVenda(idVendaCriada, totalComDesconto, nomeClienteVenda);
         await gravarAuditoria("Registou venda de mercadorias no valor de " + dinheiro(totalComDesconto) + (desconto > 0 ? ` (desconto de ${dinheiro(desconto)} aplicado)` : ""), "INFO");
         alert("Venda concluÃ­da com sucesso. Valor total: " + dinheiro(totalComDesconto));
 
@@ -2859,63 +2730,18 @@ window.imprimirReciboVenda = function(vendaId) {
     w.document.close();
 };
 
-window.enviarReciboWhatsApp = function(vendaId, telefoneOpcional) {
+window.enviarReciboWhatsApp = function(vendaId) {
     const v = FABEF.vendas.find(x => x.id === vendaId);
-    if (!v) { alert("Venda não localizada."); return; }
+    if (!v) { alert("Venda nÃ£o localizada."); return; }
     const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
-    const textoItens = (v.itens || []).map(item => `• ${item.nome} (x${item.quantidade}): ${dinheiro(item.subtotal)}`).join("\n");
-    const mensagem = encodeURIComponent(`*${nomeEmpresa.toUpperCase()} - RECIBO DIGITAL*\n----------------------------------------\n*Código da Venda:* ${v.id}\n*Data:* ${dataTexto(v.data)}\n*Operador:* ${v.operadorNome || "Balcão"}\n*NUIT Cliente:* ${v.nuitCliente || "Isento"}\n----------------------------------------\n*ARTIGOS:*\n${textoItens}\n----------------------------------------\n*TOTAL:* ${dinheiro(v.total)}\n*Forma de Pagamento:* ${v.pagamento || "—"}\n\nObrigado pela preferência! 🎉`);
-    
-    let tel = (telefoneOpcional || "").replace(/[^0-9]/g, "");
-    if (tel && !tel.startsWith("258") && tel.length === 9) {
-        tel = "258" + tel;
-    }
-    const url = tel ? `https://wa.me/${tel}?text=${mensagem}` : `https://wa.me/?text=${mensagem}`;
-    window.open(url, "_blank");
+    const textoItens = (v.itens || []).map(item => `â€¢ ${item.nome} (x${item.quantidade}): ${dinheiro(item.subtotal)}`).join("\n");
+    const mensagem = encodeURIComponent(`*${nomeEmpresa.toUpperCase()} - RECIBO DIGITAL*\n----------------------------------------\n*CÃ³digo da Venda:* ${v.id}\n*Data:* ${dataTexto(v.data)}\n*Operador:* ${v.operadorNome || "BalcÃ£o"}\n*NUIT Cliente:* ${v.nuitCliente || "Isento"}\n----------------------------------------\n*ARTIGOS:*\n${textoItens}\n----------------------------------------\n*TOTAL:* ${dinheiro(v.total)}\n*Forma de Pagamento:* ${v.pagamento || "â€”"}\n\nObrigado pela preferÃªncia! ðŸŽ‰`);
+    window.open(`https://wa.me/?text=${mensagem}`, "_blank");
 };
 
 /* =====================================================
    EXPORTAÃ‡ÃƒO DE INVENTÃRIO CSV
 ===================================================== */
-
-
-/* =====================================================
-   MÓDULO: MODAL PÓS-VENDA & WHATSAPP
-===================================================== */
-let FABEF_ULTIMA_VENDA_ID = null;
-
-function abrirModalPosVenda(vendaId, total, nomeCliente) {
-    FABEF_ULTIMA_VENDA_ID = vendaId;
-    const modal = document.getElementById("modal-pos-venda");
-    const totalEl = document.getElementById("pos-venda-total");
-    const telInput = document.getElementById("pos-venda-telefone");
-    
-    if (totalEl) totalEl.textContent = dinheiro(total);
-    
-    let telefoneCliente = "";
-    if (nomeCliente) {
-        const c = FABEF.clientes.find(x => x.nome.toLowerCase() === nomeCliente.toLowerCase());
-        if (c?.telefone) telefoneCliente = c.telefone;
-    }
-    if (telInput) telInput.value = telefoneCliente;
-    if (modal) modal.classList.add("show");
-}
-
-document.getElementById("btn-pos-venda-whatsapp")?.addEventListener("click", () => {
-    if (!FABEF_ULTIMA_VENDA_ID) return;
-    const tel = document.getElementById("pos-venda-telefone")?.value.trim() || "";
-    enviarReciboWhatsApp(FABEF_ULTIMA_VENDA_ID, tel);
-});
-
-document.getElementById("btn-pos-venda-imprimir")?.addEventListener("click", () => {
-    if (!FABEF_ULTIMA_VENDA_ID) return;
-    imprimirReciboVenda(FABEF_ULTIMA_VENDA_ID);
-});
-
-document.getElementById("btn-pos-venda-continuar")?.addEventListener("click", () => {
-    document.getElementById("modal-pos-venda")?.classList.remove("show");
-    FABEF_ULTIMA_VENDA_ID = null;
-});
 
 window.exportarInventarioCSV = function() {
     const produtosRamo = FABEF.produtos.filter(p => p.ramo === FABEF.ramo);
@@ -3535,22 +3361,17 @@ let FABEF_UNSUB_CAIXA = null;
 
 function ouvirCaixa() {
     return new Promise((resolve) => {
+        // Se jÃ¡ havia uma escuta ativa (ex: estava a ouvir o caixa de outro
+        // ramo antes de trocar), termina-a primeiro â€” nunca ficam duas em
+        // simultÃ¢neo, senÃ£o o estado do caixa ficaria instÃ¡vel.
         if (FABEF_UNSUB_CAIXA) {
             try { FABEF_UNSUB_CAIXA(); } catch (_) {}
             FABEF_UNSUB_CAIXA = null;
         }
 
-        let finalizado = false;
-        const concluir = () => {
-            if (!finalizado) {
-                finalizado = true;
-                resolve();
-            }
-        };
-        // Timeout de proteção de 2.5s para não travar inicialização
-        const timer = setTimeout(concluir, 2500);
-
+        let primeiraVez = true;
         try {
+            // Query de seguranÃ§a: Busca se existe algum caixa com estado ativo aberto para este operador e ramo
             const q = query(
                 subRef("caixas_turnos"),
                 where("ramo", "==", FABEF.ramo),
@@ -3559,7 +3380,6 @@ function ouvirCaixa() {
             );
 
             FABEF_UNSUB_CAIXA = onSnapshot(q, (snap) => {
-                clearTimeout(timer);
                 if (snap.empty) {
                     FABEF.turnoId = null;
                     FABEF.turno = null;
@@ -3571,28 +3391,23 @@ function ouvirCaixa() {
 
                 atualizarTelaCaixa();
 
-                if (!finalizado) {
-                    concluir();
-                } else {
-                    pedirRenderTudo();
-                }
+                if (primeiraVez) { primeiraVez = false; resolve(); }
+                else pedirRenderTudo();
             }, (erro) => {
-                clearTimeout(timer);
-                console.error("Erro na escuta do estado do caixa:", erro);
+                console.error("Erro crÃ­tico na escuta do estado do caixa:", erro);
                 FABEF.turnoId = null;
                 FABEF.turno = null;
                 atualizarTelaCaixa();
-                concluir();
+                if (primeiraVez) { primeiraVez = false; resolve(); }
             });
 
             FABEF.listeners.push(FABEF_UNSUB_CAIXA);
         } catch (error) {
-            clearTimeout(timer);
-            console.error("Erro na escuta do estado do caixa:", error);
+            console.error("Erro crÃ­tico na escuta do estado do caixa:", error);
             FABEF.turnoId = null;
             FABEF.turno = null;
             atualizarTelaCaixa();
-            concluir();
+            resolve();
         }
     });
 }
@@ -4477,47 +4292,7 @@ function renderAvisoPlano() {
 }
 
 
-
-function renderStatusRamosSubscricao() {
-    const lista = document.getElementById("lista-status-ramos");
-    const selectAlvo = document.getElementById("pagamento-ramo-alvo");
-    if (!lista) return;
-
-    const ramos = FABEF.empresa?.ramos_atividade || [FABEF.ramo];
-    
-    lista.innerHTML = ramos.map(r => {
-        const info = obterInfoRamo(r);
-        let badge = "";
-        let desc = "";
-        if (info.estado === "ACTIVO") {
-            badge = `<span class="badge badge-green">Activo</span>`;
-            desc = info.validade ? `Válido até ${new Date(info.validade).toLocaleDateString("pt-MZ")}` : "Subscrição regularizada";
-        } else if (info.estado === "RESTRITO" || info.estado === "EXPIRADO") {
-            badge = `<span class="badge badge-red">Uso Restrito (Expirado)</span>`;
-            desc = "Teste grátis de 7 dias terminou. Vendas bloqueadas neste ramo.";
-        } else {
-            badge = `<span class="badge badge-yellow">7 Dias Grátis</span>`;
-            desc = `Restam ${info.diasRestantes} dia(s) de teste completo.`;
-        }
-
-        return `
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border);">
-            <div>
-                <strong style="color:#fff;font-size:0.9rem;">${escapeHTML(r)}</strong>
-                <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">${desc}</p>
-            </div>
-            <div>${badge}</div>
-        </div>`;
-    }).join("");
-
-    if (selectAlvo) {
-        selectAlvo.innerHTML = ramos.map(r => `<option value="${escapeHTML(r)}">${escapeHTML(r)} (250 MT)</option>`).join("");
-    }
-}
-
 function verificarSubscricao(){
-    renderStatusRamosSubscricao();
-
     const aviso = document.getElementById("aviso-licenca");
     const bloqueio = document.getElementById("bloqueio-licenca");
     const estadoSpan = document.getElementById("estado-subscricao");
@@ -4611,7 +4386,6 @@ async function solicitarPagamentoBackend(operadora, telefone) {
         },
         body: JSON.stringify({
             empresaId: FABEF.empresaId,
-            ramo: document.getElementById("pagamento-ramo-alvo")?.value || FABEF.ramo,
             telefone: telefone,
             valor: 250,
             metodo: operadora // "MPESA" ou "EMOLA"
@@ -4677,7 +4451,7 @@ try{if(localStorage.getItem("FABEF_dark_mode")==="1"){document.body.classList.ad
    ficar negativo. Isto avisa o gerente para poder confirmar
    a quantidade fÃ­sica real e corrigir.
 ===================================================== */
-// (movido para o topo) const FABEF_STOCK_NEGATIVO_ALERTADO = new Set();
+const FABEF_STOCK_NEGATIVO_ALERTADO = new Set();
 
 function verificarReconciliacaoStock() {
     const negativos = FABEF.produtos.filter(p => numero(p.stock) < 0);
@@ -5090,87 +4864,3 @@ if (selectIdiomaElement) {
  A interface da aplicaÃ§Ã£o permanece totalmente oculta (.hidden) atÃ© que o 
  gatilho onAuthStateChanged confirme o token do utilizador junto Ã  nuvem.
 */
-
-// ============================================================
-// SISTEMA DE SEGURANÇA E CONTROLO DOS 3 PONTOS (FABEF)
-// ============================================================
-
-// 1. Lógica para Abrir/Fechar os 3 Pontos ao Clicar
-const botaoTresPontos = document.querySelector('.botao-tres-pontos');
-const caixaInformacoes = document.querySelector('.conteudo-tres-pontos');
-
-if (botaoTresPontos && caixaInformacoes) {
-  botaoTresPontos.addEventListener('click', function() {
-    caixaInformacoes.classList.toggle('aberto');
-  });
-}
-
-/* =====================================================
-   MÓDULO DE BLINDAGEM DE SESSÃO:
-   - Sair (Logout): Exige E-mail e Senha (limpa PIN e desloga)
-   - Minimizar / Trocar de Aba: Exige PIN imediato (se configurado)
-   - Inatividade (5 minutos): Exige PIN imediato (se configurado)
-===================================================== */
-let tempoInatividade = null;
-
-function reiniciarTemporizadorPIN() {
-    if (tempoInatividade) clearTimeout(tempoInatividade);
-    tempoInatividade = setTimeout(() => {
-        const user = auth.currentUser || FABEF.user;
-        if (user && elAuth("app") && !elAuth("app").classList.contains("hidden")) {
-            if (localStorage.getItem(chavePinLocal(user.uid))) {
-                mostrarEcraPin();
-            }
-        }
-    }, 300000); // 5 minutos de inatividade
-}
-
-window.addEventListener('mousemove', reiniciarTemporizadorPIN);
-window.addEventListener('keypress', reiniciarTemporizadorPIN);
-window.addEventListener('touchstart', reiniciarTemporizadorPIN);
-
-// Ao minimizar a janela ou mudar de aba: exige PIN
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden && FABEF.user && elAuth("app") && !elAuth("app").classList.contains("hidden")) {
-        const user = auth.currentUser || FABEF.user;
-        if (user && localStorage.getItem(chavePinLocal(user.uid))) {
-            mostrarEcraPin();
-        }
-    }
-});
-
-
-/* =====================================================
-   MÓDULO: CONTROLO DE LUZ (TEMA) E IDIOMA NO TOPO
-===================================================== */
-function aplicarTema(tema) {
-    const corpo = document.body;
-    const btn = document.getElementById("btn-toggle-tema");
-    if (tema === "light") {
-        corpo.classList.add("theme-light");
-        if (btn) btn.textContent = "🌙";
-    } else {
-        corpo.classList.remove("theme-light");
-        if (btn) btn.textContent = "☀️";
-    }
-    try { localStorage.setItem("FABEF_theme", tema); } catch (e) {}
-}
-
-document.getElementById("btn-toggle-tema")?.addEventListener("click", () => {
-    const temaAtual = document.body.classList.contains("theme-light") ? "dark" : "light";
-    aplicarTema(temaAtual);
-});
-
-const temaGuardado = localStorage.getItem("FABEF_theme") || "dark";
-aplicarTema(temaGuardado);
-
-document.getElementById("select-idioma")?.addEventListener("change", e => {
-    aplicarIdioma(e.target.value);
-    try { localStorage.setItem("FABEF_idioma", e.target.value); } catch (_) {}
-});
-
-const idiomaGuardado = localStorage.getItem("FABEF_idioma") || "pt";
-if (document.getElementById("select-idioma")) {
-    document.getElementById("select-idioma").value = idiomaGuardado;
-    aplicarIdioma(idiomaGuardado);
-}
