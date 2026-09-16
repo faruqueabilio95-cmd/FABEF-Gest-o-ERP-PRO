@@ -467,11 +467,12 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
           <input type="text" id="vendas-pesquisa" placeholder="🔍 Pesquisar venda..." style="flex:1;min-width:180px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
           <select id="vendas-periodo" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+            <option value="hoje" selected>Hoje</option>
             <option value="todos">Todo o período</option>
-            <option value="hoje">Hoje</option>
             <option value="7">Últimos 7 dias</option>
             <option value="30">Últimos 30 dias</option>
           </select>
+          <input type="date" id="vendas-data-exata" title="Consultar um dia específico" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Data</th><th>Operador</th><th>Itens</th><th>Total</th><th>Pagamento</th><th>NUIT</th><th>Ramo</th><th>Ações</th></tr></thead>
@@ -1476,7 +1477,7 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 </script>
 <!-- Biblioteca de leitura de código de barras/QR por câmara — funciona em Chrome, Safari (iOS) e Firefox, porque faz a descodificação em JavaScript puro, sem depender de nenhuma função nativa do navegador -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script type="module" src="./src/app.js"></script>
+<script type="module" src="./src/app.js?v=9.9.6"></script>
 
 <!-- Regista o Service Worker: é isto que permite abrir a aplicação sem internet -->
 <script>
