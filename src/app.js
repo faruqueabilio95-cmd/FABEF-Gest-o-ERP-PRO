@@ -43,6 +43,7 @@ const addDoc = async (collRef, data) => {
         const path = collRef?.path || "";
         const parts = path.split("/");
         const collName = parts[parts.length - 1];
+        if (["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"].includes(collName) && window.FABEF?.ramo && data?.ramo == null) data={...data,ramo:window.FABEF.ramo};
         if (collName && window.FABEF[collName] && Array.isArray(window.FABEF[collName])) {
             window.FABEF[collName].unshift(item);
         }
@@ -52,6 +53,8 @@ const addDoc = async (collRef, data) => {
 };
 
 const setDoc = async (documentRef, data, options) => {
+    const pp=documentRef?.path||""; const aa=pp.split("/"); const cc=aa[aa.length-2]||"";
+    if (["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"].includes(cc) && window.FABEF?.ramo && data?.ramo == null) data={...data,ramo:window.FABEF.ramo};
     if (window.FABEF?.isDemoMode) {
         const path = documentRef?.path || "";
         const parts = path.split("/");
@@ -616,13 +619,6 @@ function dataTexto(v) {
 }
 
 
-function dataLocalISO(d = new Date()) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dia = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${dia}`;
-}
-
 function dataHoje() {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -1017,7 +1013,6 @@ document.getElementById("btn-pin-sair")?.addEventListener("click", async () => {
         return;
     }
     const user = auth.currentUser;
-    if (user) localStorage.removeItem(chavePinLocal(user.uid));
     await signOut(auth);
 });
 
@@ -1156,38 +1151,34 @@ function pedirRenderTudo() {
    Ã© assim que os dados chegam quando o dispositivo estava offline
    e volta a ligar-se Ã  internet.
 ===================================================== */
-const COLECOES_POR_RAMO = new Set(["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","auditoria_logs","sugestoes","caixas_turnos"]);
+const COLECOES_POR_RAMO = new Set(["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
+const COLECOES_POR_DIA = new Set(["vendas","despesas","compras","dividas","encomendas","auditoria_logs","sugestoes"]);
 function referenciaColecaoFiltrada(nome) {
     const ref = subRef(nome);
     return COLECOES_POR_RAMO.has(nome) && FABEF.ramo ? query(ref, where("ramo", "==", FABEF.ramo)) : ref;
 }
+function dataDoRegisto(item) {
+    const v=item?.data||item?.dataVenda||item?.dataCriacao||item?.criadoEm;
+    if(!v) return "";
+    if(typeof v === "object" && typeof v.toDate === "function") return v.toDate().toISOString().slice(0,10);
+    const d=new Date(v); return Number.isNaN(d.getTime()) ? String(v).slice(0,10) : d.toISOString().slice(0,10);
+}
+function aplicarFiltroDia(){
+    for(const nome of COLECOES_POR_DIA){ const estado=nome==="auditoria_logs"?"auditoria":nome; FABEF[estado]=(FABEF._raw?.[nome]||[]).filter(x=>dataDoRegisto(x)===FABEF.dataAtiva); }
+}
+function definirDiaAtivo(data){ if(!/^\d{4}-\d{2}-\d{2}$/.test(data||"")) return; FABEF.dataAtiva=data; aplicarFiltroDia(); renderTudo(); }
+window.definirDiaAtivo=definirDiaAtivo;
 
 function escutarColecao(nome, estado) {
     return new Promise((resolve) => {
         let primeiraVez = true;
-        const unsub = onSnapshot(
-            referenciaColecaoFiltrada(nome),
-            (snap) => {
-                FABEF[estado] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-                // A cada atualizaÃ§Ã£o de produtos, verifica se algum ficou com
-                // stock negativo (sinal de duas vendas offline em conflito).
-                if (estado === "produtos") {
-                    verificarReconciliacaoStock();
-                }
-
-                if (primeiraVez) {
-                    primeiraVez = false;
-                    resolve();
-                } else {
-                    pedirRenderTudo();
-                }
-            },
-            (erro) => {
-                console.error(`Erro ao escutar a coleÃ§Ã£o "${nome}" em tempo real:`, erro);
-                if (primeiraVez) { primeiraVez = false; resolve(); }
-            }
-        );
+        const unsub = onSnapshot(referenciaColecaoFiltrada(nome), (snap) => {
+            const dados=snap.docs.map(d=>({id:d.id,...d.data()}));
+            if(COLECOES_POR_DIA.has(nome)){ FABEF._raw=FABEF._raw||{}; FABEF._raw[nome]=dados; } else FABEF[estado]=dados;
+            aplicarFiltroDia();
+            if(estado==="produtos") verificarReconciliacaoStock();
+            if(primeiraVez){primeiraVez=false;resolve();} else pedirRenderTudo();
+        }, (erro)=>{ console.error(`Erro ao escutar a colecção "${nome}":`,erro); if(primeiraVez){primeiraVez=false;resolve();} });
         FABEF.listeners.push(unsub);
     });
 }
@@ -1269,13 +1260,6 @@ function aplicarRestricoesDeAcessoPorPapel() {
     document.querySelectorAll('[data-sec="config"]').forEach(el => {
         el.style.display = ehGerenteLogado ? "" : "none";
     });
-    // Encomendas são lançadas pelo Funcionário. O Gerente apenas consulta
-    // e acompanha o estado das encomendas.
-    const btnEncomenda = document.getElementById("btn-registar-encomenda");
-    if (btnEncomenda) btnEncomenda.style.display = ehGerenteLogado ? "none" : "";
-    const formEncomenda = btnEncomenda?.closest(".card");
-    if (formEncomenda) formEncomenda.style.display = ehGerenteLogado ? "none" : "";
-
     const secConfig = document.getElementById("sec-config");
     if (secConfig && !ehGerenteLogado) secConfig.classList.remove("active");
 
@@ -1388,6 +1372,13 @@ document.addEventListener("click", (e) => {
         }
         mostrarSecao(secNome);
     }
+
+    const btnZip = e.target.closest(".btn-acao-baixar-zip");
+    if (btnZip && !btnZip.dataset.downloadTratado) {
+        btnZip.dataset.downloadTratado = "1";
+        if (window.baixarProjetoZip) {
+            window.baixarProjetoZip();
+        }
     }
 });
 
@@ -1692,16 +1683,6 @@ async function adicionarRamoPersonalizado() {
 }
 
 
-async function recarregarDadosDoRamo() {
-    (FABEF.listeners || []).forEach(unsub => { try { if (typeof unsub === "function") unsub(); } catch (_) {} });
-    FABEF.listeners = [];
-    FABEF_UNSUB_CAIXA = null;
-    ["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","pagamentos","auditoria","sugestoes"].forEach(k => FABEF[k] = []);
-    FABEF.turnoId = null;
-    FABEF.turno = null;
-    await carregarDados();
-}
-
 async function mudarRamo(ramo) {
     if (!RAMOS.includes(ramo)) return;
 
@@ -1731,8 +1712,7 @@ async function mudarRamo(ramo) {
         });
 
         FABEF.ramo = ramo;
-        await recarregarDadosDoRamo();
-        FABEF.carrinho = [];
+        await ouvirCaixa(); // reescuta o caixa jÃ¡ isolado para o novo ramo
         renderTudo();
 
         // Escreve de forma persistente a alteraÃ§Ã£o nos registos de auditoria
@@ -3003,8 +2983,6 @@ async function finalizarVenda() {
             nuitCliente: nuitCliente,
             cliente: nomeClienteVenda,
             itens: linhas,
-            turnoId: FABEF.turnoId || null,
-            dataOperacional: dataLocalISO(new Date()),
             data: new Date().toISOString(),
             criadoEm: serverTimestamp()
         });
@@ -3078,30 +3056,19 @@ async function finalizarVenda() {
 
 document.getElementById("vendas-pesquisa").addEventListener("input", renderVendas);
 document.getElementById("vendas-periodo").addEventListener("change", renderVendas);
-document.getElementById("vendas-data-exata")?.addEventListener("change", () => { const sel=document.getElementById("vendas-periodo"); if(sel) sel.value="todos"; renderVendas(); });
 
 
 function renderVendas() {
     const pesquisa = document.getElementById("vendas-pesquisa")?.value.toLowerCase() || "";
-    const periodo = document.getElementById("vendas-periodo")?.value || "hoje";
-    const dataExata = document.getElementById("vendas-data-exata")?.value || "";
+    const periodo = document.getElementById("vendas-periodo")?.value || "todos";
     let inicio = null;
-    let fim = null;
-    if (periodo === "hoje") { inicio = dataHoje(); fim = new Date(inicio); fim.setDate(fim.getDate() + 1); }
+    if (periodo === "hoje") inicio = dataHoje();
     if (periodo === "7") inicio = diasAtras(7);
     if (periodo === "30") inicio = diasAtras(30);
 
     const listaFiltrada = FABEF.vendas.filter(v => {
-        if (v.ramo !== FABEF.ramo) return false;
         const dataVenda = new Date(v.data || v.date || 0);
-        if (dataExata) {
-            const inicioExato = new Date(dataExata + "T00:00:00");
-            const fimExato = new Date(inicioExato); fimExato.setDate(fimExato.getDate() + 1);
-            if (dataVenda < inicioExato || dataVenda >= fimExato) return false;
-        } else {
-            if (inicio && dataVenda < inicio) return false;
-            if (fim && dataVenda >= fim) return false;
-        }
+        if (inicio && dataVenda < inicio) return false;
         const textoCompleto = JSON.stringify(v).toLowerCase();
         return !pesquisa || textoCompleto.includes(pesquisa);
     }).sort((a,b) => new Date(b.data || b.date || 0) - new Date(a.data || a.date || 0));
@@ -3782,10 +3749,7 @@ document.getElementById("btn-registar-encomenda").addEventListener("click", regi
 
 
 async function registarEncomenda() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
-        alert("A conta de Gerente não pode registar encomendas. Esta operação é exclusiva do Funcionário.");
-        return;
-    }
+    if (!window.FABEF?.isDemoMode && (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente") { alert("O Gerente não pode registar encomendas. Esta operação é exclusiva do Funcionário."); return; }
     if (limiteEncomendasDiariasAtingido()) {
         avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.encomendasDiarias} encomendas do plano grÃ¡tis.`);
         return;
@@ -3865,7 +3829,7 @@ const ROTULO_ESTADO_ENCOMENDA = {
 function renderEncomendas() {
     const tabelaCorpo = document.getElementById("tabela-encomendas");
     if (!tabelaCorpo) return;
-    tabelaCorpo.innerHTML = FABEF.encomendas.filter(e => e.ramo === FABEF.ramo).map(e => {
+    tabelaCorpo.innerHTML = FABEF.encomendas.map(e => {
         const valorTotal = numero(e.valorTotal);
         const valorPago = numero(e.valorPago);
         const valorRestante = Math.max(0, valorTotal - valorPago);
@@ -4036,7 +4000,6 @@ async function abrirCaixa() {
             reforcos: [],
             operadorId: FABEF.user.uid,
             operadorNome: FABEF.userData?.nome || FABEF.user.email,
-            dataOperacional: dataLocalISO(new Date()),
             dataAbertura: new Date().toISOString(),
             criadoEm: serverTimestamp()
         };
@@ -4294,7 +4257,6 @@ function renderDespesas() {
 
     // Ordena as despesas de forma decrescente pela data de lanÃ§amento
     const listaOrdenada = FABEF.despesas
-        .filter(d => d.ramo === FABEF.ramo)
         .slice()
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
 
@@ -5014,10 +4976,8 @@ async function solicitarPagamentoBackend(operadora, telefone) {
 
     const resposta = await fetch(FABEF_PIPEDREAM_COBRANCA_URL, {
         method: "POST",
-        mode: "cors",
         headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json",
             "Authorization": "Bearer " + token
         },
         body: JSON.stringify({
@@ -5028,10 +4988,8 @@ async function solicitarPagamentoBackend(operadora, telefone) {
         })
     });
 
-    const textoResposta = await resposta.text();
-    let dados = {};
-    try { dados = textoResposta ? JSON.parse(textoResposta) : {}; } catch (_) { dados = { mensagem: textoResposta }; }
-    if (!resposta.ok) throw new Error(dados.erro || dados.mensagem || `Servidor de pagamentos respondeu HTTP ${resposta.status}.`);
+    const dados = await resposta.json().catch(() => ({}));
+    if (!resposta.ok) throw new Error(dados.erro || dados.mensagem || "Falha no servidor de pagamentos.");
     return dados;
 }
 
@@ -5989,6 +5947,12 @@ function mensagemFirebase(error) {
    INICIALIZAÃ‡ÃƒO SISTÃ‰MICA E CONFIGURAÃ‡Ã•ES VISUAIS
 ===================================================== */
 
+const diaAtivoElement = document.getElementById("fabef-dia-ativo");
+if (diaAtivoElement) {
+    diaAtivoElement.value = FABEF.dataAtiva;
+    diaAtivoElement.addEventListener("change", e => definirDiaAtivo(e.target.value));
+}
+
 const selectIdiomaElement = document.getElementById("select-idioma");
 if (selectIdiomaElement) {
     selectIdiomaElement.value = "pt";
@@ -6188,3 +6152,97 @@ window.alternarPerfilDemo = function(novoPerfil) {
     renderTudo();
     alert(`✅ Perfil alternado para: ${perfil.toUpperCase()}.\n\n${perfil === 'funcionario' ? 'Ramos, compras, relatórios e configurações estão ocultos. O funcionário vai diretamente para Vendas / POS.' : 'Acesso total de Gerente restaurado com gestão de ramos, inventário e relatórios.'}`);
 };
+
+/* =====================================================
+   EXPORTAÇÃO COMPLETA DO PROJETO EM FICHEIRO ZIP
+===================================================== */
+window.baixarProjetoZip = async function() {
+    const btn = document.getElementById("btn-baixar-projeto-zip");
+    const textoOriginal = btn ? btn.innerHTML : "";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = "⏳ A compilar ficheiros do projeto...";
+    }
+
+    try {
+        const zip = new JSZip();
+        
+        // Obter index.html atual
+        const resHtml = await fetch("/index.html");
+        const htmlContent = await resHtml.text();
+        zip.file("index.html", htmlContent);
+
+        // Obter src/app.js atual
+        const resApp = await fetch("/src/app.js");
+        const appContent = await resApp.text();
+        zip.folder("src").file("app.js", appContent);
+
+        // Obter package.json
+        try {
+            const resPkg = await fetch("/package.json");
+            if (resPkg.ok) {
+                zip.file("package.json", await resPkg.text());
+            }
+        } catch (_) {}
+
+        // README explicativo com instruções de instalação e substituição
+        zip.file("LEIA-ME-INSTALACAO.txt", 
+`=============================================================
+  FABEF GESTÃO ERP PRO - PACOTE COMPLETO DE CÓDIGO FONTE
+=============================================================
+
+Este arquivo ZIP contém a versão atualizada do FABEF Gestão ERP PRO com todas as melhorias solicitadas:
+1. Controle rigoroso de perfis (Funcionário restrito a Vendas/Caixa sem acesso a outros ramos).
+2. Bloqueio automático de segurança com PIN ao minimizar a tela ou sair do foco do navegador.
+3. Logout forçado com e-mail e senha ao encerrar a sessão.
+4. Navegação ágil: o menu de 3 pontos fecha instantaneamente e abre apenas a aba selecionada.
+5. Venda fracionada de carne (kg, gramas e litros) com conversão automática de preço por peso.
+6. Recibo profissional personalizável pelo Gerente (NUIT, Endereço, Cidade, Regime de IVA e Rodapé).
+7. Impressão térmica de 80mm e envio direto via WhatsApp.
+
+COMO SUBSTITUIR NO SEU PROJETO OU GITHUB:
+------------------------------------------
+1. Extraia este arquivo ZIP no seu computador.
+2. Copie o arquivo 'index.html' para a raiz do seu repositório/hospedagem.
+3. Copie o arquivo 'src/app.js' para a pasta 'src/' substituindo o anterior.
+4. Faça commit e push no GitHub Pages ou hospede no seu servidor web.
+
+Desenvolvido com excelência para empresas de Moçambique!
+`);
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `FABEF_ERP_PRO_Completo_${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast("📦 Ficheiro ZIP gerado e descarregado com sucesso!");
+    } catch (err) {
+        console.error("Erro ao gerar ZIP:", err);
+        alert("Não foi possível gerar o ZIP automaticamente:\n" + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = textoOriginal;
+        }
+    }
+};
+
+// Binds
+document.getElementById("btn-demo-mode")?.addEventListener("click", entrarModoDemo);
+document.getElementById("btn-abrir-sugestoes")?.addEventListener("click", () => {
+    document.getElementById("modal-sugestoes")?.classList.add("show");
+});
+document.getElementById("btn-recibo-imprimir-direto")?.addEventListener("click", () => {
+    if (window.FABEF_ultimaVendaId) window.imprimirReciboVenda(window.FABEF_ultimaVendaId);
+});
+document.getElementById("btn-recibo-whatsapp-direto")?.addEventListener("click", () => {
+    if (window.FABEF_ultimaVendaId) window.enviarReciboWhatsApp(window.FABEF_ultimaVendaId);
+});
+document.getElementById("btn-recibo-fechar")?.addEventListener("click", () => {
+    fecharModal("modal-recibo-sucesso");
+});
