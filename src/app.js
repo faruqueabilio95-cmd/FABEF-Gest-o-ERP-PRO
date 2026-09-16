@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import { initializeApp, deleteApp } from "firebase/app";
 import {
     getAuth,
@@ -294,27 +295,6 @@ const RAMOS_PADRAO = [
 // empresa.ramos_atividade) juntam-se aos RAMOS_PADRAO na hora de montar
 // os selects â€” ver renderRamos().
 let RAMOS = RAMOS_PADRAO.slice();
-
-// Indicadores de peso/volume só aparecem quando o ramo atual realmente utiliza
-// produtos vendidos por kg, g ou litro. Assim, por exemplo, um Salão de Beleza
-// não apresenta referências a kg só porque o ERP também suporta talhos.
-function ramoTemPesoOuVolume() {
-    const ramo = String(FABEF?.ramo || "");
-    return (FABEF?.produtos || []).some(p =>
-        p?.ramo === ramo && ["kg", "g", "litro"].includes(String(p?.unidade || "").toLowerCase())
-    );
-}
-
-function atualizarVisibilidadePesoVolume() {
-    const ativo = ramoTemPesoOuVolume();
-    ["inicio-kg-vendidos", "rel-kg-vendidos", "card-relatorio-peso-volume"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = ativo ? "" : "none";
-    });
-    const tituloRel = document.getElementById("titulo-relatorio-peso-volume");
-    if (tituloRel) tituloRel.textContent = ativo ? "🥩 Vendas por Artigo & Unidade (peso, volume e unidades)" : "Vendas por Artigo & Unidade";
-}
-
 
 
 /* =====================================================
@@ -1076,14 +1056,8 @@ onAuthStateChanged(auth, async user => {
     // Esperamos a conclusão de criarConta() para evitar uma corrida de inicialização.
     if (FABEF_registoEmCurso) return;
 
-    // Se já existe um PIN definido neste dispositivo para este utilizador, exige-o
-    // ao reabrir em vez de abrir diretamente — isto protege o caixa
-    const temPinLocal = !!localStorage.getItem(chavePinLocal(user.uid));
-    if (temPinLocal) {
-        mostrarEcraPin();
-        return;
-    }
-
+    // LOGIN NORMAL: e-mail + senha abre diretamente a aplicação.
+    // O PIN só é usado quando a aplicação foi suspensa/minimizada ou o ecrã foi bloqueado.
     await iniciarSessaoFABEF(user);
 });
 
@@ -1279,6 +1253,13 @@ function aplicarRestricoesDeAcessoPorPapel() {
         if (botao) botao.style.display = ehGerenteLogado ? "" : "none";
     });
 
+    // Configuração só existe dentro do menu dos 3 pontos e só para o Gerente.
+    document.querySelectorAll('[data-sec="config"]').forEach(el => {
+        el.style.display = ehGerenteLogado ? "" : "none";
+    });
+    const secConfig = document.getElementById("sec-config");
+    if (secConfig && !ehGerenteLogado) secConfig.classList.remove("active");
+
     // Oculta grupos inteiros da sidebar (details) para o funcionário
     document.querySelectorAll(".sidebar details").forEach(det => {
         const summaryText = det.querySelector("summary")?.textContent || "";
@@ -1389,16 +1370,16 @@ document.addEventListener("click", (e) => {
         mostrarSecao(secNome);
     }
 
+    const btnZip = e.target.closest(".btn-acao-baixar-zip");
+    if (btnZip && !btnZip.dataset.downloadTratado) {
+        btnZip.dataset.downloadTratado = "1";
+        if (window.baixarProjetoZip) {
+            window.baixarProjetoZip();
+        }
+    }
 });
 
 function mostrarSecao(nome) {
-    const secoesGerente = ["ramos", "compras", "relatorios", "metas", "desempenho", "funcionarios", "auditoria", "subscricao", "config"];
-    const perfilAtual = FABEF?.userData?.perfil || FABEF?.userData?.role || "";
-    if (secoesGerente.includes(nome) && perfilAtual !== "gerente") {
-        alert("Acesso reservado ao Gerente.");
-        fecharMenuLateral();
-        return;
-    }
     // Remove o estado ativo de todas as secções
     document.querySelectorAll(".secao").forEach(s => s.classList.remove("active"));
 
@@ -4301,7 +4282,6 @@ document.getElementById("relatorio-periodo").addEventListener("change", renderRe
 
 
 function renderRelatorios() {
-    atualizarVisibilidadePesoVolume();
     const periodo = document.getElementById("relatorio-periodo").value;
     let inicio = null;
 
@@ -4621,6 +4601,10 @@ document.getElementById("btn-alterar-pin")?.addEventListener("click", () => {
 
 
 async function guardarConfiguracoes() {
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+        alert("Apenas o Gerente pode aceder e alterar as configurações.");
+        return;
+    }
     const nome = document.getElementById("config-nome")?.value.trim() || "";
     const nuit = document.getElementById("config-nuit")?.value.trim() || "";
     const telefone = document.getElementById("config-telefone")?.value.trim() || "";
@@ -4718,8 +4702,7 @@ async function cadastrarNovoFuncionario() {
     try {
         secondaryApp=initializeApp(firebaseConfig, "funcionario-"+Date.now());
         const secondaryAuth=getAuth(secondaryApp);
-        const cred=await createUserWithEmailAndPassword(secondaryAuth,emailNormalizado,senha);
-        secondaryUser=cred.user;
+        const cred=await createUserWithEmailAndPassword(secondaryAuth,email,senha);
         const uidFuncionario=cred.user.uid;
         const perfil={uid:uidFuncionario,nome,email,telefone,foto,empresaId:FABEF.empresaId,perfil:"funcionario",role:"operador",estado:"ATIVO",criadoPor:FABEF.user.uid,criadoEm:serverTimestamp()};
         await setDoc(doc(db,"utilizadores",uidFuncionario),perfil);
@@ -5005,6 +4988,44 @@ async function solicitarPagamentoBackend(operadora, telefone) {
     if (!resposta.ok) throw new Error(dados.erro || dados.mensagem || "Falha no servidor de pagamentos.");
     return dados;
 }
+
+async function solicitarSubscricaoMovel(){
+    const operadora = document.getElementById("pagamento-operadora")?.value;
+    const telefone = document.getElementById("pagamento-telefone")?.value.trim();
+    const resultado = document.getElementById("resultado-pagamento");
+    const botao = document.getElementById("btn-solicitar-pagamento");
+
+    if (!telefone) { alert("Por favor, introduza o nÃºmero de telefone."); return; }
+    if (!/^\d{9}$/.test(telefone)) { alert("O nÃºmero de telefone deve conter exatamente 9 dÃ­gitos."); return; }
+    if (operadora === "MPESA" && !/^8[45]/.test(telefone)) { alert("NÃºmero invÃ¡lido para M-Pesa. Deve comeÃ§ar com 84 ou 85."); return; }
+    if (operadora === "EMOLA" && !/^8[67]/.test(telefone)) { alert("NÃºmero invÃ¡lido para e-Mola. Deve comeÃ§ar com 86 ou 87."); return; }
+
+    try {
+        if (botao) botao.disabled = true;
+        const backendResult = await solicitarPagamentoBackend(operadora, telefone);
+
+        // O prÃ³prio servidor (Pipedream) jÃ¡ regista o pedido em "pagamentos" â€”
+        // aqui sÃ³ mostramos o estado, sem duplicar o registo.
+        if (resultado) {
+            resultado.className = "alert alert-warning";
+            resultado.innerHTML = `â³ Pedido enviado. Confirme o PIN no seu telemÃ³vel.<br>ReferÃªncia: <strong>${escapeHTML(backendResult?.referencia || backendResult?.sourceId || "â€”")}</strong><br><small>A licenÃ§a Ã© activada automaticamente assim que o pagamento for confirmado.</small>`;
+        }
+        await gravarAuditoria("Solicitou subscriÃ§Ã£o mensal via " + operadora, "INFO");
+    } catch (error) {
+        console.error(error);
+        if (resultado) {
+            resultado.className = "alert alert-danger";
+            resultado.textContent = "Falha ao criar o pedido de pagamento.";
+        }
+        alert(mensagemFirebase(error));
+    } finally {
+        if (botao) botao.disabled = false;
+    }
+}
+
+document.getElementById("btn-solicitar-pagamento")?.addEventListener("click", solicitarSubscricaoMovel);
+
+document.getElementById("btn-cadastrar-funcionario")?.addEventListener("click", cadastrarNovoFuncionario);
 
 /* =====================================================
    MÓDULO LÓGICO: GRÁFICO DE CONTROLO DE VENDAS DIÁRIAS (TELA PRINCIPAL)
@@ -5374,72 +5395,39 @@ async function executarPagamentoSubscricaoComercial() {
     if (operadora === "EMOLA" && !/^8[67]/.test(telefone)) { alert("Número inválido para e-Mola. Deve começar com 86 ou 87."); return; }
 
     const valorPagar = 250 + (qtdFuncionariosExtras * 50);
-    const confirmar = confirm(
-        `Confirmar pedido de pagamento de ${valorPagar} MT via ${operadora}?\n\n` +
-        `Depois de enviar, a carteira móvel irá solicitar a confirmação no telemóvel.\n` +
-        `Introduza o PIN APENAS no M-Pesa/e-Mola. Nunca coloque o PIN da carteira nesta aplicação.`
-    );
-    if (!confirmar) return;
-
     try {
         if (botao) botao.disabled = true;
         if (resultado) {
             resultado.className = "alert alert-warning";
-            resultado.innerHTML = `⏳ Pedido de ${valorPagar} MT enviado para <strong>${escapeHTML(telefone)}</strong> via <strong>${escapeHTML(operadora)}</strong>.<br><strong>Confirme agora no seu telemóvel usando o PIN da carteira móvel.</strong><br><small>Por segurança, o PIN não deve ser introduzido no FABEF ERP PRO. A licença só será ativada depois de o pagamento ser confirmado pelo servidor.</small>`;
+            resultado.innerHTML = `⏳ A enviar pedido de pagamento de <strong>${valorPagar} MT</strong> via ${operadora}.<br>
+            Confirme a operação no seu telemóvel introduzindo o <strong>PIN no M-Pesa/e-Mola</strong>.<br>
+            <small>O FABEF não pede nem recebe o seu PIN. A licença só será ativada depois da confirmação real do pagamento pelo servidor.</small>`;
         }
 
         const backendResult = await solicitarPagamentoBackend(operadora, telefone);
-        const estado = String(
-            backendResult?.estado ?? backendResult?.status ?? backendResult?.paymentStatus ?? backendResult?.situacao ?? ""
-        ).toUpperCase();
-        const confirmado = backendResult?.confirmado === true || backendResult?.pagamentoConfirmado === true ||
-            ["CONFIRMADO", "CONFIRMED", "APROVADO", "APPROVED", "PAGO", "PAID", "SUCESSO", "SUCCESS"].includes(estado);
-
-        if (!confirmado) {
-            if (resultado) {
-                resultado.className = "alert alert-warning";
-                resultado.innerHTML = `⏳ <strong>Pagamento pendente de confirmação.</strong><br>Referência: <strong>${escapeHTML(backendResult?.referencia || backendResult?.sourceId || backendResult?.id || "—")}</strong><br>Confirme a operação no telemóvel com o seu PIN. <strong>A licença ainda não foi alterada.</strong>`;
-            }
-            return;
-        }
-
-        // Só depois de uma confirmação real do servidor é que a licença é atualizada.
-        const agora = new Date();
-        let validadeBase = new Date(FABEF.empresa?.validade_subscricao || 0);
-        if (isNaN(validadeBase.getTime()) || validadeBase < agora) validadeBase = new Date(agora);
-        validadeBase.setDate(validadeBase.getDate() + 30);
-        const novaValidadeIso = validadeBase.toISOString();
-        const payloadLicenca = {
-            estado_licenca: "ACTIVO",
-            validade_subscricao: novaValidadeIso,
-            funcionarios_contratados: 3 + qtdFuncionariosExtras,
-            ultimo_pagamento_valor: valorPagar,
-            ultimo_pagamento_data: new Date().toISOString(),
-            atualizadoEm: serverTimestamp()
-        };
-
-        await updateDoc(empresaRef(), payloadLicenca);
-        FABEF.empresa = { ...FABEF.empresa, ...payloadLicenca };
-        await gravarAuditoria(`Pagamento confirmado e subscrição comercial de 30 dias ativada via ${operadora} (${valorPagar} MT).`, "INFO");
+        const referencia = backendResult?.referencia || backendResult?.sourceId || backendResult?.transactionId || "—";
 
         if (resultado) {
-            resultado.className = "alert alert-success";
-            resultado.innerHTML = `✅ <strong>Pagamento confirmado e subscrição ativa!</strong><br>A sua licença está válida até <strong>${validadeBase.toLocaleDateString("pt-MZ")}</strong>.<br>Referência: <strong>${escapeHTML(backendResult?.referencia || backendResult?.sourceId || backendResult?.id || "—")}</strong>`;
+            resultado.className = "alert alert-warning";
+            resultado.innerHTML = `⏳ <strong>Pedido de pagamento enviado.</strong><br>
+            Referência: <strong>${escapeHTML(String(referencia))}</strong><br>
+            Confirme a transação no seu telemóvel introduzindo o PIN no ${operadora === "MPESA" ? "M-Pesa" : "e-Mola"}.<br>
+            <small>Não feche esta página. A subscrição permanece pendente até o servidor confirmar o pagamento.</small>`;
         }
+
+        await gravarAuditoria("Solicitou subscrição mensal via " + operadora + " — pagamento pendente de confirmação", "INFO");
         verificarSubscricao();
-        renderDashboard();
-        alert(`Pagamento confirmado. A subscrição de 30 dias foi ativada até ${validadeBase.toLocaleDateString("pt-MZ")}.`);
     } catch (error) {
-        console.error("Erro ao processar pagamento:", error);
+        console.error(error);
         if (resultado) {
             resultado.className = "alert alert-danger";
-            resultado.textContent = "Não foi possível confirmar o pagamento: " + mensagemFirebase(error);
+            resultado.textContent = "Falha ao criar o pedido de pagamento: " + mensagemFirebase(error);
         }
-        alert("Não foi possível confirmar o pagamento. Nenhuma licença foi alterada.");
     } finally {
         if (botao) botao.disabled = false;
     }
 }
+
 document.getElementById("btn-solicitar-pagamento")?.addEventListener("click", executarPagamentoSubscricaoComercial);
 
 
@@ -5651,7 +5639,6 @@ function renderAvisoReconciliacao() {
 
 
 function renderDashboard() {
-    atualizarVisibilidadePesoVolume();
     renderAvisoReconciliacao();
 
     const indicadorEmpresa = document.getElementById("inicio-empresa");
@@ -6164,7 +6151,7 @@ async function entrarModoDemo() {
     ];
 
     window.FABEF.auditoria = [
-        { id: "aud-1", data: new Date().toISOString(), utilizadorNome: "Sistema Demo", mensagem: "Sessão iniciada em Modo Demonstração com catálogo de teste em Meticais (MT).", nivel: "INFO" }
+        { id: "aud-1", data: new Date().toISOString(), utilizadorNome: "Sistema Demo", mensagem: "Sessão iniciada em Modo Demonstração com catálogo ativo em Meticais (MT) e carnes pesadas em KG", nivel: "INFO" }
     ];
 
     window.FABEF.carregado = true;
@@ -6177,7 +6164,7 @@ async function entrarModoDemo() {
     
     aplicarRestricoesDeAcessoPorPapel();
     renderTudo();
-    toast("🚀 Modo Demonstração ativado! Teste o POS, Stock, Caixa e Recibos.");
+    toast("🚀 Modo Demonstração ativado! Teste o POS, Venda de Carne por Kg/g, Stock e Recibos.");
 }
 
 /* =====================================================
@@ -6202,3 +6189,94 @@ window.alternarPerfilDemo = function(novoPerfil) {
 /* =====================================================
    EXPORTAÇÃO COMPLETA DO PROJETO EM FICHEIRO ZIP
 ===================================================== */
+window.baixarProjetoZip = async function() {
+    const btn = document.getElementById("btn-baixar-projeto-zip");
+    const textoOriginal = btn ? btn.innerHTML : "";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = "⏳ A compilar ficheiros do projeto...";
+    }
+
+    try {
+        const zip = new JSZip();
+        
+        // Obter index.html atual
+        const resHtml = await fetch("/index.html");
+        const htmlContent = await resHtml.text();
+        zip.file("index.html", htmlContent);
+
+        // Obter src/app.js atual
+        const resApp = await fetch("/src/app.js");
+        const appContent = await resApp.text();
+        zip.folder("src").file("app.js", appContent);
+
+        // Obter package.json
+        try {
+            const resPkg = await fetch("/package.json");
+            if (resPkg.ok) {
+                zip.file("package.json", await resPkg.text());
+            }
+        } catch (_) {}
+
+        // README explicativo com instruções de instalação e substituição
+        zip.file("LEIA-ME-INSTALACAO.txt", 
+`=============================================================
+  FABEF GESTÃO ERP PRO - PACOTE COMPLETO DE CÓDIGO FONTE
+=============================================================
+
+Este arquivo ZIP contém a versão atualizada do FABEF Gestão ERP PRO com todas as melhorias solicitadas:
+1. Controle rigoroso de perfis (Funcionário restrito a Vendas/Caixa sem acesso a outros ramos).
+2. Bloqueio automático de segurança com PIN ao minimizar a tela ou sair do foco do navegador.
+3. Logout forçado com e-mail e senha ao encerrar a sessão.
+4. Navegação ágil: o menu de 3 pontos fecha instantaneamente e abre apenas a aba selecionada.
+5. Venda fracionada de carne (kg, gramas e litros) com conversão automática de preço por peso.
+6. Recibo profissional personalizável pelo Gerente (NUIT, Endereço, Cidade, Regime de IVA e Rodapé).
+7. Impressão térmica de 80mm e envio direto via WhatsApp.
+
+COMO SUBSTITUIR NO SEU PROJETO OU GITHUB:
+------------------------------------------
+1. Extraia este arquivo ZIP no seu computador.
+2. Copie o arquivo 'index.html' para a raiz do seu repositório/hospedagem.
+3. Copie o arquivo 'src/app.js' para a pasta 'src/' substituindo o anterior.
+4. Faça commit e push no GitHub Pages ou hospede no seu servidor web.
+
+Desenvolvido com excelência para empresas de Moçambique!
+`);
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `FABEF_ERP_PRO_Completo_${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast("📦 Ficheiro ZIP gerado e descarregado com sucesso!");
+    } catch (err) {
+        console.error("Erro ao gerar ZIP:", err);
+        alert("Não foi possível gerar o ZIP automaticamente:\n" + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = textoOriginal;
+        }
+    }
+};
+
+// Binds
+document.getElementById("btn-demo-mode")?.addEventListener("click", entrarModoDemo);
+document.getElementById("btn-abrir-sugestoes")?.addEventListener("click", () => {
+    document.getElementById("modal-sugestoes")?.classList.add("show");
+});
+document.getElementById("btn-baixar-projeto-zip")?.addEventListener("click", window.baixarProjetoZip);
+document.getElementById("btn-recibo-imprimir-direto")?.addEventListener("click", () => {
+    if (window.FABEF_ultimaVendaId) window.imprimirReciboVenda(window.FABEF_ultimaVendaId);
+});
+document.getElementById("btn-recibo-whatsapp-direto")?.addEventListener("click", () => {
+    if (window.FABEF_ultimaVendaId) window.enviarReciboWhatsApp(window.FABEF_ultimaVendaId);
+});
+document.getElementById("btn-recibo-fechar")?.addEventListener("click", () => {
+    fecharModal("modal-recibo-sucesso");
+});
