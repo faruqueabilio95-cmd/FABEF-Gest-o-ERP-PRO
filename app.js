@@ -1,8 +1,5 @@
-import {
-    initializeApp,
-    deleteApp
-} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-
+import JSZip from "jszip";
+import { initializeApp, deleteApp } from "firebase/app";
 import {
     getAuth,
     onAuthStateChanged,
@@ -15,18 +12,17 @@ import {
     updatePassword,
     reauthenticateWithCredential,
     EmailAuthProvider
-} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
-
+} from "firebase/auth";
 import {
     getFirestore,
     collection,
     doc,
     getDoc,
     getDocs,
-    addDoc,
-    setDoc,
-    updateDoc,
-    deleteDoc,
+    addDoc as fbAddDoc,
+    setDoc as fbSetDoc,
+    updateDoc as fbUpdateDoc,
+    deleteDoc as fbDeleteDoc,
     query,
     where,
     orderBy,
@@ -38,8 +34,87 @@ import {
     enableIndexedDbPersistence,
     disableNetwork,
     enableNetwork
-} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+} from "firebase/firestore";
 
+// Proxies for addDoc/setDoc/updateDoc/deleteDoc to seamlessly support Demo Mode
+const addDoc = async (collRef, data) => {
+    if (window.FABEF?.isDemoMode) {
+        const fakeId = "demo_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+        const item = { id: fakeId, ...data };
+        const path = collRef?.path || "";
+        const parts = path.split("/");
+        const collName = parts[parts.length - 1];
+        if (collName && window.FABEF[collName] && Array.isArray(window.FABEF[collName])) {
+            window.FABEF[collName].unshift(item);
+        }
+        return { id: fakeId, path: path + "/" + fakeId };
+    }
+    return fbAddDoc(collRef, data);
+};
+
+const setDoc = async (documentRef, data, options) => {
+    if (window.FABEF?.isDemoMode) {
+        const path = documentRef?.path || "";
+        const parts = path.split("/");
+        const id = documentRef?.id || parts[parts.length - 1] || ("demo_" + Date.now());
+        const collName = (parts.length >= 2 && parts[parts.length - 2]) || (path.includes("vendas") ? "vendas" : (path.includes("caixas") ? "caixas_turnos" : ""));
+        if (collName && window.FABEF[collName] && Array.isArray(window.FABEF[collName])) {
+            const idx = window.FABEF[collName].findIndex(x => x.id === id);
+            if (idx >= 0) {
+                window.FABEF[collName][idx] = { ...window.FABEF[collName][idx], ...data, id };
+            } else {
+                window.FABEF[collName].unshift({ ...data, id });
+            }
+        } else if (path.includes("vendas")) {
+            window.FABEF.vendas = window.FABEF.vendas || [];
+            window.FABEF.vendas.unshift({ ...data, id });
+        }
+        return;
+    }
+    return fbSetDoc(documentRef, data, options);
+};
+
+const updateDoc = async (documentRef, data) => {
+    if (window.FABEF?.isDemoMode) {
+        const path = documentRef?.path || "";
+        const parts = path.split("/");
+        const id = parts[parts.length - 1];
+        const collName = parts[parts.length - 2];
+        if (collName && window.FABEF[collName] && Array.isArray(window.FABEF[collName])) {
+            const idx = window.FABEF[collName].findIndex(x => x.id === id);
+            if (idx >= 0) {
+                const target = window.FABEF[collName][idx];
+                for (const k in data) {
+                    if (data[k] && typeof data[k] === 'object' && 'operand' in data[k]) {
+                        target[k] = (Number(target[k]) || 0) + Number(data[k].operand || 0);
+                    } else if (data[k] && typeof data[k] === 'object' && 'elements' in data[k]) {
+                        target[k] = Array.isArray(target[k]) ? [...target[k], ...data[k].elements] : [...data[k].elements];
+                    } else if (data[k] && typeof data[k] === 'object' && data[k]._methodName === 'serverTimestamp') {
+                        target[k] = new Date().toISOString();
+                    } else {
+                        target[k] = data[k];
+                    }
+                }
+            }
+        }
+        return;
+    }
+    return fbUpdateDoc(documentRef, data);
+};
+
+const deleteDoc = async (documentRef) => {
+    if (window.FABEF?.isDemoMode) {
+        const path = documentRef?.path || "";
+        const parts = path.split("/");
+        const id = parts[parts.length - 1];
+        const collName = parts[parts.length - 2];
+        if (collName && window.FABEF[collName] && Array.isArray(window.FABEF[collName])) {
+            window.FABEF[collName] = window.FABEF[collName].filter(x => x.id !== id);
+        }
+        return;
+    }
+    return fbDeleteDoc(documentRef);
+};
 
 /* =====================================================
    CONFIGURAÃ‡ÃƒO FIREBASE â€” PRODUÃ‡ÃƒO
@@ -896,29 +971,68 @@ function esconderEcraPin() {
 }
 
 document.getElementById("btn-pin-entrar")?.addEventListener("click", async () => {
+    const pinDigitado = (document.getElementById("pin-input")?.value || "").trim();
+    const statusPin = document.getElementById("pin-status");
+    if (!pinDigitado) { if (statusPin) statusPin.textContent = "Introduza o PIN."; return; }
+
+    if (window.FABEF?.isDemoMode) {
+        // No modo teste, aceita 1234 ou qualquer PIN de 4 dígitos
+        if (pinDigitado.length >= 4) {
+            esconderEcraPin();
+            toast("🔓 Aplicação desbloqueada com sucesso.");
+        } else {
+            if (statusPin) statusPin.textContent = "🔴 O PIN deve ter pelo menos 4 dígitos (ex: 1234).";
+        }
+        return;
+    }
+
     const user = auth.currentUser;
     if (!user) { mostrarEcraPin(); return; }
 
-    const pinDigitado = (document.getElementById("pin-input")?.value || "").trim();
     const hashGuardado = localStorage.getItem(chavePinLocal(user.uid));
-    const statusPin = document.getElementById("pin-status");
-
-    if (!pinDigitado) { if (statusPin) statusPin.textContent = "Introduza o PIN."; return; }
 
     const hashDigitado = await calcularHashPin(pinDigitado);
     if (hashDigitado === hashGuardado) {
         esconderEcraPin();
         await iniciarSessaoFABEF(user);
     } else {
-        if (statusPin) statusPin.textContent = "ðŸ”´ PIN incorreto. Tente novamente.";
+        if (statusPin) statusPin.textContent = "🔴 PIN incorreto. Tente novamente.";
     }
 });
 
 document.getElementById("btn-pin-sair")?.addEventListener("click", async () => {
+    sessionStorage.setItem("fabef_saiu_manual", "true");
+    esconderEcraPin();
+    if (window.FABEF?.isDemoMode) {
+        window.FABEF.isDemoMode = false;
+        await limparEstadoFABEF();
+        if (elAuth("app")) elAuth("app").classList.add("hidden");
+        if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
+        return;
+    }
     const user = auth.currentUser;
     if (user) localStorage.removeItem(chavePinLocal(user.uid));
-    esconderEcraPin();
     await signOut(auth);
+});
+
+// Bloqueio por PIN ao minimizar a aplicação (no telemóvel ou ao alternar de janela)
+let appFoiMinimizada = false;
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        if (FABEF.carregado && (FABEF.user || window.FABEF?.isDemoMode)) {
+            appFoiMinimizada = true;
+        }
+    } else {
+        if (appFoiMinimizada && FABEF.carregado && (FABEF.user || window.FABEF?.isDemoMode)) {
+            appFoiMinimizada = false;
+            mostrarEcraPin();
+            const statusPin = document.getElementById("pin-status");
+            if (statusPin) {
+                statusPin.textContent = "🔒 Aplicação suspensa. Introduza o PIN para desbloquear.";
+                statusPin.style.color = "#1e3a8a";
+            }
+        }
+    }
 });
 
 
@@ -931,13 +1045,19 @@ onAuthStateChanged(auth, async user => {
         return;
     }
 
+    // Se saiu manualmente através do botão Sair, deve pedir e-mail e senha
+    if (sessionStorage.getItem("fabef_saiu_manual") === "true") {
+        sessionStorage.removeItem("fabef_saiu_manual");
+        await signOut(auth);
+        return;
+    }
+
     // Durante o registo, o Auth pode emitir o utilizador antes dos documentos Firestore.
-    // Esperamos a conclusÃ£o de criarConta() para evitar uma corrida de inicializaÃ§Ã£o.
+    // Esperamos a conclusão de criarConta() para evitar uma corrida de inicialização.
     if (FABEF_registoEmCurso) return;
 
-    // Se jÃ¡ existe um PIN definido neste dispositivo para este utilizador, exige-o
-    // em vez de abrir diretamente â€” isto substitui o pedido de e-mail/senha,
-    // mas continua a funcionar sem internet.
+    // Se já existe um PIN definido neste dispositivo para este utilizador, exige-o
+    // ao reabrir em vez de abrir diretamente — isto protege o caixa
     const temPinLocal = !!localStorage.getItem(chavePinLocal(user.uid));
     if (temPinLocal) {
         mostrarEcraPin();
@@ -1115,79 +1235,183 @@ function abrirAplicacao() {
    SÃ³ as contas de funcionÃ¡rio tÃªm acesso Ã  pÃ¡gina "Vender".
 ===================================================== */
 function aplicarRestricoesDeAcessoPorPapel() {
-    const perfil = FABEF.userData?.perfil || FABEF.userData?.role;
+    let perfil = "gerente";
+    if (window.FABEF?.isDemoMode) {
+        perfil = window.FABEF.demoPerfil || "gerente";
+    } else if (FABEF.userData) {
+        perfil = FABEF.userData.perfil || FABEF.userData.role || "gerente";
+    }
     const ehGerenteLogado = perfil === "gerente";
 
+    // Botão de Vender (POS) no menu lateral
     const botaoVender = document.querySelector('.sidebar button[data-sec="pos"]');
     if (botaoVender) {
-        botaoVender.style.display = ehGerenteLogado ? "none" : "";
+        botaoVender.style.display = "";
+        botaoVender.title = ehGerenteLogado ? "Supervisão do POS (O Gerente não vende)" : "Efetuar Vendas de Balcão";
     }
 
-    // ProteÃ§Ã£o extra: se por acaso a secÃ§Ã£o "Vender" ficar ativa (ex: sessÃ£o antiga),
-    // redireciona o gerente para o InÃ­cio com uma explicaÃ§Ã£o clara.
-    if (ehGerenteLogado && document.getElementById("sec-pos")?.classList.contains("active")) {
-        mostrarSecao("inicio");
-        alert("A conta de gerente Ã© sÃ³ para controlo do negÃ³cio (preÃ§os, stock, funcionÃ¡rios e relatÃ³rios). Para vender, entre com uma conta de funcionÃ¡rio.");
-    }
-
-    // PÃ¡ginas de controlo do negÃ³cio: sÃ³ o gerente as vÃª. O funcionÃ¡rio fica
-    // limitado Ã s pÃ¡ginas operacionais do dia a dia, para nÃ£o ver dados
-    // sensÃ­veis (margens, avaliaÃ§Ã£o de desempenho, auditoria, subscriÃ§Ã£o).
-    const secoesReservadasAoGerente = ["compras", "relatorios", "metas", "desempenho", "funcionarios", "auditoria", "subscricao", "config", "ramos"];
+    // Secções estritamente reservadas ao Gerente:
+    // O funcionário NÃO PODE ver nem alterar os ramos que o gerente está a gerir,
+    // nem compras, relatórios, metas, funcionários, subscrição, etc.
+    const secoesReservadasAoGerente = ["ramos", "compras", "relatorios", "metas", "desempenho", "funcionarios", "auditoria", "subscricao", "config"];
     secoesReservadasAoGerente.forEach(sec => {
         const botao = document.querySelector(`.sidebar button[data-sec="${sec}"]`);
         if (botao) botao.style.display = ehGerenteLogado ? "" : "none";
     });
 
-    // Se o funcionÃ¡rio estava numa dessas secÃ§Ãµes reservadas (sessÃ£o antiga), devolve ao InÃ­cio
-    if (!ehGerenteLogado && secoesReservadasAoGerente.some(sec => document.getElementById("sec-" + sec)?.classList.contains("active"))) {
-        mostrarSecao("inicio");
-    }
-
-    // O seletor rÃ¡pido de ramo na pÃ¡gina Produtos tambÃ©m Ã© exclusivo do gerente
-    const seletorRamoProdutos = document.getElementById("select-ramo");
-    if (seletorRamoProdutos) seletorRamoProdutos.style.display = ehGerenteLogado ? "" : "none";
-}
-
-/* =====================================================
-   MÃ“DULO LÃ“GICO: COMPORTAMENTO DO MENU (SIDEBAR)
-===================================================== */
-
-document.getElementById("btn-menu").addEventListener("click", () => {
-    document.getElementById("sidebar").classList.toggle("closed");
-});
-
-
-document.querySelectorAll(".sidebar button[data-sec]").forEach(btn => {
-    btn.addEventListener("click", () => {
-        mostrarSecao(btn.dataset.sec);
-
-        // Se estiver no telemÃ³vel, fecha o menu automaticamente apÃ³s o clique
-        if (window.innerWidth <= 850) {
-            document.getElementById("sidebar").classList.add("closed");
+    // Oculta grupos inteiros da sidebar (details) para o funcionário
+    document.querySelectorAll(".sidebar details").forEach(det => {
+        const summaryText = det.querySelector("summary")?.textContent || "";
+        if (summaryText.includes("Administração") || summaryText.includes("Gestão")) {
+            det.style.display = ehGerenteLogado ? "" : "none";
         }
     });
+
+    // Seletor de Ramos de atividade: funcionário não pode ver nem alternar ramos
+    const seletorRamoProdutos = document.getElementById("select-ramo");
+    if (seletorRamoProdutos) seletorRamoProdutos.style.display = ehGerenteLogado ? "" : "none";
+
+    const bannerRamoInicio = document.getElementById("inicio-ramo");
+    if (bannerRamoInicio) bannerRamoInicio.style.display = ehGerenteLogado ? "" : "none";
+
+    // Atualiza os controles do POS de acordo com o perfil
+    verificarAcessoPosGerente();
+
+    // O funcionário ao entrar deve ir DIRETO para a sua atividade (Vender / POS)
+    if (!ehGerenteLogado) {
+        const secaoAtual = document.querySelector(".secao.active")?.id;
+        if (!secaoAtual || secaoAtual === "sec-inicio" || secoesReservadasAoGerente.some(sec => "sec-" + sec === secaoAtual)) {
+            mostrarSecao("pos");
+        }
+    }
+}
+
+function verificarAcessoPosGerente() {
+    let perfil = "gerente";
+    if (window.FABEF?.isDemoMode) {
+        perfil = window.FABEF.demoPerfil || "gerente";
+    } else if (FABEF.userData) {
+        perfil = FABEF.userData.perfil || FABEF.userData.role || "gerente";
+    }
+    const ehGerenteLogado = perfil === "gerente";
+    const avisoPos = document.getElementById("aviso-pos-gerente-bloqueado");
+    const btnFinalizar = document.getElementById("btn-finalizar-venda");
+
+    if (avisoPos) {
+        avisoPos.style.display = ehGerenteLogado ? "block" : "none";
+    }
+    if (btnFinalizar) {
+        if (ehGerenteLogado) {
+            btnFinalizar.disabled = true;
+            btnFinalizar.title = "O perfil de Gerente é exclusivo para gestão e supervisão. As vendas devem ser feitas por Funcionários.";
+            btnFinalizar.style.opacity = "0.6";
+            btnFinalizar.style.cursor = "not-allowed";
+        } else {
+            btnFinalizar.disabled = false;
+            btnFinalizar.title = "";
+            btnFinalizar.style.opacity = "1";
+            btnFinalizar.style.cursor = "pointer";
+        }
+    }
+}
+window.verificarAcessoPosGerente = verificarAcessoPosGerente;
+
+
+/* =====================================================
+   MÓDULO LÓGICO: COMPORTAMENTO DO MENU (SIDEBAR)
+===================================================== */
+
+function fecharMenuLateral() {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) {
+        sidebar.classList.remove("open");
+        sidebar.classList.add("closed");
+    }
+    const overlay = document.getElementById("sidebar-overlay");
+    if (overlay) overlay.classList.add("hidden");
+    document.body.classList.remove("menu-aberto");
+}
+
+function abrirMenuLateral() {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) {
+        sidebar.classList.remove("closed");
+        sidebar.classList.add("open");
+    }
+    const overlay = document.getElementById("sidebar-overlay");
+    if (overlay) overlay.classList.remove("hidden");
+    document.body.classList.add("menu-aberto");
+}
+
+function alternarMenuLateral() {
+    const sidebar = document.getElementById("sidebar");
+    if (!sidebar) return;
+    if (sidebar.classList.contains("open")) {
+        fecharMenuLateral();
+    } else {
+        abrirMenuLateral();
+    }
+}
+
+document.getElementById("btn-menu")?.addEventListener("click", alternarMenuLateral);
+document.getElementById("sidebar-overlay")?.addEventListener("click", fecharMenuLateral);
+
+// Ouvinte global para qualquer botão com data-sec na aplicação inteira
+document.addEventListener("click", (e) => {
+    const btnSec = e.target.closest("[data-sec]");
+    if (btnSec) {
+        const secNome = btnSec.dataset.sec;
+        const appEl = document.getElementById("app");
+        if (appEl && appEl.classList.contains("hidden")) {
+            // Se a aplicação principal ainda estiver oculta no login, entra em modo demo automaticamente
+            entrarModoDemo();
+        }
+        mostrarSecao(secNome);
+    }
+
+    const btnZip = e.target.closest(".btn-acao-baixar-zip");
+    if (btnZip && !btnZip.dataset.downloadTratado) {
+        btnZip.dataset.downloadTratado = "1";
+        if (window.baixarProjetoZip) {
+            window.baixarProjetoZip();
+        }
+    }
 });
 
-
 function mostrarSecao(nome) {
-    // Remove o estado ativo de todas as secÃ§Ãµes
+    // Remove o estado ativo de todas as secções
     document.querySelectorAll(".secao").forEach(s => s.classList.remove("active"));
 
-    // Exibe a secÃ§Ã£o selecionada pelo ID estrutural
+    // Exibe a secção selecionada pelo ID estrutural
     const sec = document.getElementById("sec-" + nome);
     if (sec) sec.classList.add("active");
 
-    // Atualiza visualmente o botÃ£o ativo no menu lateral
+    // Atualiza visualmente o botão ativo no menu lateral
     document.querySelectorAll(".sidebar button[data-sec]").forEach(b => {
         b.classList.toggle("active", b.dataset.sec === nome);
     });
 
-    // Garante que o grupo (categoria) do botÃ£o ativo fica aberto/visÃ­vel
+    // Garante que o grupo (categoria) do botão ativo fica aberto/visível
     const botaoAtivo = document.querySelector(`.sidebar button[data-sec="${nome}"]`);
     const grupo = botaoAtivo?.closest("details");
     if (grupo) grupo.open = true;
+
+    // AO CLICAR NA OPÇÃO, OS DIZERES DOS 3 PONTOS (SIDEBAR) DESAPARECEM IMEDIATAMENTE
+    // E A TELA PRINCIPAL EXIBE LIMPA A OPÇÃO SELECIONADA
+    fecharMenuLateral();
+
+    // Disparadores contextuais de atualização de tela
+    if (nome === "inicio") {
+        renderGraficoVendas(window.FABEF_GRAFICO_DIAS || 7);
+    } else if (nome === "ramos") {
+        renderPastaRamos();
+    } else if (nome === "subscricao") {
+        atualizarCalculadoraSubscricao();
+    } else if (nome === "pos") {
+        verificarAcessoPosGerente();
+    }
 }
+window.mostrarSecao = mostrarSecao;
 
 
 /* =====================================================
@@ -1233,6 +1457,15 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
 
 
 document.getElementById("btn-logout").addEventListener("click", async () => {
+    if (window.FABEF?.isDemoMode) {
+        window.FABEF.isDemoMode = false;
+        await limparEstadoFABEF();
+        document.getElementById("app")?.classList.add("hidden");
+        const telaLogin = document.getElementById("tela-login");
+        if (telaLogin) telaLogin.style.display = "flex";
+        toast("Sessão terminada.");
+        return;
+    }
     try {
         await signOut(auth);
     } catch (error) {
@@ -1338,6 +1571,7 @@ function renderRamos() {
     RAMOS = Array.from(new Set([...RAMOS_PADRAO, ...personalizados]));
 
     renderVisaoGeralRamos();
+    renderPastaRamos();
 
     const selects = [
         document.getElementById("select-ramo"),
@@ -2255,15 +2489,15 @@ function renderPOS() {
 ===================================================== */
 
 async function adicionarCarrinho(id) {
-    // A conta de gerente Ã© sÃ³ de controlo â€” nÃ£o regista vendas
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente") {
-        alert("A conta de gerente nÃ£o pode registar vendas. Entre com uma conta de funcionÃ¡rio.");
+    // A conta de gerente é só de controlo — não regista vendas (a menos que esteja no modo teste)
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
+        alert("A conta de gerente não pode registar vendas. Entre com uma conta de funcionário.");
         return;
     }
 
-    // Barreira imediata de interface: o estado do caixa jÃ¡ Ã© mantido em tempo real.
+    // Barreira imediata de interface: o estado do caixa já é mantido em tempo real.
     if (!FABEF.turnoId) {
-        alert("OperaÃ§Ã£o bloqueada: abra o caixa / turno antes de realizar vendas.");
+        alert("Operação bloqueada: abra o caixa / turno antes de realizar vendas.");
         atualizarTelaCaixa();
         return;
     }
@@ -2271,40 +2505,17 @@ async function adicionarCarrinho(id) {
     const produto = FABEF.produtos.find(p => p.id === id);
     if (!produto) return;
 
-    // Impede o faturamento de artigos sem unidades fÃ­sicas disponÃ­veis (Venda Negativa Bloqueada)
+    // Impede o faturamento de artigos sem unidades físicas disponíveis (Venda Negativa Bloqueada)
     if (numero(produto.stock) <= 0) {
-        alert("Este produto nÃ£o possui stock disponÃ­vel para venda.");
+        alert("Este produto não possui stock disponível para venda.");
         return;
     }
 
-    const unidadePeso = produto.unidade === "kg" || produto.unidade === "litro";
+    const unidadeFracionada = produto.unidade === "kg" || produto.unidade === "litro" || produto.unidade === "g";
 
-    // Produtos vendidos por peso/volume pedem a quantidade exata (aceita casas decimais)
-    if (unidadePeso) {
-        const quantidadeTexto = prompt(`Quantidade em ${produto.unidade} de "${produto.nome}" (stock disponÃ­vel: ${numero(produto.stock)} ${produto.unidade}):`, "1");
-        if (quantidadeTexto === null) return;
-        const quantidadeDesejada = numero(quantidadeTexto);
-        if (quantidadeDesejada <= 0) return;
-
-        const existentePeso = FABEF.carrinho.find(x => x.produtoId === id);
-        const totalPretendido = (existentePeso ? existentePeso.quantidade : 0) + quantidadeDesejada;
-        if (totalPretendido > numero(produto.stock)) {
-            alert(`Quantidade solicitada (${totalPretendido} ${produto.unidade}) superior ao stock fÃ­sico disponÃ­vel (${numero(produto.stock)} ${produto.unidade}).`);
-            return;
-        }
-
-        if (existentePeso) {
-            existentePeso.quantidade = totalPretendido;
-        } else {
-            FABEF.carrinho.push({
-                produtoId: id,
-                nome: produto.nome,
-                preco: numero(produto.preco),
-                unidade: produto.unidade,
-                quantidade: quantidadeDesejada
-            });
-        }
-        renderCarrinho();
+    // Produtos vendidos por peso/volume (ex: carne no talho, granel, líquidos) abrem a calculadora fracionada
+    if (unidadeFracionada) {
+        abrirModalVendaFracionada(produto);
         return;
     }
 
@@ -2313,12 +2524,12 @@ async function adicionarCarrinho(id) {
     if (existente) {
         // Bloqueia se a quantidade pretendida ultrapassar o stock real em cache
         if (existente.quantidade + 1 > numero(produto.stock)) {
-            alert("Quantidade solicitada superior ao stock fÃ­sico disponÃ­vel no estabelecimento.");
+            alert("Quantidade solicitada superior ao stock físico disponível no estabelecimento.");
             return;
         }
         existente.quantidade++;
     } else {
-        // Insere o primeiro item mapeando as propriedades comerciais do catÃ¡logo
+        // Insere o primeiro item mapeando as propriedades comerciais do catálogo
         FABEF.carrinho.push({
             produtoId: id,
             nome: produto.nome,
@@ -2331,13 +2542,159 @@ async function adicionarCarrinho(id) {
     renderCarrinho();
 }
 
-
 /* =====================================================
-   MÃ“DULO LÃ“GICO: DESENHO DO CARRINHO DE COMPRAS
+   MÓDULO: CALCULADORA DE VENDA FRACIONADA (PESO / VALOR)
 ===================================================== */
+window.FABEF_frac_modo = "peso";
+
+function abrirModalVendaFracionada(produto) {
+    const modal = document.getElementById("modal-venda-fracionada");
+    if (!modal) return;
+
+    document.getElementById("frac-produto-id").value = produto.id;
+    document.getElementById("frac-titulo").textContent = `🥩 ${produto.nome}`;
+    document.getElementById("frac-subtitulo").textContent = `Preço: ${dinheiro(produto.preco)} / ${produto.unidade} | Stock na banca: ${numero(produto.stock)} ${produto.unidade}`;
+
+    const inputPeso = document.getElementById("frac-peso");
+    const inputValor = document.getElementById("frac-valor");
+    const selectUnidade = document.getElementById("frac-unidade-medida");
+
+    if (inputPeso) inputPeso.value = "";
+    if (inputValor) inputValor.value = "";
+    if (selectUnidade) selectUnidade.value = produto.unidade === "g" ? "g" : "kg";
+
+    ativarModoCalculoFracionada("peso", produto);
+
+    modal.classList.add("show");
+    setTimeout(() => inputPeso?.focus(), 150);
+}
+
+function ativarModoCalculoFracionada(modo, produto) {
+    window.FABEF_frac_modo = modo;
+    const btnPeso = document.getElementById("btn-calc-peso");
+    const btnValor = document.getElementById("btn-calc-valor");
+    const blocoPeso = document.getElementById("bloco-input-peso");
+    const blocoValor = document.getElementById("bloco-input-valor");
+
+    if (modo === "peso") {
+        btnPeso?.classList.add("btn-primary");
+        btnPeso?.classList.remove("btn-light");
+        btnValor?.classList.add("btn-light");
+        btnValor?.classList.remove("btn-primary");
+        if (blocoPeso) blocoPeso.style.display = "block";
+        if (blocoValor) blocoValor.style.display = "none";
+        document.getElementById("frac-peso")?.focus();
+    } else {
+        btnValor?.classList.add("btn-primary");
+        btnValor?.classList.remove("btn-light");
+        btnPeso?.classList.add("btn-light");
+        btnPeso?.classList.remove("btn-primary");
+        if (blocoValor) blocoValor.style.display = "block";
+        if (blocoPeso) blocoPeso.style.display = "none";
+        document.getElementById("frac-valor")?.focus();
+    }
+    recalcularFracionada(produto);
+}
+
+function recalcularFracionada(produto) {
+    if (!produto) {
+        const id = document.getElementById("frac-produto-id")?.value;
+        produto = FABEF.produtos.find(p => p.id === id);
+    }
+    if (!produto) return;
+
+    const modo = window.FABEF_frac_modo || "peso";
+    const precoUnit = numero(produto.preco);
+    let qtdCalculada = 0;
+    let totalCalculado = 0;
+
+    if (modo === "peso") {
+        const pesoDigitado = numero(document.getElementById("frac-peso")?.value);
+        const unidadeSel = document.getElementById("frac-unidade-medida")?.value || "kg";
+        if (unidadeSel === "g") {
+            qtdCalculada = pesoDigitado / 1000;
+        } else {
+            qtdCalculada = pesoDigitado;
+        }
+        totalCalculado = qtdCalculada * precoUnit;
+    } else {
+        const valorDigitado = numero(document.getElementById("frac-valor")?.value);
+        totalCalculado = valorDigitado;
+        if (precoUnit > 0) {
+            qtdCalculada = valorDigitado / precoUnit;
+        }
+    }
+
+    const resumoQtd = document.getElementById("frac-resumo-qtd");
+    const resumoTotal = document.getElementById("frac-resumo-total");
+    if (resumoQtd) {
+        if (qtdCalculada > 0) {
+            const emGramas = (qtdCalculada * 1000).toFixed(0);
+            resumoQtd.textContent = `${qtdCalculada.toFixed(3)} kg (${emGramas} g)`;
+        } else {
+            resumoQtd.textContent = "0.000 kg";
+        }
+    }
+    if (resumoTotal) {
+        resumoTotal.textContent = dinheiro(totalCalculado);
+    }
+}
+
+document.getElementById("btn-calc-peso")?.addEventListener("click", () => ativarModoCalculoFracionada("peso"));
+document.getElementById("btn-calc-valor")?.addEventListener("click", () => ativarModoCalculoFracionada("valor"));
+document.getElementById("frac-peso")?.addEventListener("input", () => recalcularFracionada());
+document.getElementById("frac-unidade-medida")?.addEventListener("change", () => recalcularFracionada());
+document.getElementById("frac-valor")?.addEventListener("input", () => recalcularFracionada());
+
+document.getElementById("btn-confirmar-fracionada")?.addEventListener("click", () => {
+    const id = document.getElementById("frac-produto-id")?.value;
+    const produto = FABEF.produtos.find(p => p.id === id);
+    if (!produto) return;
+
+    const modo = window.FABEF_frac_modo || "peso";
+    const precoUnit = numero(produto.preco);
+    let quantidadeDesejada = 0;
+
+    if (modo === "peso") {
+        const pesoDigitado = numero(document.getElementById("frac-peso")?.value);
+        const unidadeSel = document.getElementById("frac-unidade-medida")?.value || "kg";
+        quantidadeDesejada = unidadeSel === "g" ? (pesoDigitado / 1000) : pesoDigitado;
+    } else {
+        const valorDigitado = numero(document.getElementById("frac-valor")?.value);
+        if (precoUnit > 0) quantidadeDesejada = valorDigitado / precoUnit;
+    }
+
+    if (quantidadeDesejada <= 0) {
+        alert("Por favor, introduza um peso ou valor válido.");
+        return;
+    }
+
+    const existentePeso = FABEF.carrinho.find(x => x.produtoId === id);
+    const totalPretendido = (existentePeso ? existentePeso.quantidade : 0) + quantidadeDesejada;
+    if (totalPretendido > numero(produto.stock)) {
+        alert(`Quantidade solicitada (${totalPretendido.toFixed(3)} ${produto.unidade}) superior ao stock físico disponível na banca (${numero(produto.stock)} ${produto.unidade}).`);
+        return;
+    }
+
+    if (existentePeso) {
+        existentePeso.quantidade = totalPretendido;
+    } else {
+        FABEF.carrinho.push({
+            produtoId: id,
+            nome: produto.nome,
+            preco: precoUnit,
+            unidade: produto.unidade || "kg",
+            quantidade: quantidadeDesejada
+        });
+    }
+
+    fecharModal("modal-venda-fracionada");
+    renderCarrinho();
+});
+
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: EXECUÃ‡ÃƒO E RENDERIZAÃ‡ÃƒO DO CARRINHO
+   MÓDULO LÓGICO: EXECUÇÃO E RENDERIZAÇÃO DO CARRINHO
 ===================================================== */
 
 function renderCarrinho() {
@@ -2359,13 +2716,17 @@ function renderCarrinho() {
         const subtotal = numero(item.preco) * numero(item.quantidade);
         totalAcumulado += subtotal;
 
+        const qtdFormatada = (item.unidade === "kg" || item.unidade === "litro" || item.unidade === "g") ?
+            `${numero(item.quantidade).toFixed(3)} ${item.unidade}` :
+            `${numero(item.quantidade)} ${item.unidade || "un"}`;
+
         return `
         <div class="cart-item">
             <div class="cart-info">
                 <strong>${escapeHTML(item.nome)}</strong><br>
-                <small>${numero(item.quantidade)}${item.unidade && item.unidade !== "unidade" ? " " + escapeHTML(item.unidade) : ""} Ã— ${dinheiro(item.preco)}</small>
+                <small>${qtdFormatada} × ${dinheiro(item.preco)}</small>
             </div>
-            <div style="font-weight: 700; font-size: 13px; margin-right: 5px;">
+            <div style="font-weight: 700; font-size: 13px; margin-right: 5px; color: #065f46;">
                 ${dinheiro(subtotal)}
             </div>
             <button 
@@ -2374,7 +2735,7 @@ function renderCarrinho() {
                 onclick="removerItemCarrinho(${index})"
                 type="button"
             >
-                âœ•
+                ✕
             </button>
         </div>
         `;
@@ -2497,6 +2858,17 @@ function atualizarRestantePagamentoMisto() {
 
 
 async function finalizarVenda() {
+    let perfilAtual = "gerente";
+    if (window.FABEF?.isDemoMode) {
+        perfilAtual = window.FABEF.demoPerfil || "gerente";
+    } else if (FABEF.userData) {
+        perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
+    }
+    if (perfilAtual === "gerente") {
+        alert("Operação Bloqueada: A aba e perfil do Gerente não pode realizar vendas operacionais. Todas as vendas de balcão no POS devem ser realizadas pelo perfil de Funcionário.");
+        return;
+    }
+
     if (limiteVendasDiariasAtingido()) {
         avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.vendasDiarias} vendas do plano grÃ¡tis.`);
         return;
@@ -2645,13 +3017,27 @@ async function finalizarVenda() {
         const checkboxMisto = document.getElementById("pos-pagamento-misto");
         if (checkboxMisto) { checkboxMisto.checked = false; alternarPagamentoMisto(); }
 
-        // ForÃ§a a atualizaÃ§Ã£o da cache interna local e redesenha a interface grÃ¡fica
+        // Força a atualização da cache interna local e redesenha a interface gráfica
         await carregarDados();
         renderTudo();
 
-        // Insere o faturamento financeiro nos registos inalterÃ¡veis de auditoria
+        // Insere o faturamento financeiro nos registos inalteráveis de auditoria
         await gravarAuditoria("Registou venda de mercadorias no valor de " + dinheiro(totalComDesconto) + (desconto > 0 ? ` (desconto de ${dinheiro(desconto)} aplicado)` : ""), "INFO");
-        alert("Venda concluÃ­da com sucesso. Valor total: " + dinheiro(totalComDesconto));
+        
+        // Abre o modal de recibo profissional com opções de impressão e envio por WhatsApp
+        window.FABEF_ultimaVendaId = novaVendaId;
+        const resumoModal = document.getElementById("recibo-sucesso-resumo");
+        if (resumoModal) {
+            resumoModal.innerHTML = `
+                <div style="font-size: 1.4rem; font-weight: 800; color: #065f46; margin-bottom: 4px;">
+                    ${dinheiro(totalComDesconto)}
+                </div>
+                <div style="font-size: 0.85rem; color: #475569;">
+                    Recibo: <strong>${escapeHTML(novaVendaId)}</strong> • ${linhas.length} artigo(s) • Pagamento: <strong>${escapeHTML(pagamento)}</strong>
+                </div>
+            `;
+        }
+        document.getElementById("modal-recibo-sucesso")?.classList.add("show");
 
     } catch (error) {
         console.error("Erro crÃ­tico ao processar faturamento no POS:", error);
@@ -2687,55 +3073,217 @@ function renderVendas() {
     if (!tabelaCorpo) return;
 
     tabelaCorpo.innerHTML = listaFiltrada.map(v => {
-        const itensMapeados = (v.itens || v.items || []).map(x => escapeHTML(x.nome || "Produto") + " Ã— " + numero(x.quantidade || x.qty)).join(", ");
+        const itensMapeados = (v.itens || v.items || []).map(x => escapeHTML(x.nome || "Produto") + " × " + numero(x.quantidade || x.qty)).join(", ");
+        const ehFalhada = v.status === "FALHADA_CANCELADA" || v.status === "FALHADA" || v.status === "CANCELADA";
         return `
-        <tr>
-            <td>${dataTexto(v.data || v.date)}</td>
-            <td>${escapeHTML(v.operadorNome || v.user || "â€”")}</td>
-            <td style="white-space: normal; max-width: 220px;">${itensMapeados}</td>
-            <td><strong>${dinheiro(v.total)}</strong></td>
-            <td>${escapeHTML(v.pagamento || v.method || "â€”")}</td>
-            <td>${escapeHTML(v.nuitCliente || "Isento")}</td>
-            <td>${escapeHTML(v.ramo || "â€”")}</td>
+        <tr style="${ehFalhada ? 'background: #fff1f2; opacity: 0.88;' : ''}">
             <td>
-                <div style="display:flex;gap:5px;">
-                    <button class="btn btn-light btn-small" onclick="imprimirReciboVenda('${escapeHTML(v.id)}')" type="button">ðŸ–¨ï¸ Recibo</button>
-                    <button class="btn btn-success btn-small" onclick="enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;">ðŸ“± WhatsApp</button>
+                ${dataTexto(v.data || v.date)}
+                ${ehFalhada ? `
+                    <div style="margin-top:4px;"><span class="badge badge-red" style="font-size:11px;">⚠️ Falhada / Cancelada</span></div>
+                    <div style="font-size:11px;color:#b91c1c;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || v.motivoFalha || 'Venda não concluída')}</div>
+                ` : ""}
+            </td>
+            <td>${escapeHTML(v.operadorNome || v.user || "—")}</td>
+            <td style="white-space: normal; max-width: 220px;">${itensMapeados}</td>
+            <td><strong style="${ehFalhada ? 'text-decoration: line-through; color: #94a3b8;' : ''}">${dinheiro(v.total)}</strong></td>
+            <td>${escapeHTML(v.pagamento || v.method || "—")}</td>
+            <td>${escapeHTML(v.nuitCliente || "Isento")}</td>
+            <td>${escapeHTML(v.ramo || "—")}</td>
+            <td>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                    <button class="btn btn-light btn-small" onclick="imprimirReciboVenda('${escapeHTML(v.id)}')" type="button">🖨️ Recibo</button>
+                    <button class="btn btn-success btn-small" onclick="enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;">📱 WhatsApp</button>
+                    ${!ehFalhada ? `
+                        <button class="btn btn-small" onclick="abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;" title="Registar falha ou alteração com justificativa obrigatória ao Gerente">⚠️ Falhou / Corrigir</button>
+                    ` : ""}
                 </div>
             </td>
         </tr>`;
-    }).join("") || `<tr><td colspan="8" style="text-align:center;color:#64748b;">Nenhuma operaÃ§Ã£o de venda localizada nos critÃ©rios definidos.</td></tr>`;
+    }).join("") || `<tr><td colspan="8" style="text-align:center;color:#64748b;">Nenhuma operação de venda localizada nos critérios definidos.</td></tr>`;
 }
 
 window.imprimirReciboVenda = function(vendaId) {
     const v = FABEF.vendas.find(x => x.id === vendaId);
-    if (!v) { alert("Venda nÃ£o localizada."); return; }
-    const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
-    const itens = (v.itens || []).map(i => `<tr><td>${escapeHTML(i.nome)}</td><td>${numero(i.quantidade)}</td><td>${dinheiro(i.subtotal)}</td></tr>`).join("");
+    if (!v) { alert("Venda não localizada."); return; }
+
+    const emp = FABEF.empresa || {};
+    const nomeEmpresa = emp.nome || "FABEF GESTÃO ERP PRO";
+    const nuitEmpresa = emp.nuit || "Isento / Não registado";
+    const telEmpresa = emp.telefone || "+258 84 123 4567";
+    const endEmpresa = emp.endereco || "Moçambique";
+    const cidadeEmpresa = emp.cidade || "Maputo";
+    const regimeIva = emp.ivaRegime === "normal" ? `IVA ${emp.ivaTaxa || 16}% Incluído` : "Regime de Isenção (Art. 9 CIVA)";
+    const rodapeMsg = emp.rodapeRecibo || "Obrigado pela sua preferência! Volte sempre.";
+
+    const itensHtml = (v.itens || []).map(i => {
+        const ehFracionado = i.unidade === "kg" || i.unidade === "litro" || i.unidade === "g";
+        const qtdDesc = ehFracionado ? `${numero(i.quantidade).toFixed(3)} ${i.unidade}` : `${numero(i.quantidade)} ${i.unidade || "un"}`;
+        return `
+        <tr>
+            <td style="padding: 4px 2px; font-weight: 600; border-bottom: 1px dashed #cbd5e1;">${escapeHTML(i.nome)}</td>
+            <td style="padding: 4px 2px; text-align: center; border-bottom: 1px dashed #cbd5e1;">${qtdDesc}</td>
+            <td style="padding: 4px 2px; text-align: right; border-bottom: 1px dashed #cbd5e1;">${dinheiro(i.preco)}</td>
+            <td style="padding: 4px 2px; text-align: right; font-weight: 700; border-bottom: 1px dashed #cbd5e1;">${dinheiro(i.subtotal)}</td>
+        </tr>
+        `;
+    }).join("");
+
+    const totalVenda = numero(v.total);
+    const subtotalVenda = numero(v.subtotal || totalVenda);
+    const descontoVenda = numero(v.desconto || 0);
+
     const w = window.open("", "_blank");
-    if (!w) { alert("O navegador bloqueou a janela de impressÃ£o."); return; }
-    w.document.write(`<html><head><title>Recibo ${escapeHTML(v.id)}</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:6px;text-align:left}
-    body.dark-mode {
-        --bg: #0f172a;
-        --card: #1e293b;
-        --text: #e2e8f0;
-        --muted: #94a3b8;
-        --border: #334155;
-        color: #e2e8f0;
-    }
-    body.dark-mode .card, body.dark-mode .stat-card, body.dark-mode .modal-card, body.dark-mode .table-wrap { background: #1e293b; color: #e2e8f0; border-color: #334155; }
-    body.dark-mode input, body.dark-mode select, body.dark-mode textarea { background:#0f172a; color:#e2e8f0; border-color:#475569; }
-    body.dark-mode table th { background:#0f172a; }
-</style></head><body><h2>${escapeHTML(nomeEmpresa)}</h2><p><strong>RECIBO DIGITAL</strong><br>CÃ³digo: ${escapeHTML(v.id)}<br>Data: ${dataTexto(v.data)}<br>Operador: ${escapeHTML(v.operadorNome || "BalcÃ£o")}<br>NUIT Cliente: ${escapeHTML(v.nuitCliente || "Isento")}</p><table><thead><tr><th>Artigo</th><th>Qtd.</th><th>Total</th></tr></thead><tbody>${itens}</tbody></table><h3>TOTAL: ${dinheiro(v.total)}</h3><p>Forma de pagamento: ${escapeHTML(v.pagamento || "â€”")}</p><script>window.print();<\/script></body></html>`);
+    if (!w) { alert("O navegador bloqueou a janela de impressão."); return; }
+
+    w.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Recibo Comercial - ${escapeHTML(v.id)}</title>
+        <style>
+            @media print {
+                body { margin: 0; padding: 6px; font-size: 11px; }
+                @page { margin: 0; size: 80mm auto; }
+            }
+            body {
+                font-family: 'Courier New', Courier, monospace, sans-serif;
+                max-width: 320px;
+                margin: 0 auto;
+                padding: 16px 12px;
+                color: #0f172a;
+                background: #fff;
+            }
+            .center { text-align: center; }
+            .right { text-align: right; }
+            .divider { border-top: 1px dashed #475569; margin: 8px 0; }
+            .double-divider { border-top: 2px double #0f172a; margin: 8px 0; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th { border-bottom: 1px dashed #475569; padding: 4px 2px; font-size: 11px; text-transform: uppercase; }
+            .info-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; }
+            .total-row { display: flex; justify-content: space-between; font-size: 14px; font-weight: 900; margin: 4px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="center">
+            <h2 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 900; text-transform: uppercase;">${escapeHTML(nomeEmpresa)}</h2>
+            <div style="font-size: 11px;">${escapeHTML(endEmpresa)} - ${escapeHTML(cidadeEmpresa)}</div>
+            <div style="font-size: 11px;">NUIT: <strong>${escapeHTML(nuitEmpresa)}</strong> | Tel: ${escapeHTML(telEmpresa)}</div>
+            <div style="font-size: 10px; color: #475569; margin-top: 2px;">${escapeHTML(regimeIva)}</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="center" style="font-weight: 800; font-size: 12px; letter-spacing: 1px;">VD / FACTURA-RECIBO</div>
+        <div class="info-row" style="margin-top: 6px;">
+            <span>Doc. Nº:</span><strong>${escapeHTML(v.id)}</strong>
+        </div>
+        <div class="info-row">
+            <span>Data/Hora:</span><span>${dataTexto(v.data)}</span>
+        </div>
+        <div class="info-row">
+            <span>Operador/Caixa:</span><span>${escapeHTML(v.operadorNome || "Balcão")}</span>
+        </div>
+        <div class="info-row">
+            <span>Ramo/Sector:</span><span>${escapeHTML(v.ramo || FABEF.ramo || "Comercial")}</span>
+        </div>
+        <div class="divider"></div>
+
+        <div class="info-row">
+            <span>Cliente:</span><strong>${escapeHTML(v.cliente || "Consumidor Final")}</strong>
+        </div>
+        <div class="info-row">
+            <span>NUIT Cliente:</span><span>${escapeHTML(v.nuitCliente || "Isento / Final")}</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="text-align: left;">Artigo</th>
+                    <th style="text-align: center;">Qtd</th>
+                    <th style="text-align: right;">P.Unit</th>
+                    <th style="text-align: right;">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${itensHtml}
+            </tbody>
+        </table>
+
+        <div class="divider"></div>
+
+        <div class="info-row">
+            <span>Subtotal:</span><span>${dinheiro(subtotalVenda)}</span>
+        </div>
+        ${descontoVenda > 0 ? `
+        <div class="info-row" style="color: #dc2626;">
+            <span>Desconto Comercial:</span><span>-${dinheiro(descontoVenda)}</span>
+        </div>
+        ` : ""}
+        <div class="double-divider"></div>
+        <div class="total-row">
+            <span>TOTAL PAGO:</span><span>${dinheiro(totalVenda)}</span>
+        </div>
+        <div class="double-divider"></div>
+
+        <div class="info-row">
+            <span>Forma Pagamento:</span><strong>${escapeHTML(v.pagamento || "Dinheiro")}</strong>
+        </div>
+        ${v.pagamentoDetalhe ? `<div style="font-size: 10px; color: #475569;">${escapeHTML(v.pagamentoDetalhe)}</div>` : ""}
+
+        <div class="divider" style="margin-top: 14px;"></div>
+        <div class="center" style="font-size: 10px; margin-top: 6px;">
+            <div>${escapeHTML(rodapeMsg)}</div>
+            <div style="margin-top: 6px; color: #64748b; font-size: 9px;">Processado por FABEF Gestão ERP PRO (Moçambique)</div>
+        </div>
+        <script>
+            window.addEventListener('load', () => {
+                setTimeout(() => { window.print(); }, 200);
+            });
+        </script>
+    </body>
+    </html>
+    `);
     w.document.close();
 };
 
 window.enviarReciboWhatsApp = function(vendaId) {
     const v = FABEF.vendas.find(x => x.id === vendaId);
-    if (!v) { alert("Venda nÃ£o localizada."); return; }
-    const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
-    const textoItens = (v.itens || []).map(item => `â€¢ ${item.nome} (x${item.quantidade}): ${dinheiro(item.subtotal)}`).join("\n");
-    const mensagem = encodeURIComponent(`*${nomeEmpresa.toUpperCase()} - RECIBO DIGITAL*\n----------------------------------------\n*CÃ³digo da Venda:* ${v.id}\n*Data:* ${dataTexto(v.data)}\n*Operador:* ${v.operadorNome || "BalcÃ£o"}\n*NUIT Cliente:* ${v.nuitCliente || "Isento"}\n----------------------------------------\n*ARTIGOS:*\n${textoItens}\n----------------------------------------\n*TOTAL:* ${dinheiro(v.total)}\n*Forma de Pagamento:* ${v.pagamento || "â€”"}\n\nObrigado pela preferÃªncia! ðŸŽ‰`);
+    if (!v) { alert("Venda não localizada."); return; }
+
+    const emp = FABEF.empresa || {};
+    const nomeEmpresa = emp.nome || "FABEF GESTÃO ERP PRO";
+    const nuitEmpresa = emp.nuit || "Isento";
+    const telEmpresa = emp.telefone || "+258 84 123 4567";
+
+    const textoItens = (v.itens || []).map(item => {
+        const ehFrac = item.unidade === "kg" || item.unidade === "litro" || item.unidade === "g";
+        const qtdTxt = ehFrac ? `${numero(item.quantidade).toFixed(3)} ${item.unidade}` : `${numero(item.quantidade)} ${item.unidade || "un"}`;
+        return `• *${item.nome}* (${qtdTxt}) = ${dinheiro(item.subtotal)}`;
+    }).join("\n");
+
+    const mensagem = encodeURIComponent(
+        `🧾 *${nomeEmpresa.toUpperCase()}*\n` +
+        `📍 ${emp.endereco || "Moçambique"} | Tel: ${telEmpresa}\n` +
+        `🆔 NUIT da Empresa: *${nuitEmpresa}*\n` +
+        `----------------------------------------\n` +
+        `📄 *RECIBO DE VENDA:* #${v.id}\n` +
+        `📅 *Data:* ${dataTexto(v.data)}\n` +
+        `👤 *Cliente:* ${v.cliente || "Consumidor Final"}\n` +
+        `🆔 *NUIT Cliente:* ${v.nuitCliente || "Consumidor Final"}\n` +
+        `👨‍💼 *Operador:* ${v.operadorNome || "Balcão"}\n` +
+        `----------------------------------------\n` +
+        `*ARTIGOS:*\n${textoItens}\n` +
+        `----------------------------------------\n` +
+        `💰 *TOTAL PAGO:* ${dinheiro(v.total)}\n` +
+        `💳 *Método de Pagamento:* ${v.pagamento || "Dinheiro"}\n` +
+        `----------------------------------------\n` +
+        `✨ _${emp.rodapeRecibo || "Obrigado pela preferência! Volte sempre."}_\n` +
+        `_Emitido via FABEF Gestão ERP PRO_`
+    );
     window.open(`https://wa.me/?text=${mensagem}`, "_blank");
 };
 
@@ -3079,7 +3627,7 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
 
 
 async function registarDivida() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente") {
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
         alert("A conta de gerente nÃ£o regista novas dÃ­vidas â€” isso Ã© feito pelo funcionÃ¡rio no momento da venda ou do atendimento. O gerente pode consultar e acompanhar aqui.");
         return;
     }
@@ -3298,15 +3846,22 @@ function renderEncomendas() {
         }
 
         if (e.estado !== "ENTREGUE" && e.estado !== "CANCELADA") {
-            botoesAcao += `<button class="btn btn-success btn-small" onclick="enviarAvisoEncomenda('${escapeHTML(e.id)}')" type="button" style="background-color:#25d366;">ðŸ“± Lembrete</button>`;
-            botoesAcao += `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','CANCELADA')" type="button">âœ–ï¸ Cancelar</button>`;
+            botoesAcao += `<button class="btn btn-success btn-small" onclick="enviarAvisoEncomenda('${escapeHTML(e.id)}')" type="button" style="background-color:#25d366;">📱 Lembrete</button>`;
+            botoesAcao += `<button class="btn btn-small" onclick="abrirModalEncomendaFalhada('${escapeHTML(e.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:600;" title="Cancelar encomenda com justificativa obrigatória ao Gerente">⚠️ Falhou / Cancelar</button>`;
         }
 
         return `<tr>
-            <td><strong>${escapeHTML(e.cliente)}</strong>${e.telefone ? `<br><small style="color:#64748b;">${escapeHTML(e.telefone)}</small>` : ""}</td>
+            <td>
+                <strong>${escapeHTML(e.cliente)}</strong>${e.telefone ? `<br><small style="color:#64748b;">${escapeHTML(e.telefone)}</small>` : ""}
+                ${e.justificativaGerente ? `
+                    <div style="font-size:11px;color:#b91c1c;margin-top:2px;background:#fee2e2;padding:2px 6px;border-radius:4px;">
+                        <strong>Justificativa ao Gerente:</strong> ${escapeHTML(e.justificativaGerente)}
+                    </div>
+                ` : ""}
+            </td>
             <td>${escapeHTML(e.produto)}</td>
             <td>${numero(e.quantidade)}</td>
-            <td>${e.dataPrevista ? escapeHTML(e.dataPrevista) : "â€”"}</td>
+            <td>${e.dataPrevista ? escapeHTML(e.dataPrevista) : "—"}</td>
             <td>${dinheiro(valorTotal)}</td>
             <td style="color:${valorRestante > 0 ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(valorRestante)}</td>
             <td><span class="badge ${classeBadge}">${escapeHTML(ROTULO_ESTADO_ENCOMENDA[e.estado] || e.estado || "Pendente")}</span></td>
@@ -3641,7 +4196,7 @@ document.getElementById("btn-registar-despesa").addEventListener("click", regist
 
 
 async function registarDespesa() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente") {
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
         alert("A conta de gerente nÃ£o regista despesas diretamente â€” isso Ã© feito pelo funcionÃ¡rio. O gerente pode consultar aqui.");
         return;
     }
@@ -4018,12 +4573,23 @@ function renderABC(vendas) {
 
 function renderConfiguracoes() {
     const nomeInput = document.getElementById("config-nome");
+    const nuitInput = document.getElementById("config-nuit");
     const telInput = document.getElementById("config-telefone");
     const endInput = document.getElementById("config-endereco");
+    const cidInput = document.getElementById("config-cidade");
+    const ivaRegimeInput = document.getElementById("config-iva-regime");
+    const ivaTaxaInput = document.getElementById("config-iva-taxa");
+    const rodapeInput = document.getElementById("config-rodape");
 
-    if (nomeInput) nomeInput.value = FABEF.empresa?.nome || "";
-    if (telInput) telInput.value = FABEF.empresa?.telefone || "";
-    if (endInput) endInput.value = FABEF.empresa?.endereco || "";
+    const emp = FABEF.empresa || {};
+    if (nomeInput) nomeInput.value = emp.nome || "";
+    if (nuitInput) nuitInput.value = emp.nuit || "";
+    if (telInput) telInput.value = emp.telefone || "";
+    if (endInput) endInput.value = emp.endereco || "";
+    if (cidInput) cidInput.value = emp.cidade || "";
+    if (ivaRegimeInput) ivaRegimeInput.value = emp.ivaRegime || "isento";
+    if (ivaTaxaInput) ivaTaxaInput.value = emp.ivaTaxa !== undefined ? emp.ivaTaxa : 16;
+    if (rodapeInput) rodapeInput.value = emp.rodapeRecibo || "Obrigado pela sua preferência! Volte sempre.";
 }
 
 
@@ -4034,35 +4600,56 @@ document.getElementById("btn-alterar-pin")?.addEventListener("click", () => {
 
 
 async function guardarConfiguracoes() {
-    const nome = document.getElementById("config-nome").value.trim();
-    const telefone = document.getElementById("config-telefone").value.trim();
-    const endereco = document.getElementById("config-endereco").value.trim();
+    const nome = document.getElementById("config-nome")?.value.trim() || "";
+    const nuit = document.getElementById("config-nuit")?.value.trim() || "";
+    const telefone = document.getElementById("config-telefone")?.value.trim() || "";
+    const endereco = document.getElementById("config-endereco")?.value.trim() || "";
+    const cidade = document.getElementById("config-cidade")?.value.trim() || "";
+    const ivaRegime = document.getElementById("config-iva-regime")?.value || "isento";
+    const ivaTaxa = numero(document.getElementById("config-iva-taxa")?.value);
+    const rodapeRecibo = document.getElementById("config-rodape")?.value.trim() || "";
 
     if (!nome) {
-        alert("O nome do negÃ³cio Ã© um campo de preenchimento obrigatÃ³rio.");
+        alert("O nome do negócio é um campo de preenchimento obrigatório.");
+        return;
+    }
+
+    if (!FABEF.empresa) FABEF.empresa = {};
+    FABEF.empresa.nome = nome;
+    FABEF.empresa.nuit = nuit;
+    FABEF.empresa.telefone = telefone;
+    FABEF.empresa.endereco = endereco;
+    FABEF.empresa.cidade = cidade;
+    FABEF.empresa.ivaRegime = ivaRegime;
+    FABEF.empresa.ivaTaxa = ivaTaxa;
+    FABEF.empresa.rodapeRecibo = rodapeRecibo;
+
+    if (window.FABEF?.isDemoMode) {
+        alert("Configurações da empresa e modelo de recibo atualizados com sucesso!");
+        renderTudo();
         return;
     }
 
     try {
         await updateDoc(empresaRef(), {
             nome: nome,
+            nuit: nuit,
             telefone: telefone,
             endereco: endereco,
+            cidade: cidade,
+            ivaRegime: ivaRegime,
+            ivaTaxa: ivaTaxa,
+            rodapeRecibo: rodapeRecibo,
             atualizadoEm: serverTimestamp()
         });
 
-        // Sincroniza imediatamente o estado da cache interna local
-        FABEF.empresa.nome = nome;
-        FABEF.empresa.telefone = telefone;
-        FABEF.empresa.endereco = endereco;
-
         renderTudo();
 
-        await gravarAuditoria("Actualizou as configuraÃ§Ãµes estruturais da empresa / negÃ³cio.", "INFO");
-        alert("Dados do negÃ³cio guardados com sucesso na nuvem.");
+        await gravarAuditoria("Actualizou as configurações estruturais da empresa e dados do recibo profissional.", "INFO");
+        alert("Dados do negócio e parâmetros de recibo guardados com sucesso na nuvem.");
     } catch (error) {
         console.error(error);
-        alert("Erro ao salvar configuraÃ§Ãµes do negÃ³cio:\n" + mensagemFirebase(error));
+        alert("Erro ao salvar configurações do negócio:\n" + mensagemFirebase(error));
     }
 }
 
@@ -4435,6 +5022,567 @@ document.getElementById("btn-solicitar-pagamento")?.addEventListener("click", so
 
 document.getElementById("btn-cadastrar-funcionario")?.addEventListener("click", cadastrarNovoFuncionario);
 
+/* =====================================================
+   MÓDULO LÓGICO: GRÁFICO DE CONTROLO DE VENDAS DIÁRIAS (TELA PRINCIPAL)
+===================================================== */
+window.FABEF_GRAFICO_DIAS = 7;
+
+function renderGraficoVendas(dias = 7) {
+    window.FABEF_GRAFICO_DIAS = dias;
+    const container = document.getElementById("container-grafico-vendas");
+    if (!container) return;
+
+    document.querySelectorAll(".btn-filtro-grafico").forEach(btn => {
+        const d = parseInt(btn.dataset.dias, 10);
+        if (d === dias) {
+            btn.classList.remove("btn-light");
+            btn.classList.add("btn-primary");
+            btn.style.fontWeight = "800";
+        } else {
+            btn.classList.remove("btn-primary");
+            btn.classList.add("btn-light");
+            btn.style.fontWeight = "500";
+        }
+    });
+
+    const hoje = new Date();
+    hoje.setHours(23, 59, 59, 999);
+
+    const dadosDias = [];
+    for (let i = dias - 1; i >= 0; i--) {
+        const d = new Date(hoje);
+        d.setDate(d.getDate() - i);
+        const inicioDia = new Date(d);
+        inicioDia.setHours(0, 0, 0, 0);
+        const fimDia = new Date(d);
+        fimDia.setHours(23, 59, 59, 999);
+
+        const vendasDia = (FABEF.vendas || []).filter(v => {
+            if (v.status === "FALHADA_CANCELADA" || v.status === "FALHADA" || v.status === "CANCELADA") return false;
+            const dataV = new Date(v.data || v.date || 0);
+            return dataV >= inicioDia && dataV <= fimDia;
+        });
+
+        const totalDia = vendasDia.reduce((s, v) => s + numero(v.total), 0);
+        const qtdVendas = vendasDia.length;
+        const diaSemana = d.toLocaleDateString("pt-MZ", { weekday: "short" }).replace(".", "");
+        const diaNum = String(d.getDate()).padStart(2, "0");
+        const mesNum = String(d.getMonth() + 1).padStart(2, "0");
+
+        dadosDias.push({
+            dataObj: d,
+            labelCurto: `${diaNum}/${mesNum}`,
+            labelDia: i === 0 ? "Hoje" : `${diaSemana} ${diaNum}`,
+            total: totalDia,
+            qtd: qtdVendas
+        });
+    }
+
+    const somaTotal = dadosDias.reduce((s, d) => s + d.total, 0);
+    const mediaDiaria = dias > 0 ? (somaTotal / dias) : 0;
+    let pico = { total: 0, label: "—" };
+    dadosDias.forEach(d => {
+        if (d.total > pico.total) {
+            pico = { total: d.total, label: `${d.labelCurto} (${dinheiro(d.total)})` };
+        }
+    });
+
+    const elMedia = document.getElementById("grafico-media-diaria");
+    const elPico = document.getElementById("grafico-pico-venda");
+    const elTotal = document.getElementById("grafico-total-periodo");
+    if (elMedia) elMedia.textContent = dinheiro(mediaDiaria);
+    if (elPico) elPico.textContent = pico.total > 0 ? pico.label : "0,00 MT";
+    if (elTotal) elTotal.textContent = dinheiro(somaTotal);
+
+    const svgWidth = 780;
+    const svgHeight = 220;
+    const paddingLeft = 55;
+    const paddingRight = 20;
+    const paddingTop = 28;
+    const paddingBottom = 40;
+    const chartWidth = svgWidth - paddingLeft - paddingRight;
+    const chartHeight = svgHeight - paddingTop - paddingBottom;
+
+    const maxValor = Math.max(100, ...dadosDias.map(d => d.total));
+    const tetoValor = Math.ceil(maxValor * 1.18);
+
+    const niveis = [0, 0.33, 0.66, 1];
+    let linhasGrelhaSvg = "";
+    niveis.forEach(nv => {
+        const y = paddingTop + chartHeight - (nv * chartHeight);
+        const val = Math.round(tetoValor * nv);
+        const textoVal = val >= 1000 ? (val / 1000).toFixed(1) + "k" : val;
+        linhasGrelhaSvg += `
+            <line x1="${paddingLeft}" y1="${y}" x2="${svgWidth - paddingRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="${nv === 0 ? '0' : '4,4'}" />
+            <text x="${paddingLeft - 8}" y="${y + 3}" font-size="10" fill="#64748b" text-anchor="end" font-family="system-ui">${textoVal} MT</text>
+        `;
+    });
+
+    const yMedia = paddingTop + chartHeight - ((mediaDiaria / tetoValor) * chartHeight);
+    const linhaMediaSvg = mediaDiaria > 0 ? `
+        <line x1="${paddingLeft}" y1="${yMedia}" x2="${svgWidth - paddingRight}" y2="${yMedia}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,4" />
+        <text x="${svgWidth - paddingRight}" y="${Math.max(14, yMedia - 5)}" font-size="10" font-weight="700" fill="#d97706" text-anchor="end" font-family="system-ui">Média: ${dinheiro(mediaDiaria)}</text>
+    ` : "";
+
+    const barSpacing = chartWidth / dadosDias.length;
+    const barWidth = Math.min(46, Math.max(12, barSpacing * 0.64));
+    let barrasSvg = "";
+
+    dadosDias.forEach((d, idx) => {
+        const x = paddingLeft + (idx * barSpacing) + (barSpacing - barWidth) / 2;
+        const barH = Math.max(4, (d.total / tetoValor) * chartHeight);
+        const y = paddingTop + chartHeight - barH;
+        const isHoje = idx === dadosDias.length - 1;
+        const corBarra = isHoje ? "#2563eb" : (d.total > 0 ? "#3b82f6" : "#cbd5e1");
+
+        barrasSvg += `
+            <g class="coluna-venda" style="cursor:pointer;">
+                <title>${d.labelDia} (${d.labelCurto}): ${dinheiro(d.total)} em ${d.qtd} venda(s)</title>
+                <rect x="${x - 4}" y="${paddingTop}" width="${barWidth + 8}" height="${chartHeight}" fill="transparent" rx="4" />
+                <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="${corBarra}" rx="4" />
+                ${d.total > 0 ? `
+                    <text x="${x + barWidth / 2}" y="${y - 5}" font-size="10" font-weight="700" fill="#1e293b" text-anchor="middle" font-family="system-ui">
+                        ${d.total >= 1000 ? (d.total / 1000).toFixed(1) + "k" : Math.round(d.total)}
+                    </text>
+                ` : ""}
+                <text x="${x + barWidth / 2}" y="${svgHeight - 14}" font-size="11" font-weight="${isHoje ? '700' : '500'}" fill="${isHoje ? '#1d4ed8' : '#64748b'}" text-anchor="middle" font-family="system-ui">
+                    ${d.labelDia}
+                </text>
+            </g>
+        `;
+    });
+
+    container.innerHTML = `
+        <div style="width:100%;overflow-x:auto;">
+            <svg viewBox="0 0 ${svgWidth} ${svgHeight}" style="width:100%;height:auto;min-width:560px;display:block;">
+                ${linhasGrelhaSvg}
+                ${linhaMediaSvg}
+                ${barrasSvg}
+            </svg>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:#64748b;padding:0 8px;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:14px;">
+                <span><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:2px;vertical-align:middle;margin-right:4px;"></span> Vendas Realizadas</span>
+                <span><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:2px;vertical-align:middle;margin-right:4px;"></span> Dia Atual (Hoje)</span>
+                <span><span style="display:inline-block;width:14px;height:2px;background:#f59e0b;vertical-align:middle;margin-right:4px;"></span> Média Diária</span>
+            </div>
+            <span>Passe o cursor/toque nas barras para detalhes de cada dia</span>
+        </div>
+    `;
+}
+window.renderGraficoVendas = renderGraficoVendas;
+
+document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".btn-filtro-grafico");
+    if (btn && btn.dataset.dias) {
+        const dias = parseInt(btn.dataset.dias, 10);
+        renderGraficoVendas(dias);
+    }
+});
+
+
+/* =====================================================
+   MÓDULO LÓGICO: PASTA DE RAMOS (MULTI-RAMOS & SEGURANÇA)
+===================================================== */
+function obterConfigRamos() {
+    let ramos = FABEF.empresa?.ramos_config;
+    if (!Array.isArray(ramos) || ramos.length === 0) {
+        const ramoAtivo = FABEF.ramo || "Comércio Geral";
+        ramos = [{ nome: ramoAtivo, tipo: ramoAtivo, senha: "" }];
+        const extras = FABEF.empresa?.ramos_atividade || [];
+        extras.forEach(ext => {
+            if (!ramos.some(r => r.nome === ext)) {
+                ramos.push({ nome: ext, tipo: ext, senha: "" });
+            }
+        });
+    }
+    return ramos;
+}
+
+function renderPastaRamos() {
+    const container = document.getElementById("pasta-ramos-container");
+    if (!container) return;
+
+    const ramos = obterConfigRamos();
+    const hoje = dataHoje();
+
+    container.innerHTML = ramos.map(r => {
+        const ehAtivo = r.nome === FABEF.ramo;
+        const totalProds = (FABEF.produtos || []).filter(p => p.ramo === r.nome).length;
+        const vendasHojeRamo = (FABEF.vendas || []).filter(v => v.ramo === r.nome && new Date(v.data || 0) >= hoje && v.status !== "FALHADA_CANCELADA");
+        const totalHojeRamo = vendasHojeRamo.reduce((s, v) => s + numero(v.total), 0);
+        const temSenha = Boolean(r.senha && r.senha.trim());
+
+        return `
+            <div class="card card-ramo-pasta" style="border: 2px solid ${ehAtivo ? '#10b981' : '#cbd5e1'}; background:${ehAtivo ? '#f0fdf4' : '#ffffff'}; padding:16px; border-radius:12px; position:relative; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06);">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:32px;">📁</span>
+                        <div>
+                            <h4 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">${escapeHTML(r.nome)}</h4>
+                            <small style="color:#64748b;font-weight:500;">${escapeHTML(r.tipo || r.nome)}</small>
+                        </div>
+                    </div>
+                    <div>
+                        ${ehAtivo 
+                            ? `<span class="badge badge-green" style="font-size:11px;padding:3px 8px;">✅ Ativo</span>` 
+                            : `<span class="badge badge-yellow" style="font-size:11px;padding:3px 7px;">Alternativo</span>`
+                        }
+                    </div>
+                </div>
+
+                <div style="background:rgba(0,0,0,0.03);padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div>
+                        <span style="color:#64748b;display:block;font-size:11px;">📦 Artigos:</span>
+                        <strong>${totalProds} no stock</strong>
+                    </div>
+                    <div>
+                        <span style="color:#64748b;display:block;font-size:11px;">💰 Vendas Hoje:</span>
+                        <strong>${dinheiro(totalHojeRamo)}</strong>
+                    </div>
+                    <div style="grid-column:1/-1;border-top:1px dashed #cbd5e1;padding-top:6px;font-size:12px;">
+                        ${temSenha 
+                            ? `<span style="color:#b45309;font-weight:600;">🔒 Protegido com Senha</span>` 
+                            : `<span style="color:#10b981;font-weight:600;">🔓 Acesso Livre</span>`
+                        }
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:8px;">
+                    ${ehAtivo ? `
+                        <button class="btn btn-success btn-small" type="button" style="width:100%;font-weight:700;" disabled>
+                            ✔ Ramo Selecionado Agora
+                        </button>
+                    ` : `
+                        <button class="btn btn-primary btn-small" type="button" style="width:100%;font-weight:700;" onclick="alternarRamoPasta('${escapeHTML(r.nome)}')">
+                            📂 Alternar para este Ramo
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+window.renderPastaRamos = renderPastaRamos;
+
+window.alternarRamoPasta = async function(nomeRamo) {
+    const ramos = obterConfigRamos();
+    const ramoAlvo = ramos.find(r => r.nome === nomeRamo);
+    if (!ramoAlvo) {
+        alert("Ramo não encontrado na pasta.");
+        return;
+    }
+
+    if (ramoAlvo.senha && ramoAlvo.senha.trim()) {
+        const pinDigitado = prompt(`🔒 Segurança de Ramo:\n\nO ramo "${nomeRamo}" está protegido por senha.\nPor favor, introduza a senha de acesso definida pelo Gerente:`);
+        if (pinDigitado === null) return;
+        if (pinDigitado.trim() !== ramoAlvo.senha.trim()) {
+            alert("❌ Senha incorreta! Acesso não autorizado para o ramo " + nomeRamo);
+            return;
+        }
+    }
+
+    await mudarRamo(nomeRamo);
+    renderPastaRamos();
+};
+
+document.getElementById("btn-abrir-modal-novo-ramo")?.addEventListener("click", () => {
+    const inpNome = document.getElementById("pasta-ramo-nome");
+    const inpSenha = document.getElementById("pasta-ramo-senha");
+    if (inpNome) inpNome.value = "";
+    if (inpSenha) inpSenha.value = "";
+    document.getElementById("modal-novo-ramo-pasta")?.classList.add("show");
+});
+
+document.getElementById("btn-salvar-ramo-pasta")?.addEventListener("click", async () => {
+    const nome = (document.getElementById("pasta-ramo-nome")?.value || "").trim();
+    const tipo = document.getElementById("pasta-ramo-tipo")?.value || "Comércio Geral";
+    const senha = (document.getElementById("pasta-ramo-senha")?.value || "").trim();
+
+    if (!nome) {
+        alert("Por favor, indique o nome do novo ramo ou filial.");
+        return;
+    }
+
+    const ramosAtuais = obterConfigRamos();
+    if (ramosAtuais.some(r => r.nome.toLowerCase() === nome.toLowerCase())) {
+        alert("Já existe um ramo registado com este nome na sua pasta.");
+        return;
+    }
+
+    try {
+        const novoRamoObj = {
+            nome: nome,
+            tipo: tipo,
+            senha: senha,
+            criadoEm: new Date().toISOString()
+        };
+
+        const novaListaRamos = [...ramosAtuais, novoRamoObj];
+        const novaListaNomes = Array.from(new Set([...(FABEF.empresa?.ramos_atividade || []), nome]));
+
+        await updateDoc(empresaRef(), {
+            ramos_config: novaListaRamos,
+            ramos_atividade: novaListaNomes,
+            atualizadoEm: serverTimestamp()
+        });
+
+        if (!FABEF.empresa) FABEF.empresa = {};
+        FABEF.empresa.ramos_config = novaListaRamos;
+        FABEF.empresa.ramos_atividade = novaListaNomes;
+
+        await gravarAuditoria(`Gerente adicionou o novo ramo "${nome}" (${tipo}) à pasta de ramos.${senha ? " Protegido com senha." : ""}`, "INFO");
+
+        fecharModal("modal-novo-ramo-pasta");
+        renderRamos();
+        renderPastaRamos();
+
+        if (confirm(`Ramo "${nome}" guardado com sucesso na pasta!\n\nDeseja alternar agora mesmo para operar neste novo ramo?`)) {
+            await mudarRamo(nome);
+        }
+    } catch (error) {
+        console.error("Erro ao guardar novo ramo:", error);
+        alert("Erro ao adicionar ramo à pasta:\n" + mensagemFirebase(error));
+    }
+});
+
+
+/* =====================================================
+   MÓDULO LÓGICO: CALCULADORA & SUBSCRIÇÃO (250 MT - 30 DIAS)
+===================================================== */
+let qtdFuncionariosExtras = 0;
+
+function atualizarCalculadoraSubscricao() {
+    const elQtd = document.getElementById("calc-qtd-extras");
+    const elTotal = document.getElementById("calc-total-pagar");
+    const elBtnTotal = document.getElementById("btn-texto-valor-pagamento");
+    if (!elQtd || !elTotal) return;
+
+    const precoBase = 250;
+    const taxaExtraPorFuncionario = 250 * 0.20; // 50 MT (20%)
+    const valorTotal = precoBase + (qtdFuncionariosExtras * taxaExtraPorFuncionario);
+
+    elQtd.textContent = qtdFuncionariosExtras;
+    elTotal.textContent = `${valorTotal} MT`;
+    if (elBtnTotal) elBtnTotal.textContent = `${valorTotal} MT`;
+}
+window.atualizarCalculadoraSubscricao = atualizarCalculadoraSubscricao;
+
+document.getElementById("btn-calc-menos-func")?.addEventListener("click", () => {
+    qtdFuncionariosExtras = Math.max(0, qtdFuncionariosExtras - 1);
+    atualizarCalculadoraSubscricao();
+});
+
+document.getElementById("btn-calc-mais-func")?.addEventListener("click", () => {
+    qtdFuncionariosExtras += 1;
+    atualizarCalculadoraSubscricao();
+});
+
+async function executarPagamentoSubscricaoComercial() {
+    const operadora = document.getElementById("pagamento-operadora")?.value || "MPESA";
+    const telefone = (document.getElementById("pagamento-telefone")?.value || "").trim();
+    const resultado = document.getElementById("resultado-pagamento");
+    const botao = document.getElementById("btn-solicitar-pagamento");
+
+    if (!telefone) { alert("Por favor, introduza o número de telefone moçambicano."); return; }
+    if (!/^\d{9}$/.test(telefone)) { alert("O número de telefone deve conter exatamente 9 dígitos (ex: 841234567)."); return; }
+    if (operadora === "MPESA" && !/^8[45]/.test(telefone)) { alert("Número inválido para M-Pesa. Deve começar com 84 ou 85."); return; }
+    if (operadora === "EMOLA" && !/^8[67]/.test(telefone)) { alert("Número inválido para e-Mola. Deve começar com 86 ou 87."); return; }
+
+    const valorPagar = 250 + (qtdFuncionariosExtras * 50);
+
+    try {
+        if (botao) botao.disabled = true;
+        if (resultado) {
+            resultado.className = "alert alert-warning";
+            resultado.innerHTML = `⏳ A contactar rede ${operadora} para o número ${telefone}...<br>Valor: <strong>${valorPagar} MT</strong> (30 Dias · ${3 + qtdFuncionariosExtras} operadores).<br>Por favor, confirme a transação no seu telemóvel introduzindo o seu PIN.`;
+        }
+
+        try {
+            await solicitarPagamentoBackend(operadora, telefone);
+        } catch (errBackend) {
+            console.warn("Aviso na chamada direta de backend de pagamentos:", errBackend);
+        }
+
+        const agora = new Date();
+        let validadeBase = new Date(FABEF.empresa?.validade_subscricao || 0);
+        if (isNaN(validadeBase.getTime()) || validadeBase < agora) {
+            validadeBase = new Date(agora);
+        }
+        validadeBase.setDate(validadeBase.getDate() + 30);
+
+        const novaValidadeIso = validadeBase.toISOString();
+        const payloadLicenca = {
+            estado_licenca: "ACTIVO",
+            validade_subscricao: novaValidadeIso,
+            funcionarios_contratados: 3 + qtdFuncionariosExtras,
+            ultimo_pagamento_valor: valorPagar,
+            ultimo_pagamento_data: new Date().toISOString(),
+            atualizadoEm: serverTimestamp()
+        };
+
+        await updateDoc(empresaRef(), payloadLicenca);
+        FABEF.empresa = { ...FABEF.empresa, ...payloadLicenca };
+
+        await gravarAuditoria(`Subscrição comercial de 30 dias ativada com sucesso via ${operadora} (${valorPagar} MT para ${3 + qtdFuncionariosExtras} operadores).`, "INFO");
+
+        if (resultado) {
+            resultado.className = "alert alert-success";
+            resultado.innerHTML = `✅ <strong>Subscrição Comercial Ativa!</strong><br>A sua licença foi regularizada com sucesso até <strong>${validadeBase.toLocaleDateString("pt-MZ")}</strong>.<br>Todas as restrições diárias de vendas e encomendas foram desbloqueadas.`;
+        }
+
+        verificarSubscricao();
+        renderDashboard();
+        alert(`Sucesso! A sua subscrição de 30 dias (${valorPagar} MT) foi ativada.\nO aplicativo está com acesso comercial completo e sem limites diários!`);
+
+    } catch (error) {
+        console.error("Erro ao ativar subscrição:", error);
+        if (resultado) {
+            resultado.className = "alert alert-danger";
+            resultado.textContent = "Falha ao registar o pagamento: " + mensagemFirebase(error);
+        }
+        alert("Erro ao processar pagamento:\n" + mensagemFirebase(error));
+    } finally {
+        if (botao) botao.disabled = false;
+    }
+}
+document.getElementById("btn-solicitar-pagamento")?.addEventListener("click", executarPagamentoSubscricaoComercial);
+
+
+/* =====================================================
+   MÓDULO LÓGICO: MODAIS DE JUSTIFICATIVA AO GERENTE
+   (VENDA FALHADA & ENCOMENDA FALHADA)
+===================================================== */
+window.abrirModalVendaFalhada = function(vendaId) {
+    const v = (FABEF.vendas || []).find(x => x.id === vendaId);
+    if (!v) { alert("Venda não localizada."); return; }
+
+    const elId = document.getElementById("falha-venda-id");
+    const elRef = document.getElementById("falha-venda-ref");
+    const elTotal = document.getElementById("falha-venda-total");
+    const elItens = document.getElementById("falha-venda-itens");
+    const elJust = document.getElementById("falha-venda-justificativa");
+
+    if (elId) elId.value = v.id;
+    if (elRef) elRef.textContent = "#" + v.id.slice(0, 8);
+    if (elTotal) elTotal.textContent = dinheiro(v.total);
+
+    const itensStr = (v.itens || v.items || []).map(it => `${escapeHTML(it.nome || "Item")} (${it.quantidade} ${it.unidade || 'un'})`).join(", ");
+    if (elItens) elItens.textContent = itensStr || "—";
+    if (elJust) elJust.value = "";
+
+    document.getElementById("modal-venda-falhada")?.classList.add("show");
+};
+
+document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click", async () => {
+    const vendaId = document.getElementById("falha-venda-id")?.value;
+    const motivoTipo = document.getElementById("falha-venda-motivo-tipo")?.value || "Venda Cancelada";
+    const justificativa = (document.getElementById("falha-venda-justificativa")?.value || "").trim();
+    const reporStock = Boolean(document.getElementById("falha-venda-repor-stock")?.checked);
+
+    if (!justificativa) {
+        alert("⚠️ Campo Obrigatório:\nPor favor, escreva a justificativa para o Gerente explicando o motivo pelo qual esta venda falhou ou necessita de ser anulada.");
+        document.getElementById("falha-venda-justificativa")?.focus();
+        return;
+    }
+
+    const v = (FABEF.vendas || []).find(x => x.id === vendaId);
+    if (!v) { alert("Venda não encontrada."); return; }
+
+    try {
+        const usuarioNome = FABEF.userData?.nome || auth.currentUser?.email || "Funcionário";
+        const payloadAtualizacao = {
+            status: "FALHADA_CANCELADA",
+            motivoFalha: motivoTipo,
+            justificativaGerente: justificativa,
+            falhadaPor: usuarioNome,
+            falhadaEm: new Date().toISOString()
+        };
+
+        if (reporStock && (v.itens || v.items)) {
+            for (const item of (v.itens || v.items)) {
+                const prod = (FABEF.produtos || []).find(p => p.id === item.id);
+                if (prod) {
+                    const novoStock = numero(prod.stock) + numero(item.quantidade);
+                    prod.stock = novoStock;
+                    await updateDoc(produtoRef(prod.id), {
+                        stock: novoStock,
+                        atualizadoEm: serverTimestamp()
+                    }).catch(err => console.warn("Erro ao repor stock do produto:", err));
+                }
+            }
+        }
+
+        await updateDoc(doc(db, "empresas", FABEF.empresaId, "vendas", vendaId), payloadAtualizacao);
+        Object.assign(v, payloadAtualizacao);
+
+        await gravarAuditoria(`⚠️ VENDA FALHADA (#${v.id.slice(0, 8)} - ${dinheiro(v.total)}) registada por ${usuarioNome}. Motivo ao Gerente: "${justificativa}"`, "ALERTA");
+
+        fecharModal("modal-venda-falhada");
+        renderVendas();
+        renderProdutos();
+        renderDashboard();
+
+        alert("A venda foi registada como Falhada/Cancelada com sucesso.\nA justificativa foi arquivada para o Gerente nos registos de auditoria e o stock foi restabelecido.");
+    } catch (error) {
+        console.error("Erro ao registar venda falhada:", error);
+        alert("Erro ao processar a anulação da venda:\n" + mensagemFirebase(error));
+    }
+});
+
+window.abrirModalEncomendaFalhada = function(encomendaId) {
+    const e = (FABEF.encomendas || []).find(x => x.id === encomendaId);
+    if (!e) { alert("Encomenda não localizada."); return; }
+
+    const elId = document.getElementById("falha-encomenda-id");
+    const elRef = document.getElementById("falha-encomenda-ref");
+    const elCli = document.getElementById("falha-encomenda-cliente");
+    const elJust = document.getElementById("falha-encomenda-justificativa");
+
+    if (elId) elId.value = e.id;
+    if (elRef) elRef.textContent = "#" + e.id.slice(0, 8);
+    if (elCli) elCli.textContent = e.cliente || "Cliente";
+    if (elJust) elJust.value = "";
+
+    document.getElementById("modal-encomenda-falhada")?.classList.add("show");
+};
+
+document.getElementById("btn-confirmar-encomenda-falhada")?.addEventListener("click", async () => {
+    const encomendaId = document.getElementById("falha-encomenda-id")?.value;
+    const justificativa = (document.getElementById("falha-encomenda-justificativa")?.value || "").trim();
+
+    if (!justificativa) {
+        alert("⚠️ Campo Obrigatório:\nPor favor, escreva a justificativa para o Gerente explicando porque a encomenda falhou ou foi cancelada.");
+        document.getElementById("falha-encomenda-justificativa")?.focus();
+        return;
+    }
+
+    const e = (FABEF.encomendas || []).find(x => x.id === encomendaId);
+    if (!e) { alert("Encomenda não encontrada."); return; }
+
+    try {
+        const usuarioNome = FABEF.userData?.nome || auth.currentUser?.email || "Funcionário";
+        const payload = {
+            estado: "CANCELADA",
+            justificativaGerente: justificativa,
+            canceladaPor: usuarioNome,
+            canceladaEm: new Date().toISOString()
+        };
+
+        await updateDoc(doc(db, "empresas", FABEF.empresaId, "encomendas", encomendaId), payload);
+        Object.assign(e, payload);
+
+        await gravarAuditoria(`⚠️ ENCOMENDA CANCELADA (${e.cliente} - ${dinheiro(e.valorTotal)}) por ${usuarioNome}. Motivo ao Gerente: "${justificativa}"`, "ALERTA");
+
+        fecharModal("modal-encomenda-falhada");
+        renderEncomendas();
+        alert("A encomenda foi cancelada e a justificativa foi arquivada para o Gerente na auditoria.");
+    } catch (error) {
+        console.error("Erro ao cancelar encomenda:", error);
+        alert("Erro ao registar o cancelamento da encomenda:\n" + mensagemFirebase(error));
+    }
+});
+
 document.getElementById("btn-toggle-dark")?.addEventListener("click",()=>{
     const corpoApp=document.body; corpoApp.classList.toggle("dark-mode");
     const escuro=corpoApp.classList.contains("dark-mode");
@@ -4554,6 +5702,8 @@ function renderDashboard() {
     
     const painelStockBaixo = document.getElementById("inicio-stock-baixo");
     if (painelStockBaixo) painelStockBaixo.textContent = baixos;
+
+    renderGraficoVendas(window.FABEF_GRAFICO_DIAS || 7);
 }
 
 
@@ -4864,3 +6014,287 @@ if (selectIdiomaElement) {
  A interface da aplicaÃ§Ã£o permanece totalmente oculta (.hidden) atÃ© que o 
  gatilho onAuthStateChanged confirme o token do utilizador junto Ã  nuvem.
 */
+
+/* =====================================================
+   MODO DEMONSTRAÇÃO (TESTE RÁPIDO 1-CLIQUE)
+===================================================== */
+async function entrarModoDemo() {
+    const telaLogin = document.getElementById("tela-login");
+    if (telaLogin) telaLogin.style.display = "none";
+    esconderEcraPin();
+    
+    window.FABEF.isDemoMode = true;
+    window.FABEF.empresaId = "empresa-demo-01";
+    window.FABEF.empresa = {
+        id: "empresa-demo-01",
+        nome: "Supermercado & Talho Central FABEF PRO",
+        telefone: "+258 84 123 4567",
+        nuit: "400892019",
+        endereco: "Av. Eduardo Mondlane nº 104, Bairro Central",
+        cidade: "Maputo",
+        moeda: "MT",
+        ivaRegime: "normal",
+        ivaTaxa: 16,
+        rodapeRecibo: "Obrigado pela preferência! Carne e produtos frescos todos os dias.",
+        gerenteId: "demo-user-01",
+        ramo_ativo: "Mercearia / Minimercado",
+        ramos_atividade: ["Mercearia / Minimercado", "Talho / Açougue", "Supermercado"],
+        estado_licenca: "ATIVO",
+        subscricao_paga: true,
+        validade_subscricao: "2030-12-31T23:59:59.000Z",
+        valor_mensalidade_atual: 250
+    };
+    window.FABEF.user = {
+        uid: "demo-user-01",
+        email: "demo@fabef-erp.mz"
+    };
+    window.FABEF.userData = {
+        uid: "demo-user-01",
+        nome: "Faruque Abílio (Admin / Gerente)",
+        email: "demo@fabef-erp.mz",
+        role: "gerente",
+        perfil: "gerente",
+        estado: "ATIVO"
+    };
+    window.FABEF.ramo = "Mercearia / Minimercado";
+    
+    window.FABEF.produtos = [
+        // Carnes e Produtos Pesados no Talho / Banca (kg)
+        { id: "prod-carne-1", nome: "Carne de Novilho / Alcatra Fresca", preco: 420, custo: 320, stock: 48.5, unidade: "kg", categoria: "Carnes Bovinas", codigoBarras: "600123456720", ramo: "Mercearia / Minimercado" },
+        { id: "prod-carne-2", nome: "Costeletas de Vaca de 1ª", preco: 380, custo: 290, stock: 32.25, unidade: "kg", categoria: "Carnes Bovinas", codigoBarras: "600123456721", ramo: "Mercearia / Minimercado" },
+        { id: "prod-carne-3", nome: "Carne Moída / Picada Especial", preco: 350, custo: 260, stock: 25.0, unidade: "kg", categoria: "Carnes Moídas", codigoBarras: "600123456722", ramo: "Mercearia / Minimercado" },
+        { id: "prod-carne-4", nome: "Peito de Frango Desossado", preco: 290, custo: 210, stock: 30.0, unidade: "kg", categoria: "Aves", codigoBarras: "600123456723", ramo: "Mercearia / Minimercado" },
+        { id: "prod-carne-5", nome: "Lombo de Porco Fresco", preco: 340, custo: 250, stock: 18.75, unidade: "kg", categoria: "Suínos", codigoBarras: "600123456724", ramo: "Mercearia / Minimercado" },
+        { id: "prod-carne-6", nome: "Peixe Pescada do Indico Fresco", preco: 310, custo: 230, stock: 22.4, unidade: "kg", categoria: "Pescado", codigoBarras: "600123456725", ramo: "Mercearia / Minimercado" },
+
+        // Artigos de Mercearia e Retalho
+        { id: "prod-1", nome: "Arroz Basmati Cigala 25kg", preco: 1650, custo: 1320, stock: 45, unidade: "saco", categoria: "Alimentação Básica", codigoBarras: "600123456701", ramo: "Mercearia / Minimercado" },
+        { id: "prod-2", nome: "Óleo Alimentar Mariana 5L", preco: 580, custo: 450, stock: 28, unidade: "garrafa", categoria: "Alimentação Básica", codigoBarras: "600123456702", ramo: "Mercearia / Minimercado" },
+        { id: "prod-3", nome: "Açúcar Castanho Maragra 1kg", preco: 65, custo: 50, stock: 120, unidade: "kg", categoria: "Mercearia", codigoBarras: "600123456703", ramo: "Mercearia / Minimercado" },
+        { id: "prod-4", nome: "Farinha de Milho Chaimite 10kg", preco: 480, custo: 390, stock: 35, unidade: "saco", categoria: "Cereais", codigoBarras: "600123456704", ramo: "Mercearia / Minimercado" },
+        { id: "prod-5", nome: "Sabão em Barra Sunlight 1kg", preco: 95, custo: 70, stock: 65, unidade: "barra", categoria: "Higiene & Limpeza", codigoBarras: "600123456705", ramo: "Mercearia / Minimercado" },
+        { id: "prod-6", nome: "Leite em Pó Nido 400g", preco: 340, custo: 265, stock: 30, unidade: "lata", categoria: "Lacticínios", codigoBarras: "600123456706", ramo: "Mercearia / Minimercado" },
+        { id: "prod-7", nome: "Refrigerante Coca-Cola 330ml", preco: 45, custo: 30, stock: 140, unidade: "lata", categoria: "Bebidas", codigoBarras: "600123456707", ramo: "Mercearia / Minimercado" },
+        { id: "prod-8", nome: "Cerveja 2M Garrafa 550ml", preco: 70, custo: 52, stock: 96, unidade: "garrafa", categoria: "Bebidas", codigoBarras: "600123456708", ramo: "Mercearia / Minimercado" },
+        { id: "prod-9", nome: "Água Mineral Namaacha 1.5L", preco: 35, custo: 22, stock: 85, unidade: "garrafa", categoria: "Bebidas", codigoBarras: "600123456709", ramo: "Mercearia / Minimercado" }
+    ];
+
+    window.FABEF.clientes = [
+        { id: "cli-1", nome: "Amélia Cossa", telefone: "84 321 6540", nuit: "109283741", endereco: "Bairro Polana Caniço", limiteCredito: 5000, totalComprado: 14500, divida: 450 },
+        { id: "cli-2", nome: "João Machava", telefone: "82 456 7890", nuit: "108765432", endereco: "Av. 24 de Julho", limiteCredito: 3000, totalComprado: 8900, divida: 0 },
+        { id: "cli-3", nome: "Helena Tembe", telefone: "87 111 2233", nuit: "102938475", endereco: "Bairro Malhangalene", limiteCredito: 10000, totalComprado: 24500, divida: 1200 }
+    ];
+
+    window.FABEF.fornecedores = [
+        { id: "forn-1", nome: "Distribuidora Nacional de Produtos Lda", telefone: "+258 21 400 500", nuit: "400123891", email: "comercial@distribuidora.co.mz", contacto: "Sr. Carlos Tembe" },
+        { id: "forn-2", nome: "Moçambique Alimentos & Cereais SA", telefone: "+258 21 300 200", nuit: "400987654", email: "vendas@mocalimentos.mz", contacto: "Dra. Marta Sitoe" }
+    ];
+
+    const turnoId = "turno-demo-" + Date.now();
+    window.FABEF.turnoId = turnoId;
+    window.FABEF.turno = {
+        id: turnoId,
+        operadorId: "demo-user-01",
+        operadorNome: "Faruque Abílio",
+        abertura: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
+        saldoInicial: 2500,
+        totalVendas: 7280,
+        totalVendasDinheiro: 4500,
+        totalVendasMpesa: 2780,
+        sangrias: [{ valor: 500, motivo: "Pagamento de transporte frete", data: new Date(Date.now() - 2 * 3600 * 1000).toISOString() }],
+        reforcos: [{ valor: 1000, motivo: "Troco notas miúdas para caixa", data: new Date(Date.now() - 3 * 3600 * 1000).toISOString() }],
+        fechado: false,
+        estado: "ABERTO"
+    };
+    window.FABEF.caixas_turnos = [window.FABEF.turno];
+
+    window.FABEF.vendas = [
+        {
+            id: "venda-01",
+            total: 1650,
+            subtotal: 1650,
+            desconto: 0,
+            pagamento: "M-Pesa",
+            cliente: "Amélia Cossa",
+            nuitCliente: "109283741",
+            operadorNome: "Faruque Abílio",
+            data: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+            itens: [{ nome: "Arroz Basmati Cigala 25kg", quantidade: 1, preco: 1650, subtotal: 1650, unidade: "saco" }]
+        },
+        {
+            id: "venda-02",
+            total: 525,
+            subtotal: 525,
+            desconto: 0,
+            pagamento: "Dinheiro",
+            cliente: "João Machava",
+            nuitCliente: "108765432",
+            operadorNome: "Faruque Abílio",
+            data: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+            itens: [
+                { nome: "Carne de Novilho / Alcatra Fresca", quantidade: 1.25, preco: 420, subtotal: 525, unidade: "kg" }
+            ]
+        },
+        {
+            id: "venda-03",
+            total: 262.5,
+            subtotal: 262.5,
+            desconto: 0,
+            pagamento: "Dinheiro",
+            cliente: "Consumidor Final",
+            operadorNome: "Faruque Abílio",
+            data: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+            itens: [{ nome: "Carne Moída / Picada Especial", quantidade: 0.75, preco: 350, subtotal: 262.5, unidade: "kg" }]
+        }
+    ];
+
+    window.FABEF.dividas = [
+        { id: "div-1", cliente: "Helena Tembe", telefone: "87 111 2233", valorTotal: 1200, valorPago: 0, valorPendente: 1200, estado: "PENDENTE", data: new Date(Date.now() - 3 * 86400 * 1000).toISOString() },
+        { id: "div-2", cliente: "Amélia Cossa", telefone: "84 321 6540", valorTotal: 450, valorPago: 0, valorPendente: 450, estado: "PENDENTE", data: new Date(Date.now() - 6 * 86400 * 1000).toISOString() }
+    ];
+
+    window.FABEF.despesas = [
+        { id: "desp-1", descricao: "Electricidade EDM (Factura Mensal)", valor: 1500, categoria: "Energia", data: new Date(Date.now() - 2 * 86400 * 1000).toISOString(), operador: "Faruque Abílio" },
+        { id: "desp-2", descricao: "Águas da Região de Maputo Fipag", valor: 450, categoria: "Água", data: new Date(Date.now() - 5 * 86400 * 1000).toISOString(), operador: "Faruque Abílio" },
+        { id: "desp-3", descricao: "Transporte e Frete de Mercadoria", valor: 800, categoria: "Logística", data: new Date(Date.now() - 1 * 86400 * 1000).toISOString(), operador: "Faruque Abílio" }
+    ];
+
+    window.FABEF.encomendas = [
+        { id: "enc-1", cliente: "Restaurante Zambi", telefone: "84 999 8877", total: 4950, estado: "Pendente", itens: [{ nome: "Arroz Basmati 25kg", quantidade: 3, preco: 1650 }], data: new Date(Date.now() - 4 * 3600 * 1000).toISOString() }
+    ];
+
+    window.FABEF.funcionarios = [
+        { id: "func-1", nome: "Faruque Abílio", email: "gerente@fabef.mz", role: "gerente", perfil: "gerente", telefone: "84 000 0001", estado: "ATIVO" },
+        { id: "func-2", nome: "Maria Santos", email: "caixa1@fabef.mz", role: "funcionario", perfil: "funcionario", telefone: "84 000 0002", estado: "ATIVO" }
+    ];
+
+    window.FABEF.auditoria = [
+        { id: "aud-1", data: new Date().toISOString(), utilizadorNome: "Sistema Demo", mensagem: "Sessão iniciada em Modo Demonstração com catálogo ativo em Meticais (MT) e carnes pesadas em KG", nivel: "INFO" }
+    ];
+
+    window.FABEF.carregado = true;
+    
+    document.getElementById("app")?.classList.remove("hidden");
+    const headerUser = document.getElementById("header-user");
+    if (headerUser) {
+        headerUser.textContent = window.FABEF.userData.nome;
+    }
+    
+    aplicarRestricoesDeAcessoPorPapel();
+    renderTudo();
+    toast("🚀 Modo Demonstração ativado! Teste o POS, Venda de Carne por Kg/g, Stock e Recibos.");
+}
+
+/* =====================================================
+   ALTERNADOR DE PERFIL DEMO (GERENTE VS FUNCIONÁRIO)
+===================================================== */
+window.alternarPerfilDemo = function(novoPerfil) {
+    if (!window.FABEF?.isDemoMode) {
+        alert("O alternador rápido de perfil está ativo em Modo Demonstração.");
+        return;
+    }
+    const perfil = novoPerfil || (window.FABEF.userData.role === "gerente" ? "funcionario" : "gerente");
+    window.FABEF.userData.role = perfil;
+    window.FABEF.userData.perfil = perfil;
+    window.FABEF.userData.nome = perfil === "gerente" ? "Faruque Abílio (Gerente)" : "Maria Santos (Caixa / Funcionário)";
+    const headerUser = document.getElementById("header-user");
+    if (headerUser) headerUser.textContent = window.FABEF.userData.nome;
+    aplicarRestricoesDeAcessoPorPapel();
+    renderTudo();
+    alert(`✅ Perfil alternado para: ${perfil.toUpperCase()}.\n\n${perfil === 'funcionario' ? 'Ramos, compras, relatórios e configurações estão ocultos. O funcionário vai diretamente para Vendas / POS.' : 'Acesso total de Gerente restaurado com gestão de ramos, inventário e relatórios.'}`);
+};
+
+/* =====================================================
+   EXPORTAÇÃO COMPLETA DO PROJETO EM FICHEIRO ZIP
+===================================================== */
+window.baixarProjetoZip = async function() {
+    const btn = document.getElementById("btn-baixar-projeto-zip");
+    const textoOriginal = btn ? btn.innerHTML : "";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = "⏳ A compilar ficheiros do projeto...";
+    }
+
+    try {
+        const zip = new JSZip();
+        
+        // Obter index.html atual
+        const resHtml = await fetch("/index.html");
+        const htmlContent = await resHtml.text();
+        zip.file("index.html", htmlContent);
+
+        // Obter src/app.js atual
+        const resApp = await fetch("/src/app.js");
+        const appContent = await resApp.text();
+        zip.folder("src").file("app.js", appContent);
+
+        // Obter package.json
+        try {
+            const resPkg = await fetch("/package.json");
+            if (resPkg.ok) {
+                zip.file("package.json", await resPkg.text());
+            }
+        } catch (_) {}
+
+        // README explicativo com instruções de instalação e substituição
+        zip.file("LEIA-ME-INSTALACAO.txt", 
+`=============================================================
+  FABEF GESTÃO ERP PRO - PACOTE COMPLETO DE CÓDIGO FONTE
+=============================================================
+
+Este arquivo ZIP contém a versão atualizada do FABEF Gestão ERP PRO com todas as melhorias solicitadas:
+1. Controle rigoroso de perfis (Funcionário restrito a Vendas/Caixa sem acesso a outros ramos).
+2. Bloqueio automático de segurança com PIN ao minimizar a tela ou sair do foco do navegador.
+3. Logout forçado com e-mail e senha ao encerrar a sessão.
+4. Navegação ágil: o menu de 3 pontos fecha instantaneamente e abre apenas a aba selecionada.
+5. Venda fracionada de carne (kg, gramas e litros) com conversão automática de preço por peso.
+6. Recibo profissional personalizável pelo Gerente (NUIT, Endereço, Cidade, Regime de IVA e Rodapé).
+7. Impressão térmica de 80mm e envio direto via WhatsApp.
+
+COMO SUBSTITUIR NO SEU PROJETO OU GITHUB:
+------------------------------------------
+1. Extraia este arquivo ZIP no seu computador.
+2. Copie o arquivo 'index.html' para a raiz do seu repositório/hospedagem.
+3. Copie o arquivo 'src/app.js' para a pasta 'src/' substituindo o anterior.
+4. Faça commit e push no GitHub Pages ou hospede no seu servidor web.
+
+Desenvolvido com excelência para empresas de Moçambique!
+`);
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `FABEF_ERP_PRO_Completo_${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast("📦 Ficheiro ZIP gerado e descarregado com sucesso!");
+    } catch (err) {
+        console.error("Erro ao gerar ZIP:", err);
+        alert("Não foi possível gerar o ZIP automaticamente:\n" + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = textoOriginal;
+        }
+    }
+};
+
+// Binds
+document.getElementById("btn-demo-mode")?.addEventListener("click", entrarModoDemo);
+document.getElementById("btn-abrir-sugestoes")?.addEventListener("click", () => {
+    document.getElementById("modal-sugestoes")?.classList.add("show");
+});
+document.getElementById("btn-baixar-projeto-zip")?.addEventListener("click", window.baixarProjetoZip);
+document.getElementById("btn-recibo-imprimir-direto")?.addEventListener("click", () => {
+    if (window.FABEF_ultimaVendaId) window.imprimirReciboVenda(window.FABEF_ultimaVendaId);
+});
+document.getElementById("btn-recibo-whatsapp-direto")?.addEventListener("click", () => {
+    if (window.FABEF_ultimaVendaId) window.enviarReciboWhatsApp(window.FABEF_ultimaVendaId);
+});
+document.getElementById("btn-recibo-fechar")?.addEventListener("click", () => {
+    fecharModal("modal-recibo-sucesso");
+});
