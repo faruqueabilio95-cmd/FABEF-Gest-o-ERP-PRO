@@ -4979,7 +4979,7 @@ async function solicitarPagamentoBackend(operadora, telefone) {
         body: JSON.stringify({
             empresaId: FABEF.empresaId,
             telefone: telefone,
-            valor: 250,
+            valor: 250 + (typeof qtdFuncionariosExtras !== "undefined" ? (qtdFuncionariosExtras * 50) : 0),
             metodo: operadora // "MPESA" ou "EMOLA"
         })
     });
@@ -5383,52 +5383,9 @@ document.getElementById("btn-calc-mais-func")?.addEventListener("click", () => {
     atualizarCalculadoraSubscricao();
 });
 
-async function executarPagamentoSubscricaoComercial() {
-    const operadora = document.getElementById("pagamento-operadora")?.value || "MPESA";
-    const telefone = (document.getElementById("pagamento-telefone")?.value || "").trim();
-    const resultado = document.getElementById("resultado-pagamento");
-    const botao = document.getElementById("btn-solicitar-pagamento");
 
-    if (!telefone) { alert("Por favor, introduza o número de telefone moçambicano."); return; }
-    if (!/^\d{9}$/.test(telefone)) { alert("O número de telefone deve conter exatamente 9 dígitos (ex: 841234567)."); return; }
-    if (operadora === "MPESA" && !/^8[45]/.test(telefone)) { alert("Número inválido para M-Pesa. Deve começar com 84 ou 85."); return; }
-    if (operadora === "EMOLA" && !/^8[67]/.test(telefone)) { alert("Número inválido para e-Mola. Deve começar com 86 ou 87."); return; }
-
-    const valorPagar = 250 + (qtdFuncionariosExtras * 50);
-    try {
-        if (botao) botao.disabled = true;
-        if (resultado) {
-            resultado.className = "alert alert-warning";
-            resultado.innerHTML = `⏳ A enviar pedido de pagamento de <strong>${valorPagar} MT</strong> via ${operadora}.<br>
-            Confirme a operação no seu telemóvel introduzindo o <strong>PIN no M-Pesa/e-Mola</strong>.<br>
-            <small>O FABEF não pede nem recebe o seu PIN. A licença só será ativada depois da confirmação real do pagamento pelo servidor.</small>`;
-        }
-
-        const backendResult = await solicitarPagamentoBackend(operadora, telefone);
-        const referencia = backendResult?.referencia || backendResult?.sourceId || backendResult?.transactionId || "—";
-
-        if (resultado) {
-            resultado.className = "alert alert-warning";
-            resultado.innerHTML = `⏳ <strong>Pedido de pagamento enviado.</strong><br>
-            Referência: <strong>${escapeHTML(String(referencia))}</strong><br>
-            Confirme a transação no seu telemóvel introduzindo o PIN no ${operadora === "MPESA" ? "M-Pesa" : "e-Mola"}.<br>
-            <small>Não feche esta página. A subscrição permanece pendente até o servidor confirmar o pagamento.</small>`;
-        }
-
-        await gravarAuditoria("Solicitou subscrição mensal via " + operadora + " — pagamento pendente de confirmação", "INFO");
-        verificarSubscricao();
-    } catch (error) {
-        console.error(error);
-        if (resultado) {
-            resultado.className = "alert alert-danger";
-            resultado.textContent = "Falha ao criar o pedido de pagamento: " + mensagemFirebase(error);
-        }
-    } finally {
-        if (botao) botao.disabled = false;
-    }
-}
-
-document.getElementById("btn-solicitar-pagamento")?.addEventListener("click", executarPagamentoSubscricaoComercial);
+// O botão de subscrição usa apenas solicitarSubscricaoMovel().
+// A licença NÃO é activada no navegador: somente o backend/webhook, após confirmação real do pagamento, deve actualizar o Firestore.
 
 
 /* =====================================================
