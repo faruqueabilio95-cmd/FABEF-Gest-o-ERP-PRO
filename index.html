@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#10b981">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>FABEF Gestão ERP PRO</title>
@@ -169,18 +169,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div style="font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4;">
         Acesso instantâneo com catálogo em Meticais (MT), caixa aberto, vendas e relatórios sem registo no Firebase.
       </div>
-
-      <!-- CARTÃO DE DOWNLOAD DIRETO DO CÓDIGO FONTE ZIP -->
-      <div style="margin-top: 14px; padding: 14px 12px; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 10px; text-align: center;">
-        <div style="font-size: 13px; font-weight: 800; color: #065f46; margin-bottom: 4px;">
-          📦 Descarregar Código-Fonte Completo (ZIP)
-        </div>
-        <p style="font-size: 11px; color: #334155; margin-bottom: 10px; line-height: 1.3;">
-          Baixe todos os ficheiros atualizados prontos para o seu repositório GitHub ou servidor de alojamento:
-        </p>
-        
-      </div>
-
       <p class="rodape-criar-conta">Ainda não tem conta? <a id="btn-mostrar-registo">Criar conta</a></p>
       <p class="rodape-criar-conta"><a id="btn-esqueci-senha">Esqueci a senha</a></p>
     </form>
@@ -293,13 +281,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <span>Menu</span>
       </button>
       <strong>FABEF ERP</strong>
-      <button type="button" data-sec="config" class="btn btn-small" style="background:#2563eb;color:#fff;font-weight:700;padding:5px 10px;border-radius:6px;font-size:11px;display:inline-flex;align-items:center;gap:4px;border:none;cursor:pointer;margin-left:4px;" title="Abrir Configurações do Negócio e Recibo">
-        ⚙️ Configurações
-      </button>
     </div>
     <div class="lado">
       <span id="indicador-ligacao" style="font-size:11px;font-weight:700;"></span>
-      
       <button id="btn-abrir-sugestoes" class="btn btn-small" style="background:#f59e0b;color:#0f172a;font-weight:700;padding:6px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:5px;border:none;cursor:pointer;" title="Ver Diagnóstico & Sugestões de Melhoria">
         💡 Sugestões
       </button>
@@ -347,7 +331,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <button data-sec="ramos">🏷️ Ramos</button>
       <button data-sec="auditoria">📝 Auditoria</button>
       <button data-sec="subscricao">💳 Subscrição</button>
-      
     </details>
 
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;gap:8px;align-items:center;">
@@ -364,28 +347,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- INÍCIO -->
     <section class="secao active" id="sec-inicio">
       <h2>Painel Principal</h2>
-
-      <!-- CARTÃO DE ACESSO RÁPIDO AO MENU CONFIGURAÇÕES E DOWNLOAD ZIP -->
-      <div class="card" style="background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%); color: #fff; padding: 18px; border-radius: 12px; margin-bottom: 16px; border: 1.5px solid #3b82f6; box-shadow: 0 4px 14px rgba(0,0,0,0.15);">
-        <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px;">
-          <div>
-            <div style="display:inline-block; background:#2563eb; color:#fff; font-size:11px; font-weight:800; padding:3px 10px; border-radius:12px; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">
-              Acesso Rápido
-            </div>
-            <h3 style="font-size:18px; font-weight:800; color:#fff; margin-bottom:4px;">⚙️ Configurações da Empresa & Ficheiros ZIP</h3>
-            <p style="font-size:13px; color:#cbd5e1; max-width:620px; line-height:1.4;">
-              Personalize o NUIT da sua empresa, telefone, endereço, IVA e rodapé dos recibos. Ou clique para descarregar o projeto completo em formato ZIP e publicar no seu repositório GitHub.
-            </p>
-          </div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button type="button" data-sec="config" class="btn" style="background:#2563eb; color:#fff; font-weight:700; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:13px; box-shadow: 0 2px 6px rgba(37,99,235,0.4);">
-              ⚙️ Abrir Menu Configurações
-            </button>
-            
-          </div>
-        </div>
-      </div>
-
       <div id="aviso-licenca"></div>
       <div id="aviso-reconciliacao-stock"></div>
       <div id="aviso-plano-gratis"></div>
@@ -395,7 +356,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <div class="kpi"><div class="rotulo">Utilizador</div><div class="valor" id="inicio-utilizador" style="font-size:14px;">—</div></div>
         <div class="kpi"><div class="rotulo">Ramo ativo</div><div class="valor" id="inicio-ramo" style="font-size:14px;">—</div></div>
         <div class="kpi"><div class="rotulo">Vendas de hoje</div><div class="valor" id="inicio-vendas">MT 0,00</div></div>
-        <div class="kpi"><div class="rotulo">Kg/Litros vendidos hoje</div><div class="valor" id="inicio-kg-vendidos" style="font-size:18px;">0 kg</div></div>
+        <div class="kpi" id="kpi-inicio-peso-volume"><div class="rotulo">Peso/Volume vendidos hoje</div><div class="valor" id="inicio-kg-vendidos" style="font-size:18px;">0</div></div>
         <div class="kpi"><div class="rotulo">Produtos em stock baixo</div><div class="valor" id="inicio-stock-baixo">0</div></div>
       </div>
 
@@ -777,14 +738,14 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <div class="kpi"><div class="rotulo">Faturamento</div><div class="valor" id="rel-faturamento">MT 0,00</div></div>
         <div class="kpi"><div class="rotulo">Despesas</div><div class="valor" id="rel-despesas">MT 0,00</div></div>
         <div class="kpi"><div class="rotulo">Resultado</div><div class="valor" id="rel-resultado">MT 0,00</div></div>
-        <div class="kpi"><div class="rotulo">Kg/Litros vendidos</div><div class="valor" id="rel-kg-vendidos" style="font-size:18px;">0 kg</div></div>
+        <div class="kpi" id="kpi-rel-peso-volume"><div class="rotulo">Peso/Volume vendidos</div><div class="valor" id="rel-kg-vendidos" style="font-size:18px;">0 kg</div></div>
       </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
           <div>
             <h3 style="margin:0;color:#0f172a;">🥩 Vendas por Artigo & Unidade (kg, Litros, Unidades)</h3>
             <p style="margin:2px 0 0;font-size:12px;color:#64748b;">
-              Registo detalhado de quantos kg de carne ou artigos foram vendidos, total faturado em MT e stock restante na banca.
+              Registo detalhado dos artigos vendidos, total faturado em MT e stock restante. Os indicadores de peso/volume aparecem apenas quando são usados pelo ramo ativo.
             </p>
           </div>
           <span id="badge-total-kg-resumo" class="badge badge-blue" style="font-size:12px;padding:6px 12px;">0 kg vendidos</span>
@@ -1124,14 +1085,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <input type="text" id="config-rodape" placeholder="Ex: Obrigado pela sua preferência! Volte sempre ao nosso estabelecimento.">
         </div>
         <button id="btn-guardar-config" class="btn btn-entrar" style="width:auto;padding:12px 26px;font-weight:700;">💾 Guardar Configurações da Empresa</button>
-      </div>
-
-      <div class="card" style="border: 2px solid #10b981; background: #f0fdf4;">
-        <h3 style="margin-bottom:8px; color:#065f46;">📦 Ficheiros ZIP do ERP para Download</h3>
-        <p style="font-size:13px; color:#1e293b; margin-bottom:14px;">
-          Descarregue o pacote ZIP atualizado com todos os ficheiros do projeto (index.html, src/app.js, manifest.json, sw.js, ícones e documentação) para substituir diretamente no seu repositório GitHub ou servidor de alojamento.
-        </p>
-        
       </div>
 
       <div class="card">
@@ -1624,14 +1577,5 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
     </div>
   </div>
 </div>
-
-<!-- ATALHO FLUTUANTE VISÍVEL EM TODAS AS TELAS -->
-<div id="barra-flutuante-atalhos" style="position:fixed; bottom:20px; right:20px; z-index:9990; display:flex; gap:8px; align-items:center; background:rgba(15,23,42,0.88); backdrop-filter:blur(10px); padding:8px 12px; border-radius:30px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.2);">
-  <button type="button" data-sec="config" style="background:#2563eb; color:#fff; font-weight:700; border:none; border-radius:20px; padding:8px 14px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 2px 6px rgba(37,99,235,0.4);">
-    ⚙️ Configurações
-  </button>
-  
-</div>
-
 </body>
 </html>
