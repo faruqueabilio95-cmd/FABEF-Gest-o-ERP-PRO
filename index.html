@@ -170,19 +170,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         Acesso instantâneo com catálogo em Meticais (MT), caixa aberto, vendas e relatórios sem registo no Firebase.
       </div>
 
-      <!-- CARTÃO DE DOWNLOAD DIRETO DO CÓDIGO FONTE ZIP -->
-      <div style="margin-top: 14px; padding: 14px 12px; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 10px; text-align: center;">
-        <div style="font-size: 13px; font-weight: 800; color: #065f46; margin-bottom: 4px;">
-          📦 Descarregar Código-Fonte Completo (ZIP)
-        </div>
-        <p style="font-size: 11px; color: #334155; margin-bottom: 10px; line-height: 1.3;">
-          Baixe todos os ficheiros atualizados prontos para o seu repositório GitHub ou servidor de alojamento:
-        </p>
-        <a href="/fabef-erp-pro-atualizado.zip" download="fabef-erp-pro-atualizado.zip" class="btn btn-acao-baixar-zip" style="width: 100%; background: #059669; color: #fff; font-weight: 800; border-radius: 6px; padding: 10px; font-size: 13px; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 4px rgba(5,150,105,0.25);">
-          ⬇️ Baixar Pacote ZIP Agora
-        </a>
-      </div>
-
       <p class="rodape-criar-conta">Ainda não tem conta? <a id="btn-mostrar-registo">Criar conta</a></p>
       <p class="rodape-criar-conta"><a id="btn-esqueci-senha">Esqueci a senha</a></p>
     </form>
@@ -1532,7 +1519,7 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 </script>
 <!-- Biblioteca de leitura de código de barras/QR por câmara — funciona em Chrome, Safari (iOS) e Firefox, porque faz a descodificação em JavaScript puro, sem depender de nenhuma função nativa do navegador -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script type="module" src="/src/app.js"></script>
+<script type="module" src="./src/app.js"></script>
 
 <!-- Regista o Service Worker: é isto que permite abrir a aplicação sem internet -->
 <script>
