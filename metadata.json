@@ -1,0 +1,6 @@
+{
+  "name": "FABEF Gestão ERP PRO",
+  "description": "Sistema de Gestão Comercial e ERP completo para pequenas e médias empresas — POS, Controlo de Vendas, Stock, Caixa, Encomendas, Dívidas e Relatórios.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
