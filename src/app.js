@@ -1,5 +1,5 @@
-import JSZip from "jszip";
-import { initializeApp, deleteApp } from "firebase/app";
+import JSZip from "https://esm.sh/jszip@3.10.1";
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
     getAuth,
     onAuthStateChanged,
@@ -12,7 +12,7 @@ import {
     updatePassword,
     reauthenticateWithCredential,
     EmailAuthProvider
-} from "firebase/auth";
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
     getFirestore,
     collection,
@@ -34,7 +34,7 @@ import {
     enableIndexedDbPersistence,
     disableNetwork,
     enableNetwork
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
 // Proxies for addDoc/setDoc/updateDoc/deleteDoc to seamlessly support Demo Mode
 const addDoc = async (collRef, data) => {
