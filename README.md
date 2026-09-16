@@ -1,21 +1,11 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+FABEF Gestão ERP PRO - versão corrigida
 
-# Run and deploy your AI Studio app
+Correções aplicadas:
+1. Firebase e JSZip passaram a usar imports ESM compatíveis com navegador.
+2. O carregamento do app.js foi alterado para caminho relativo ./src/app.js, compatível com GitHub Pages em subpasta.
+3. Removido o cartão "Descarregar Código-Fonte Completo (ZIP)" que aparecia por baixo do botão Modo Demonstração.
+4. O restante do visual e funcionalidades do ficheiro original foram preservados.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/e5396426-250a-4013-809c-395417991d52
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
-   
+Ficheiros:
+- index.html
+- src/app.js
