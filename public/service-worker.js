@@ -1,35 +1,33 @@
 /* =====================================================
-   FABEF ERP â€” Service Worker
-   Guarda o "esqueleto" da aplicaÃ§Ã£o (HTML/JS/manifest) no
-   telemÃ³vel, para que abrir a aplicaÃ§Ã£o funcione mesmo sem
-   nenhuma ligaÃ§Ã£o Ã  internet â€” mesmo depois de fechar tudo.
-
-   Os DADOS (produtos, vendas, clientes, etc.) nÃ£o passam por
-   aqui: esses jÃ¡ ficam guardados pelo prÃ³prio Firestore
-   (ativado em app.js com enableIndexedDbPersistence). Este
-   ficheiro cuida sÃ³ dos ficheiros do programa em si.
+   FABEF ERP — Service Worker (Modo Offline Seguro)
+   Garante funcionamento offline do esqueleto da aplicação.
 ===================================================== */
-
-const NOME_CACHE = "fabef-erp-v1";
-
+const NOME_CACHE = "fabef-erp-v9.9.9";
 const FICHEIROS_ESSENCIAIS = [
     "./",
     "./index.html",
-    "./app.js",
+    "./src/app.js",
     "./manifest.json"
 ];
 
 self.addEventListener("install", (event) => {
     event.waitUntil(
         caches.open(NOME_CACHE)
-            .then((cache) => cache.addAll(FICHEIROS_ESSENCIAIS))
+            .then(async (cache) => {
+                for (const url of FICHEIROS_ESSENCIAIS) {
+                    try {
+                        await cache.add(url);
+                    } catch (e) {
+                        console.warn("Aviso na cache offline para " + url + ":", e);
+                    }
+                }
+            })
             .catch((erro) => console.error("Erro ao preparar a cache offline:", erro))
     );
     self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-    // Remove versÃµes antigas da cache quando a app Ã© atualizada
     event.waitUntil(
         caches.keys().then((chaves) =>
             Promise.all(chaves.filter((chave) => chave !== NOME_CACHE).map((chave) => caches.delete(chave)))
@@ -40,11 +38,8 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
     const url = event.request.url;
-
-    // Nunca intercepta pedidos ao Firebase/Firestore/Auth â€” esses jÃ¡ tÃªm o
-    // seu prÃ³prio mecanismo de sincronizaÃ§Ã£o offline, e interferir aqui
-    // poderia causar conflitos ou dados desatualizados.
-    if (url.includes("googleapis.com") || url.includes("google.com") || url.includes("gstatic.com/firebasejs")) {
+    // Não intercepta Firebase ou APIs de rede externa direta
+    if (url.includes("googleapis.com") || url.includes("google.com") || url.includes("gstatic.com") || url.includes("firebase")) {
         return;
     }
 
@@ -53,16 +48,15 @@ self.addEventListener("fetch", (event) => {
             if (respostaGuardada) {
                 return respostaGuardada;
             }
-
             return fetch(event.request)
                 .then((respostaRede) => {
-                    // Guarda uma cÃ³pia da resposta para a prÃ³xima vez que estiver offline
-                    const copia = respostaRede.clone();
-                    caches.open(NOME_CACHE).then((cache) => cache.put(event.request, copia));
+                    if (respostaRede && respostaRede.status === 200 && event.request.method === "GET") {
+                        const copia = respostaRede.clone();
+                        caches.open(NOME_CACHE).then((cache) => cache.put(event.request, copia));
+                    }
                     return respostaRede;
                 })
                 .catch(() => {
-                    // Sem rede e sem nada em cache: se for a prÃ³pria pÃ¡gina, mostra o index.html guardado
                     if (event.request.mode === "navigate") {
                         return caches.match("./index.html");
                     }
