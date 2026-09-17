@@ -181,9 +181,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div style="font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4;">
         Acesso instantâneo com catálogo em Meticais (MT), caixa aberto, vendas e relatórios sem registo no Firebase.
       </div>
-      <button type="button" onclick="window.baixarProjetoZip && window.baixarProjetoZip()" class="btn btn-light" style="width: 100%; margin-top: 8px; font-size: 11px; padding: 7px; border: 1px dashed #94a3b8; font-weight: 600;">
-        📥 Descarregar ZIP com Código Corrigido (para GitHub)
-      </button>
 
       <p class="rodape-criar-conta">Ainda não tem conta? <a id="btn-mostrar-registo">Criar conta</a></p>
       <p class="rodape-criar-conta"><a id="btn-esqueci-senha">Esqueci a senha</a></p>
@@ -857,6 +854,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <div class="form-group"><label for="func-nome">Nome</label><input type="text" id="func-nome"></div>
           <div class="form-group"><label for="func-email">E-mail</label><input type="email" id="func-email"></div>
           <div class="form-group"><label for="func-telefone">Telefone</label><input type="text" id="func-telefone"></div>
+          <div class="form-group"><label for="func-ramo">Ramo de Atuação / Filial</label><select id="func-ramo"></select></div>
           <div class="form-group"><label for="func-senha">Senha</label><input type="password" id="func-senha" placeholder="Mínimo 6 caracteres"></div>
           <div class="form-group"><label for="func-foto">Foto (link/URL, opcional)</label><input type="text" id="func-foto" placeholder="https://..."></div>
         </div>
@@ -864,7 +862,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Função</th><th>Estado</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Ramo / Filial</th><th>Função</th><th>Estado</th><th>Ações</th></tr></thead>
           <tbody id="tabela-funcionarios"></tbody>
         </table></div>
       </div>
@@ -1056,23 +1054,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <!-- CONFIGURAÇÕES -->
     <section class="secao" id="sec-config">
-
-      <!-- CARTÃO DE EXPORTAÇÃO DO CÓDIGO CORRIGIDO / REPOSITÓRIO -->
-      <div class="card" style="border: 2px solid #2563eb; background: #eff6ff; margin-bottom: 20px;">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-          <div>
-            <h3 style="color:#1e3a8a; font-size:16px; font-weight:800; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
-              📦 Descarregar Pacote ZIP Retificado (Atualização do GitHub)
-            </h3>
-            <p style="font-size:13px; color:#334155; max-width:680px; line-height:1.5;">
-              Todas as correções necessárias foram implementadas com sucesso: <strong>eliminação de erros de caracteres UTF-8</strong>, <strong>desbloqueio correto por PIN sem tela preta</strong>, <strong>ativação dos botões de recibo e WhatsApp</strong>, <strong>suporte offline corrigido no Service Worker</strong> e caminhos relativos para GitHub Pages.
-            </p>
-          </div>
-          <button type="button" id="btn-baixar-projeto-zip" class="btn btn-acao-baixar-zip" style="background:#2563eb; color:#fff; font-weight:700; padding:12px 20px; border-radius:8px; box-shadow:0 4px 6px -1px rgba(37,99,235,0.3); cursor:pointer;">
-            📥 Descarregar ZIP Completo Retificado
-          </button>
-        </div>
-      </div>
 
       <h2>Configurações do Estabelecimento & Recibo</h2>
       <div class="card">
@@ -1281,6 +1262,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <input type="hidden" id="edit-func-id">
       <div class="form-group"><label for="edit-func-nome">Nome</label><input type="text" id="edit-func-nome"></div>
       <div class="form-group"><label for="edit-func-telefone">Telefone</label><input type="text" id="edit-func-telefone"></div>
+      <div class="form-group"><label for="edit-func-ramo">Ramo de Atuação / Filial</label><select id="edit-func-ramo"></select></div>
       <p style="font-size:12px;color:#64748b;">O e-mail de acesso não pode ser alterado aqui. Para desativar o acesso, use o botão "Desativar" na lista.</p>
       <div class="modal-acoes">
         <button class="btn btn-light" type="button" onclick="fecharModal('modal-editar-funcionario')" style="flex:1;">Cancelar</button>
@@ -1611,12 +1593,7 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 
     </div>
 
-    <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
-
-      <button type="button" class="btn btn-acao-baixar-zip" style="background: #10b981; color: #fff; font-weight: 700; padding: 8px 16px; margin-right: auto;">
-        📥 Descarregar ZIP Retificado
-      </button>
-
+    <div style="margin-top: 20px; display: flex; justify-content: flex-end; align-items: center;">
       <button class="btn btn-primary" onclick="fecharModal('modal-sugestoes')" style="padding: 8px 20px;">Entendido</button>
     </div>
   </div>
