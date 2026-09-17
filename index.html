@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js",
+    "jszip": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm",
+    "canvas-confetti": "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/+esm"
+  }
+}
+</script>
+
 <meta charset="UTF-8">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <link rel="manifest" href="./manifest.json">
@@ -169,6 +181,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div style="font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4;">
         Acesso instantâneo com catálogo em Meticais (MT), caixa aberto, vendas e relatórios sem registo no Firebase.
       </div>
+      <button type="button" onclick="window.baixarProjetoZip && window.baixarProjetoZip()" class="btn btn-light" style="width: 100%; margin-top: 8px; font-size: 11px; padding: 7px; border: 1px dashed #94a3b8; font-weight: 600;">
+        📥 Descarregar ZIP com Código Corrigido (para GitHub)
+      </button>
 
       <p class="rodape-criar-conta">Ainda não tem conta? <a id="btn-mostrar-registo">Criar conta</a></p>
       <p class="rodape-criar-conta"><a id="btn-esqueci-senha">Esqueci a senha</a></p>
@@ -1501,7 +1516,7 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script type="module" src="/src/app.js"></script>
+<script type="module" src="./src/app.js"></script>
 
 <!-- Regista o Service Worker: é isto que permite abrir a aplicação sem internet -->
 <script>
