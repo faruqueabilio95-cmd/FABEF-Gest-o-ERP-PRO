@@ -190,6 +190,8 @@ window.FABEF = {
     carrinho: [],
     turnoId: null,
     turno: null,
+    dataAtiva: new Date().toLocaleDateString("en-CA"),
+    _raw: {},
     listeners: []
 };
 
@@ -887,6 +889,8 @@ async function limparEstadoFABEF() {
     FABEF.carrinho = [];
     FABEF.turnoId = null;
     FABEF.turno = null;
+    FABEF.dataAtiva = new Date().toLocaleDateString("en-CA");
+    FABEF._raw = {};
     FABEF.carregado = false;
 }
 
@@ -1161,10 +1165,24 @@ function dataDoRegisto(item) {
     const v=item?.data||item?.dataVenda||item?.dataCriacao||item?.criadoEm;
     if(!v) return "";
     if(typeof v === "object" && typeof v.toDate === "function") return v.toDate().toISOString().slice(0,10);
-    const d=new Date(v); return Number.isNaN(d.getTime()) ? String(v).slice(0,10) : d.toISOString().slice(0,10);
+    const d=new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v).slice(0,10);
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
 }
 function aplicarFiltroDia(){
-    for(const nome of COLECOES_POR_DIA){ const estado=nome==="auditoria_logs"?"auditoria":nome; FABEF[estado]=(FABEF._raw?.[nome]||[]).filter(x=>dataDoRegisto(x)===FABEF.dataAtiva); }
+    for(const nome of COLECOES_POR_DIA){
+        const estado=nome==="auditoria_logs"?"auditoria":nome;
+        const raw=FABEF._raw?.[nome]||[];
+        // Vendas/despesas/encomendas do turno actual ficam isoladas do período anterior.
+        // Se não houver turno aberto, a consulta passa a ser por dia, permitindo ao gerente
+        // escolher a data histórica no selector.
+        if (FABEF.turnoId && ["vendas","despesas","encomendas"].includes(nome)) {
+            FABEF[estado]=raw.filter(x => x.turnoId === FABEF.turnoId && dataDoRegisto(x)===FABEF.dataAtiva);
+        } else {
+            FABEF[estado]=raw.filter(x=>dataDoRegisto(x)===FABEF.dataAtiva);
+        }
+    }
 }
 function definirDiaAtivo(data){ if(!/^\d{4}-\d{2}-\d{2}$/.test(data||"")) return; FABEF.dataAtiva=data; aplicarFiltroDia(); renderTudo(); }
 window.definirDiaAtivo=definirDiaAtivo;
@@ -1650,7 +1668,7 @@ document.getElementById("ramo-pagina").addEventListener("change", e => mudarRamo
 document.getElementById("btn-adicionar-ramo")?.addEventListener("click", adicionarRamoPersonalizado);
 
 async function adicionarRamoPersonalizado() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+    if (perfilFABEF() !== "gerente") {
         alert("Apenas o gerente pode adicionar novos ramos de atividade.");
         return;
     }
@@ -1682,6 +1700,33 @@ async function adicionarRamoPersonalizado() {
     }
 }
 
+
+function perfilFABEF() {
+    return String(FABEF.userData?.perfil || FABEF.userData?.role || "").trim().toLowerCase();
+}
+
+async function recarregarDadosDoRamoAtual() {
+    // Encerra TODOS os listeners das coleções do ramo anterior antes de criar os novos.
+    if (FABEF.listeners && FABEF.listeners.length) {
+        FABEF.listeners.forEach(unsub => { try { if (typeof unsub === "function") unsub(); } catch (_) {} });
+    }
+    FABEF.listeners = [];
+    FABEF._raw = {};
+    FABEF.produtos = [];
+    FABEF.clientes = [];
+    FABEF.fornecedores = [];
+    FABEF.compras = [];
+    FABEF.vendas = [];
+    FABEF.despesas = [];
+    FABEF.dividas = [];
+    FABEF.encomendas = [];
+    FABEF.auditoria = [];
+    FABEF.sugestoes = [];
+    FABEF.carrinho = [];
+    FABEF.turnoId = null;
+    FABEF.turno = null;
+    await carregarDados();
+}
 
 async function mudarRamo(ramo) {
     if (!RAMOS.includes(ramo)) return;
@@ -2978,6 +3023,8 @@ async function finalizarVenda() {
             pagamento: pagamento,
             pagamentoDetalhe: detalhePagamento,
             ramo: FABEF.ramo,
+            turnoId: FABEF.turnoId || null,
+            diaOperacional: FABEF.dataAtiva,
             operadorId: FABEF.user.uid,
             operadorNome: FABEF.userData?.nome || FABEF.user.email,
             nuitCliente: nuitCliente,
@@ -3745,11 +3792,11 @@ window.amortizarDividaPrompt = async function(id, cliente) {
    MÃ“DULO LÃ“GICO: GESTÃƒO E FILTRAGEM DE ENCOMENDAS
 ===================================================== */
 
-document.getElementById("btn-registar-encomenda").addEventListener("click", registarEncomenda);
+document.getElementById("btn-registar-encomenda")?.addEventListener("click", registarEncomenda);
 
 
 async function registarEncomenda() {
-    if (!window.FABEF?.isDemoMode && (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente") { alert("O Gerente não pode registar encomendas. Esta operação é exclusiva do Funcionário."); return; }
+    if (!window.FABEF?.isDemoMode && perfilFABEF() === "gerente") { alert("O Gerente não pode registar encomendas. Esta operação é exclusiva do Funcionário."); return; }
     if (limiteEncomendasDiariasAtingido()) {
         avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.encomendasDiarias} encomendas do plano grÃ¡tis.`);
         return;
@@ -3783,6 +3830,8 @@ async function registarEncomenda() {
             valorPago: valorPago,
             estado: "PENDENTE",
             ramo: FABEF.ramo,
+            turnoId: FABEF.turnoId || null,
+            diaOperacional: FABEF.dataAtiva,
             data: new Date().toISOString(),
             criadoPor: FABEF.user.uid,
             criadoEm: serverTimestamp()
@@ -3790,7 +3839,7 @@ async function registarEncomenda() {
 
         const ref = await addDoc(subRef("encomendas"), payload);
 
-        FABEF.encomendas.push({ id: ref.id, ...payload, criadoEm: undefined });
+        // O onSnapshot adiciona o registo à lista local; não duplicar aqui.
 
         // Esvazia os campos para prevenir submissÃµes duplicadas
         [
@@ -3827,9 +3876,11 @@ const ROTULO_ESTADO_ENCOMENDA = {
 };
 
 function renderEncomendas() {
+    const formulario = document.getElementById("encomenda-formulario");
+    if (formulario) formulario.style.display = perfilFABEF() === "gerente" ? "none" : "";
     const tabelaCorpo = document.getElementById("tabela-encomendas");
     if (!tabelaCorpo) return;
-    tabelaCorpo.innerHTML = FABEF.encomendas.map(e => {
+    tabelaCorpo.innerHTML = FABEF.encomendas.filter(e => e.ramo === FABEF.ramo).map(e => {
         const valorTotal = numero(e.valorTotal);
         const valorPago = numero(e.valorPago);
         const valorRestante = Math.max(0, valorTotal - valorPago);
@@ -3990,6 +4041,7 @@ async function abrirCaixa() {
     const valor = numero(document.getElementById("caixa-valor-inicial").value);
 
     try {
+        FABEF.dataAtiva = new Date().toLocaleDateString("en-CA");
         const payload = {
             estado: "ABERTO",
             ramo: FABEF.ramo,
@@ -4018,7 +4070,9 @@ async function abrirCaixa() {
             reforcos: []
         };
 
+        aplicarFiltroDia();
         atualizarTelaCaixa();
+        renderTudo();
         await gravarAuditoria("Realizou a abertura de novo turno de caixa com fundo de faturamento inicial de " + dinheiro(valor), "INFO");
     } catch (error) {
         console.error(error);
@@ -4141,7 +4195,9 @@ async function fecharCaixa() {
         const inputInicial = document.getElementById("caixa-valor-inicial");
         if (inputInicial) inputInicial.value = "0";
 
+        aplicarFiltroDia();
         atualizarTelaCaixa();
+        renderTudo();
     } catch (error) {
         console.error(error);
         alert("Erro ao fechar o turno de caixa:\n" + mensagemFirebase(error));
