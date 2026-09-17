@@ -1,4 +1,7 @@
-import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import JSZip from "jszip";
+import confetti from "canvas-confetti";
+if (typeof window !== "undefined") { window.JSZip = JSZip; window.confetti = confetti; }
+import { initializeApp, deleteApp } from "firebase/app";
 import {
     getAuth,
     onAuthStateChanged,
@@ -11,7 +14,7 @@ import {
     updatePassword,
     reauthenticateWithCredential,
     EmailAuthProvider
-} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+} from "firebase/auth";
 import {
     getFirestore,
     collection,
@@ -33,7 +36,7 @@ import {
     enableIndexedDbPersistence,
     disableNetwork,
     enableNetwork
-} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+} from "firebase/firestore";
 
 // Proxies for addDoc/setDoc/updateDoc/deleteDoc to seamlessly support Demo Mode
 const addDoc = async (collRef, data) => {
@@ -119,7 +122,7 @@ const deleteDoc = async (documentRef) => {
 };
 
 /* =====================================================
-   CONFIGURAÃ‡ÃƒO FIREBASE â€” PRODUÃ‡ÃƒO
+   CONFIGURAÇão FIREBASE — PRODUÇão
 ===================================================== */
 
 const firebaseConfig = {
@@ -136,38 +139,38 @@ const firebaseConfig = {
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
 
-// A sessÃ£o fica guardada no dispositivo (nÃ£o expira ao fechar o navegador/app).
-// Isto Ã© necessÃ¡rio para o aplicativo funcionar OFFLINE â€” sem isto, reabrir sem
-// internet obrigaria sempre a um novo login, que precisa de rede. A seguranÃ§a de
-// "pedir sempre alguma coisa ao reabrir" passa a ser feita pelo ecrÃ£ de PIN local
-// (ver mÃ³dulo PIN mais abaixo), que nÃ£o depende de internet.
-setPersistence(auth, browserLocalPersistence).catch(err => console.error("Erro ao configurar persistÃªncia de sessÃ£o:", err));
+// A sessão fica guardada no dispositivo (não expira ao fechar o navegador/app).
+// Isto é necessário para o aplicativo funcionar OFFLINE — sem isto, reabrir sem
+// internet obrigaria sempre a um novo login, que precisa de rede. A segurança de
+// "pedir sempre alguma coisa ao reabrir" passa a ser feita pelo ecrã de PIN local
+// (ver módulo PIN mais abaixo), que não depende de internet.
+setPersistence(auth, browserLocalPersistence).catch(err => console.error("Erro ao configurar persistência de sessão:", err));
 
 const db = getFirestore(appFirebase);
 
-// Guarda em cache local (IndexedDB) os dados jÃ¡ lidos, para continuarem
-// disponÃ­veis sem internet, e permite que escritas feitas offline fiquem
+// Guarda em cache local (IndexedDB) os dados já lidos, para continuarem
+// disponíveis sem internet, e permite que escritas feitas offline fiquem
 // em fila e sincronizem sozinhas quando a rede voltar.
 enableIndexedDbPersistence(db).catch(err => {
     if (err.code === "failed-precondition") {
-        console.warn("Modo offline: sÃ³ Ã© suportado numa aba aberta de cada vez.");
+        console.warn("Modo offline: só é suportado numa aba aberta de cada vez.");
     } else if (err.code === "unimplemented") {
-        console.warn("Este navegador nÃ£o suporta o modo offline.");
+        console.warn("Este navegador não suporta o modo offline.");
     }
 });
 
 /* =====================================================
-   POLÃTICA DE OPERAÃ‡Ã•ES CRÃTICAS
-   O navegador apenas solicita a operaÃ§Ã£o. A autorizaÃ§Ã£o real
+   POLÍTICA DE OPERAÇÕES CRÍTICAS
+   O navegador apenas solicita a operação. A autorização real
    continua dependente do Firebase Authentication + Firestore Rules.
-   NÃ£o existe modo de demonstraÃ§Ã£o nem aprovaÃ§Ã£o local de pagamento.
+   Não existe modo de demonstração nem aprovação local de pagamento.
 ===================================================== */
 const FABEF_PRODUCAO = true;
 const FABEF_API_BASE = window.FABEF_API_BASE || "";
 
 
 /* =====================================================
-   ESTADO GLOBAL DA APLICAÃ‡ÃƒO (FABEF GLOBAL MEMORY)
+   ESTADO GLOBAL DA APLICAÇão (FABEF GLOBAL MEMORY)
 ===================================================== */
 
 window.FABEF = {
@@ -204,8 +207,8 @@ const RAMOS_PADRAO = [
     "Mercearia / Minimercado",
     "Supermercado",
     "Boutique / Moda",
-    "CalÃ§ados",
-    "SalÃ£o de Beleza",
+    "Calçados",
+    "Salão de Beleza",
     "Barbearia",
     "Restaurante",
     "Lanchonete",
@@ -213,96 +216,96 @@ const RAMOS_PADRAO = [
     "Pastelaria",
     "Padaria",
     "Doceria / Bolos",
-    "Talho / AÃ§ougue",
+    "Talho / Açougue",
     "Peixaria",
     "Frutaria",
-    "HortÃ­cola",
-    "FarmÃ¡cia / Perfumaria",
-    "CosmÃ©ticos",
-    "Material de ConstruÃ§Ã£o",
+    "Hortícola",
+    "Farmácia / Perfumaria",
+    "Cosméticos",
+    "Material de Construção",
     "Ferragem",
-    "ElÃ©trica",
-    "CanalizaÃ§Ã£o",
+    "Elétrica",
+    "Canalização",
     "Serralharia",
-    "Serralharia de AlumÃ­nio",
-    "VidraÃ§aria",
+    "Serralharia de Alumínio",
+    "Vidraçaria",
     "Carpintaria / Marcenaria",
     "Estofaria",
     "Colchoaria",
     "Tintas e Vernizes",
-    "InformÃ¡tica",
-    "ManutenÃ§Ã£o de Computadores",
-    "TelemÃ³veis e AcessÃ³rios",
-    "ElectrÃ³nica",
-    "Cyber CafÃ©",
+    "Informática",
+    "Manutenção de Computadores",
+    "Telemóveis e Acessórios",
+    "Electrónica",
+    "Cyber Café",
     "Papelaria",
     "Papelaria e Material Escolar",
     "Livraria",
-    "MÃ³veis",
-    "MÃ³veis de EscritÃ³rio",
-    "ElectrodomÃ©sticos",
+    "Móveis",
+    "Móveis de Escritório",
+    "Electrodomésticos",
     "Oficina Auto",
-    "PeÃ§as Auto",
-    "MecÃ¢nica",
+    "Peças Auto",
+    "Mecânica",
     "Motorizadas",
     "Lavagem de Carros (Lavajato)",
     "Aluguer de Equipamentos",
     "Hotel / Hospedagem",
-    "AgÃªncia de Viagens",
+    "Agência de Viagens",
     "Transporte de Carga",
     "Taxi / Moto-Taxi",
-    "Posto de CombustÃ­vel",
-    "Distribuidora de GÃ¡s",
-    "ServiÃ§os de Limpeza",
-    "ServiÃ§os de ImpressÃ£o",
-    "GrÃ¡fica",
-    "Fotografia / EstÃºdio",
+    "Posto de Combustível",
+    "Distribuidora de Gás",
+    "Serviços de Limpeza",
+    "Serviços de Impressão",
+    "Gráfica",
+    "Fotografia / Estúdio",
     "Florista",
-    "DecoraÃ§Ã£o de Eventos",
+    "Decoração de Eventos",
     "Aluguer de Salas / Eventos",
-    "DJ / Som e IluminaÃ§Ã£o",
+    "DJ / Som e Iluminação",
     "Pet Shop",
-    "AgropecuÃ¡ria",
-    "Agro-veterinÃ¡ria",
+    "Agropecuária",
+    "Agro-veterinária",
     "Loja de Sementes",
     "Restaurante / Catering",
     "Joalharia / Bijuteria",
     "Relojoaria",
-    "Ã“ptica",
+    "Óptica",
     "Artigos Religiosos",
     "Loja de Brinquedos",
     "Artigos de Festa",
-    "Loja de BebÃ©",
+    "Loja de Bebé",
     "Loja de Desporto",
     "Loja de Bicicletas",
-    "GinÃ¡sio / Academia",
-    "ClÃ­nica MÃ©dica",
-    "ClÃ­nica DentÃ¡ria",
+    "Ginásio / Academia",
+    "Clínica Médica",
+    "Clínica Dentária",
     "Costura / Alfaiataria",
     "Sapataria (Conserto)",
     "Lavandaria",
-    "Escola / ExplicaÃ§Ãµes",
-    "InfantÃ¡rio / Creche",
-    "EstÃºdio de MÃºsica",
+    "Escola / Explicações",
+    "Infantário / Creche",
+    "Estúdio de Música",
     "Contabilidade / Consultoria",
     "Advocacia",
-    "ImobiliÃ¡ria",
+    "Imobiliária",
     "Seguros",
-    "AgÃªncia de Emprego",
-    "SeguranÃ§a Privada",
+    "Agência de Emprego",
+    "Segurança Privada",
     "Artesanato",
-    "ComÃ©rcio Geral",
+    "Comércio Geral",
     "Outro"
 ];
 
-// Ramos personalizados adicionados pela prÃ³pria empresa (guardados em
+// Ramos personalizados adicionados pela própria empresa (guardados em
 // empresa.ramos_atividade) juntam-se aos RAMOS_PADRAO na hora de montar
-// os selects â€” ver renderRamos().
+// os selects — ver renderRamos().
 let RAMOS = RAMOS_PADRAO.slice();
 
 
 /* =====================================================
-   DICIONÃRIO SISTÃ‰MICO DE IDIOMAS (TRADUÃ‡ÃƒO DE TERMOS)
+   DICIONÁRIO SISTÉMICO DE IDIOMAS (TRADUÇão DE TERMOS)
 ===================================================== */
 
 const IDIOMAS = {
@@ -310,15 +313,15 @@ const IDIOMAS = {
         idioma: "Idioma",
         entrar: "Entrar",
         sair: "Sair",
-        inicio: "InÃ­cio",
+        inicio: "Início",
         vendas: "Vendas",
         produtos: "Produtos",
-        inventario: "InventÃ¡rio",
+        inventario: "Inventário",
         compras: "Compras",
         clientes: "Clientes",
         fornecedores: "Fornecedores",
-        relatorios: "RelatÃ³rios",
-        subscricao: "SubscriÃ§Ã£o"
+        relatorios: "Relatórios",
+        subscricao: "Subscrição"
     },
     en: {
         idioma: "Language",
@@ -366,208 +369,208 @@ const IDIOMAS = {
 
 
 /* =====================================================
-   SUGESTÃ•ES DE ARTIGOS POR RAMO DE NEGÃ“CIO
+   SUGESTÕES DE ARTIGOS POR RAMO DE NEGÓCIO
 ===================================================== */
 
 const SUGESTOES = {
     "Mercearia / Minimercado": [
-        "Arroz", "AÃ§Ãºcar", "Ã“leo", "Farinha de milho", "Farinha de trigo", "FeijÃ£o",
-        "Sal", "SabÃ£o azul e branco", "SabÃ£o em pÃ³", "Leite em pÃ³", "Bolachas",
-        "Massa esparguete", "ChÃ¡", "CafÃ©", "FÃ³sforos", "Velas", "Pilhas"
+        "Arroz", "Açúcar", "Óleo", "Farinha de milho", "Farinha de trigo", "Feijão",
+        "Sal", "Sabão azul e branco", "Sabão em pó", "Leite em pó", "Bolachas",
+        "Massa esparguete", "Chá", "Café", "Fósforos", "Velas", "Pilhas"
     ],
     "Supermercado": [
-        "Arroz", "Ã“leo alimentar", "AÃ§Ãºcar", "Leite", "Refrigerante", "Ãgua mineral",
-        "Detergente", "Papel higiÃ©nico", "Pasta de dentes", "Sabonete", "Manteiga",
-        "Queijo", "Iogurte", "Ovos", "CarvÃ£o", "Fraldas"
+        "Arroz", "Óleo alimentar", "Açúcar", "Leite", "Refrigerante", "Água mineral",
+        "Detergente", "Papel higiénico", "Pasta de dentes", "Sabonete", "Manteiga",
+        "Queijo", "Iogurte", "Ovos", "Carvão", "Fraldas"
     ],
     "Boutique / Moda": [
-        "T-shirt", "CalÃ§a de ganga", "Vestido", "Saia", "Camisa social", "Casaco",
-        "Cinto", "BonÃ©", "Meias", "LenÃ§o", "Bolsa"
+        "T-shirt", "Calça de ganga", "Vestido", "Saia", "Camisa social", "Casaco",
+        "Cinto", "Boné", "Meias", "Lenço", "Bolsa"
     ],
-    "CalÃ§ados": [
-        "Sapato social", "SandÃ¡lia", "Chinelo", "Sapatilha desportiva", "Bota",
-        "Sapato de crianÃ§a", "Palmilha", "CadarÃ§o"
+    "Calçados": [
+        "Sapato social", "Sandália", "Chinelo", "Sapatilha desportiva", "Bota",
+        "Sapato de criança", "Palmilha", "Cadarço"
     ],
-    "SalÃ£o de Beleza": [
-        "Corte de cabelo", "Penteado / TranÃ§a", "Manicure", "Pedicure",
+    "Salão de Beleza": [
+        "Corte de cabelo", "Penteado / Trança", "Manicure", "Pedicure",
         "Shampoo", "Condicionador", "Creme alisante", "Tinta de cabelo",
-        "ExtensÃ£o de cabelo", "Ã“leo capilar"
+        "Extensão de cabelo", "Óleo capilar"
     ],
     "Barbearia": [
         "Corte de cabelo", "Barba", "Corte + Barba", "Gel", "Pomada", "Shampoo",
-        "MÃ¡quina de corte (manutenÃ§Ã£o)"
+        "Máquina de corte (manutenção)"
     ],
     "Restaurante": [
         "Arroz", "Frango grelhado", "Carne assada", "Peixe grelhado", "Batata frita",
-        "Salada", "Sumo natural", "Refrigerante", "Ãgua", "Sobremesa"
+        "Salada", "Sumo natural", "Refrigerante", "Água", "Sobremesa"
     ],
     "Lanchonete": [
-        "HambÃºrguer", "Cachorro-quente", "SanduÃ­che", "Batata frita", "Sumo",
-        "Ãgua", "Pastel", "Rissol", "ChamuÃ§a"
+        "Hambúrguer", "Cachorro-quente", "Sanduíche", "Batata frita", "Sumo",
+        "Água", "Pastel", "Rissol", "Chamuça"
     ],
     "Bar / Bebidas": [
-        "Ãgua", "Sumo", "Cerveja", "Vinho", "Whisky", "Gin", "Vodka", "Gelo",
+        "Água", "Sumo", "Cerveja", "Vinho", "Whisky", "Gin", "Vodka", "Gelo",
         "Refrigerante", "Petiscos"
     ],
     "Pastelaria": [
-        "PÃ£o", "Croissant", "Bolo", "Pastel de nata", "Empada", "ChamuÃ§a",
-        "Rissol", "Sumo", "CafÃ©", "ChÃ¡"
+        "Pão", "Croissant", "Bolo", "Pastel de nata", "Empada", "Chamuça",
+        "Rissol", "Sumo", "Café", "Chá"
     ],
     "Padaria": [
-        "PÃ£o de trigo", "PÃ£o de forma", "PÃ£o integral", "Bolo simples",
+        "Pão de trigo", "Pão de forma", "Pão integral", "Bolo simples",
         "Bolachas", "Farinha", "Fermento", "Manteiga"
     ],
     "Doceria / Bolos": [
-        "Bolo de aniversÃ¡rio", "Cupcake", "Brigadeiro", "Torta", "Bolo de casamento",
+        "Bolo de aniversário", "Cupcake", "Brigadeiro", "Torta", "Bolo de casamento",
         "Docinhos", "Biscoitos decorados"
     ],
-    "Talho / AÃ§ougue": [
+    "Talho / Açougue": [
         "Carne de vaca (kg)", "Carne de porco (kg)", "Frango inteiro (kg)",
-        "Peito de frango (kg)", "MiÃºdos", "LinguiÃ§a", "Salsicha", "Osso para caldo"
+        "Peito de frango (kg)", "Miúdos", "Linguiça", "Salsicha", "Osso para caldo"
     ],
     "Peixaria": [
-        "Peixe fresco (kg)", "CamarÃ£o (kg)", "Lagosta (kg)", "Polvo (kg)",
-        "Caranguejo", "Gelo para conservaÃ§Ã£o"
+        "Peixe fresco (kg)", "Camarão (kg)", "Lagosta (kg)", "Polvo (kg)",
+        "Caranguejo", "Gelo para conservação"
     ],
     "Frutaria": [
-        "Banana", "Manga", "Laranja", "MaÃ§Ã£", "Abacaxi", "Melancia", "Papaia",
-        "LimÃ£o", "Abacate"
+        "Banana", "Manga", "Laranja", "Maçã", "Abacaxi", "Melancia", "Papaia",
+        "Limão", "Abacate"
     ],
-    "HortÃ­cola": [
+    "Hortícola": [
         "Tomate (kg)", "Cebola (kg)", "Repolho", "Alface", "Cenoura (kg)",
         "Batata (kg)", "Couve", "Pimento"
     ],
-    "FarmÃ¡cia / Perfumaria": [
-        "Paracetamol", "Ibuprofeno", "Soro fisiolÃ³gico", "Ãlcool gel",
-        "MÃ¡scara", "Preservativo", "Perfume", "Sabonete lÃ­quido", "Vitaminas"
+    "Farmácia / Perfumaria": [
+        "Paracetamol", "Ibuprofeno", "Soro fisiológico", "Álcool gel",
+        "Máscara", "Preservativo", "Perfume", "Sabonete líquido", "Vitaminas"
     ],
-    "CosmÃ©ticos": [
-        "Base", "Batom", "RÃ­mel", "PÃ³ compacto", "Esmalte", "Creme facial",
+    "Cosméticos": [
+        "Base", "Batom", "Rímel", "Pó compacto", "Esmalte", "Creme facial",
         "Protetor solar", "Removedor de maquilhagem"
     ],
-    "Material de ConstruÃ§Ã£o": [
-        "Cimento (saco)", "Areia (mÂ³)", "Brita (mÂ³)", "Ferro de construÃ§Ã£o",
+    "Material de Construção": [
+        "Cimento (saco)", "Areia (mÂ³)", "Brita (mÂ³)", "Ferro de construção",
         "Bloco / Tijolo", "Tinta", "Tubo PVC", "Prego"
     ],
     "Ferragem": [
-        "Martelo", "Chave de fendas", "Fita mÃ©trica", "Corda", "Cadeado",
-        "DobradiÃ§a", "Fechadura", "Arame"
+        "Martelo", "Chave de fendas", "Fita métrica", "Corda", "Cadeado",
+        "Dobradiça", "Fechadura", "Arame"
     ],
-    "ElÃ©trica": [
-        "LÃ¢mpada", "Fio elÃ©trico (metro)", "Tomada", "Interruptor", "Disjuntor",
-        "Fita isoladora", "ExtensÃ£o elÃ©trica"
+    "Elétrica": [
+        "Lâmpada", "Fio elétrico (metro)", "Tomada", "Interruptor", "Disjuntor",
+        "Fita isoladora", "Extensão elétrica"
     ],
-    "InformÃ¡tica": [
-        "ManutenÃ§Ã£o de computador", "InstalaÃ§Ã£o de Windows", "Rato",
-        "Teclado", "Pen drive", "Cabo HDMI", "ImpressÃ£o de documentos"
+    "Informática": [
+        "Manutenção de computador", "Instalação de Windows", "Rato",
+        "Teclado", "Pen drive", "Cabo HDMI", "Impressão de documentos"
     ],
-    "TelemÃ³veis e AcessÃ³rios": [
-        "Capa de telemÃ³vel", "PelÃ­cula de vidro", "Carregador", "Auricular",
-        "CartÃ£o de memÃ³ria", "Bateria", "ReparaÃ§Ã£o de ecrÃ£"
+    "Telemóveis e Acessórios": [
+        "Capa de telemóvel", "Película de vidro", "Carregador", "Auricular",
+        "Cartão de memória", "Bateria", "Reparação de ecrã"
     ],
     "Papelaria": [
-        "Caderno", "Caneta", "LÃ¡pis", "Borracha", "RÃ©gua", "Cola", "Tesoura",
-        "Papel A4 (resma)", "ImpressÃ£o / FotocÃ³pia"
+        "Caderno", "Caneta", "Lápis", "Borracha", "Régua", "Cola", "Tesoura",
+        "Papel A4 (resma)", "Impressão / Fotocópia"
     ],
-    "MÃ³veis": [
-        "Cama", "SofÃ¡", "Mesa", "Cadeira", "ArmÃ¡rio", "Estante", "ColchÃ£o"
+    "Móveis": [
+        "Cama", "Sofá", "Mesa", "Cadeira", "Armário", "Estante", "Colchão"
     ],
-    "ElectrodomÃ©sticos": [
-        "FrigorÃ­fico", "FogÃ£o", "Micro-ondas", "Ventilador", "Ferro de engomar",
-        "Liquidificador", "RÃ¡dio"
+    "Electrodomésticos": [
+        "Frigorífico", "Fogão", "Micro-ondas", "Ventilador", "Ferro de engomar",
+        "Liquidificador", "Rádio"
     ],
     "Oficina Auto": [
-        "MudanÃ§a de Ã³leo", "Alinhamento", "Balanceamento", "RevisÃ£o geral",
-        "DiagnÃ³stico eletrÃ³nico", "Troca de pastilhas de travÃ£o"
+        "Mudança de óleo", "Alinhamento", "Balanceamento", "Revisão geral",
+        "Diagnóstico eletrónico", "Troca de pastilhas de travão"
     ],
-    "PeÃ§as Auto": [
-        "Ã“leo de motor", "Filtro de Ã³leo", "Filtro de ar", "Pastilha de travÃ£o",
-        "Vela de igniÃ§Ã£o", "Bateria de carro", "Pneu"
+    "Peças Auto": [
+        "Óleo de motor", "Filtro de óleo", "Filtro de ar", "Pastilha de travão",
+        "Vela de ignição", "Bateria de carro", "Pneu"
     ],
     "Motorizadas": [
-        "MudanÃ§a de Ã³leo", "RevisÃ£o", "Pneu", "Vela", "Corrente", "TravÃµes"
+        "Mudança de óleo", "Revisão", "Pneu", "Vela", "Corrente", "Travões"
     ],
     "Hotel / Hospedagem": [
-        "DiÃ¡ria quarto simples", "DiÃ¡ria quarto duplo", "Pequeno-almoÃ§o",
+        "Diária quarto simples", "Diária quarto duplo", "Pequeno-almoço",
         "Lavandaria", "Estacionamento"
     ],
     "Transporte de Carga": [
-        "Frete curta distÃ¢ncia", "Frete longa distÃ¢ncia", "MudanÃ§a residencial",
+        "Frete curta distância", "Frete longa distância", "Mudança residencial",
         "Carregamento / Descarregamento"
     ],
     "Taxi / Moto-Taxi": [
         "Corrida curta", "Corrida longa", "Corrida noturna", "Aluguer por hora"
     ],
-    "Posto de CombustÃ­vel": [
-        "Gasolina (litro)", "GasÃ³leo (litro)", "PetrÃ³leo (litro)", "Ã“leo de motor"
+    "Posto de Combustível": [
+        "Gasolina (litro)", "Gasóleo (litro)", "Petróleo (litro)", "Óleo de motor"
     ],
-    "Distribuidora de GÃ¡s": [
-        "Botija de gÃ¡s 6kg", "Botija de gÃ¡s 12kg", "Botija de gÃ¡s 45kg",
-        "Regulador de gÃ¡s", "Mangueira de gÃ¡s"
+    "Distribuidora de Gás": [
+        "Botija de gás 6kg", "Botija de gás 12kg", "Botija de gás 45kg",
+        "Regulador de gás", "Mangueira de gás"
     ],
-    "ServiÃ§os de Limpeza": [
-        "Limpeza residencial", "Limpeza de escritÃ³rio", "Limpeza pÃ³s-obra",
+    "Serviços de Limpeza": [
+        "Limpeza residencial", "Limpeza de escritório", "Limpeza pós-obra",
         "Lavagem de estofos", "Lavagem de tapetes"
     ],
-    "GrÃ¡fica": [
-        "ImpressÃ£o de cartÃµes", "ImpressÃ£o de banners", "ImpressÃ£o de flyers",
-        "PlastificaÃ§Ã£o", "EncadernaÃ§Ã£o"
+    "Gráfica": [
+        "Impressão de cartões", "Impressão de banners", "Impressão de flyers",
+        "Plastificação", "Encadernação"
     ],
-    "Fotografia / EstÃºdio": [
-        "SessÃ£o fotogrÃ¡fica", "Cobertura de evento", "RevelaÃ§Ã£o de fotos",
-        "EdiÃ§Ã£o de vÃ­deo", "ImpressÃ£o de fotos"
+    "Fotografia / Estúdio": [
+        "Sessão fotográfica", "Cobertura de evento", "Revelação de fotos",
+        "Edição de vídeo", "Impressão de fotos"
     ],
     "Florista": [
         "Ramo de flores", "Arranjo de mesa", "Coroa de flores", "Vaso decorativo"
     ],
     "Pet Shop": [
-        "RaÃ§Ã£o para cÃ£o", "RaÃ§Ã£o para gato", "Banho e tosquia", "Coleira",
+        "Ração para cão", "Ração para gato", "Banho e tosquia", "Coleira",
         "Vacina", "Brinquedo para animal"
     ],
-    "AgropecuÃ¡ria": [
-        "RaÃ§Ã£o animal", "Vacina veterinÃ¡ria", "Adubo", "Semente", "Ferramenta agrÃ­cola"
+    "Agropecuária": [
+        "Ração animal", "Vacina veterinária", "Adubo", "Semente", "Ferramenta agrícola"
     ],
     "Joalharia / Bijuteria": [
-        "Anel", "Colar", "Pulseira", "Brincos", "RelÃ³gio", "Corrente de prata"
+        "Anel", "Colar", "Pulseira", "Brincos", "Relógio", "Corrente de prata"
     ],
-    "Ã“ptica": [
-        "Ã“culos de grau", "Ã“culos de sol", "Lente de contacto", "Exame de vista",
-        "Conserto de armaÃ§Ã£o"
+    "Óptica": [
+        "Óculos de grau", "Óculos de sol", "Lente de contacto", "Exame de vista",
+        "Conserto de armação"
     ],
-    "ClÃ­nica MÃ©dica": [
+    "Clínica Médica": [
         "Consulta geral", "Consulta especializada", "Exame de rotina",
-        "InjeÃ§Ã£o / Curativo", "AferiÃ§Ã£o de tensÃ£o"
+        "Injeção / Curativo", "Aferição de tensão"
     ],
-    "ClÃ­nica DentÃ¡ria": [
-        "Consulta dentÃ¡ria", "Limpeza dentÃ¡ria", "ExtraÃ§Ã£o", "ObturaÃ§Ã£o",
+    "Clínica Dentária": [
+        "Consulta dentária", "Limpeza dentária", "Extração", "Obturação",
         "Branqueamento"
     ],
     "Costura / Alfaiataria": [
-        "Ajuste de calÃ§a", "ConfecÃ§Ã£o de fato", "Bainha", "ReparaÃ§Ã£o de roupa",
-        "ConfecÃ§Ã£o de capulana"
+        "Ajuste de calça", "Confecção de fato", "Bainha", "Reparação de roupa",
+        "Confecção de capulana"
     ],
     "Lavandaria": [
         "Lavagem de roupa (kg)", "Passar a ferro", "Lavagem a seco",
         "Lavagem de edredon"
     ],
-    "Escola / ExplicaÃ§Ãµes": [
-        "ExplicaÃ§Ã£o de MatemÃ¡tica", "ExplicaÃ§Ã£o de PortuguÃªs", "ExplicaÃ§Ã£o de InglÃªs",
-        "ExplicaÃ§Ã£o de FÃ­sica", "Curso de informÃ¡tica"
+    "Escola / Explicações": [
+        "Explicação de Matemática", "Explicação de Português", "Explicação de Inglês",
+        "Explicação de Física", "Curso de informática"
     ],
     "Contabilidade / Consultoria": [
-        "DeclaraÃ§Ã£o de impostos", "Contabilidade mensal", "Abertura de empresa",
+        "Declaração de impostos", "Contabilidade mensal", "Abertura de empresa",
         "Consultoria financeira"
     ],
-    "SeguranÃ§a Privada": [
-        "VigilÃ¢ncia diurna", "VigilÃ¢ncia noturna", "InstalaÃ§Ã£o de cÃ¢maras",
-        "Ronda de seguranÃ§a"
+    "Segurança Privada": [
+        "Vigilância diurna", "Vigilância noturna", "Instalação de câmaras",
+        "Ronda de segurança"
     ],
-    "ComÃ©rcio Geral": [
+    "Comércio Geral": [
         "Produto diverso 1", "Produto diverso 2", "Produto diverso 3"
     ]
 };
 /* =====================================================
-   FUNÃ‡Ã•ES UTILITÃRIAS DO SISTEMA
+   FUNÇÕES UTILITÁRIAS DO SISTEMA
 ===================================================== */
 
 function dinheiro(v) {
@@ -606,7 +609,7 @@ function escapeHTML(v) {
 
 
 function dataTexto(v) {
-    if (!v) return "â€”";
+    if (!v) return "—";
 
     let d;
     if (typeof v === "object" && typeof v.toDate === "function") {
@@ -615,7 +618,7 @@ function dataTexto(v) {
         d = new Date(v);
     }
 
-    if (Number.isNaN(d.getTime())) return "â€”";
+    if (Number.isNaN(d.getTime())) return "—";
 
     return d.toLocaleString("pt-MZ");
 }
@@ -647,7 +650,7 @@ window.fecharModal = function (id) {
 
 
 /* =====================================================
-   REFERÃŠNCIAS DE SEGURANÃ‡A MULTIEMPRESA (FIRESTORE)
+   REFERÊNCIAS DE SEGURANÇA MULTIEMPRESA (FIRESTORE)
 ===================================================== */
 
 function empresaRef() {
@@ -666,11 +669,11 @@ function produtoRef(id) {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: REGISTO DE AUDITORIA
-   FUNÃ‡ÃƒO EM FALTA NO FICHEIRO ORIGINAL â€” Ã© chamada em cerca
-   de 20 sÃ­tios (produtos, vendas, compras, caixa, etc.) mas
+   MÓDULO LÓGICO: REGISTO DE AUDITORIA
+   FUNÇão EM FALTA NO FICHEIRO ORIGINAL — é chamada em cerca
+   de 20 sítios (produtos, vendas, compras, caixa, etc.) mas
    nunca tinha sido definida, o que gerava ReferenceError e
-   interrompia a operaÃ§Ã£o a meio (ex: guardarConfiguracoes).
+   interrompia a operação a meio (ex: guardarConfiguracoes).
 ===================================================== */
 async function gravarAuditoria(mensagem, nivel) {
     if (!FABEF.empresaId || !FABEF.user) return;
@@ -685,18 +688,18 @@ async function gravarAuditoria(mensagem, nivel) {
             criadoEm: serverTimestamp()
         });
     } catch (error) {
-        // Um erro no registo de auditoria nunca deve travar a operaÃ§Ã£o principal.
-        console.error("NÃ£o foi possÃ­vel gravar o registo de auditoria:", error);
+        // Um erro no registo de auditoria nunca deve travar a operação principal.
+        console.error("Não foi possível gravar o registo de auditoria:", error);
     }
 }
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: AUTENTICAÃ‡ÃƒO E CICLO DE ARRANQUE V9.9
-   - Um Ãºnico fluxo de login/registo
+   MÓDULO LÓGICO: AUTENTICAÇão E CICLO DE ARRANQUE V9.9
+   - Um único fluxo de login/registo
    - Sem fallback inseguro de perfil
-   - Bloqueio de corrida durante criaÃ§Ã£o da conta
-   - NÃ£o faz logout automÃ¡tico quando Firestore falha
+   - Bloqueio de corrida durante criação da conta
+   - Não faz logout automático quando Firestore falha
 ===================================================== */
 
 let FABEF_registoEmCurso = false;
@@ -725,7 +728,7 @@ if (btnLogin && !btnLogin.dataset.fabefBound) {
             if (status) status.textContent = "ðŸŸ¢ Login realizado. A carregar...";
         } catch (error) {
             console.error("Erro de login:", error);
-            if (status) status.textContent = "ðŸ”´ " + mensagemFirebase(error);
+            if (status) status.textContent = "🔴 " + mensagemFirebase(error);
         } finally {
             btnLogin.disabled = false;
         }
@@ -758,15 +761,15 @@ if (btnEsqueciSenha && !btnEsqueciSenha.dataset.fabefBound) {
         const email = elAuth("login-email")?.value.trim();
         const status = elAuth("login-status");
         if (!email) {
-            if (status) status.textContent = "ðŸ”´ Escreva primeiro o seu e-mail no campo acima, depois clique em \"Esqueci a senha\".";
+            if (status) status.textContent = "🔴 Escreva primeiro o seu e-mail no campo acima, depois clique em \"Esqueci a senha\".";
             return;
         }
         try {
             await sendPasswordResetEmail(auth, email);
-            if (status) status.textContent = "ðŸŸ¢ EnviÃ¡mos um e-mail para " + email + " com as instruÃ§Ãµes para definir uma nova senha. Verifique tambÃ©m a pasta de spam.";
+            if (status) status.textContent = "ðŸŸ¢ Enviámos um e-mail para " + email + " com as instruções para definir uma nova senha. Verifique também a pasta de spam.";
         } catch (error) {
             console.error(error);
-            if (status) status.textContent = "ðŸ”´ " + mensagemFirebase(error);
+            if (status) status.textContent = "🔴 " + mensagemFirebase(error);
         }
     });
 }
@@ -783,13 +786,13 @@ async function criarConta() {
     const empresaNome = elAuth("reg-empresa")?.value?.trim() || "";
     const gerente = elAuth("reg-gerente")?.value?.trim() || "";
     const telefone = elAuth("reg-telefone")?.value?.trim() || "";
-    const ramo = elAuth("reg-ramo")?.value?.trim() || "ComÃ©rcio Geral";
+    const ramo = elAuth("reg-ramo")?.value?.trim() || "Comércio Geral";
     const email = elAuth("reg-email")?.value?.trim() || "";
     const senha = elAuth("reg-senha")?.value || "";
     const status = elAuth("reg-status");
 
     if (!empresaNome || !gerente || !email || !senha) {
-        if (status) status.textContent = "âš ï¸ Preencha os campos obrigatÃ³rios.";
+        if (status) status.textContent = "âš ï¸ Preencha os campos obrigatórios.";
         return;
     }
 
@@ -837,16 +840,16 @@ async function criarConta() {
             criadoEm: serverTimestamp()
         };
 
-        // Os dois documentos sÃ³ sÃ£o criados para o UID autenticado.
+        // Os dois documentos só são criados para o UID autenticado.
         await setDoc(doc(db, "empresas", empresaId), empresa);
         await setDoc(doc(db, "utilizadores", uidUser), utilizador);
 
         if (status) status.textContent = "ðŸŸ¢ Conta criada com sucesso. A abrir o sistema...";
 
-        // CORREÃ‡ÃƒO: o onAuthStateChanged jÃ¡ disparou (ignorado, porque
-        // FABEF_registoEmCurso estava ativo) e nÃ£o volta a disparar sozinho,
-        // porque o estado de autenticaÃ§Ã£o nÃ£o muda outra vez. Por isso,
-        // depois de os documentos existirem, arrancamos a sessÃ£o manualmente.
+        // CORREÇão: o onAuthStateChanged já disparou (ignorado, porque
+        // FABEF_registoEmCurso estava ativo) e não volta a disparar sozinho,
+        // porque o estado de autenticação não muda outra vez. Por isso,
+        // depois de os documentos existirem, arrancamos a sessão manualmente.
         FABEF_registoEmCurso = false;
         if (auth.currentUser) {
             await iniciarSessaoFABEF(auth.currentUser);
@@ -854,7 +857,7 @@ async function criarConta() {
         return;
     } catch (error) {
         console.error("Erro ao criar conta:", error);
-        if (status) status.textContent = "ðŸ”´ " + mensagemFirebase(error);
+        if (status) status.textContent = "🔴 " + mensagemFirebase(error);
     } finally {
         FABEF_registoEmCurso = false;
         if (btnRegistar) btnRegistar.disabled = false;
@@ -903,7 +906,7 @@ async function iniciarSessaoFABEF(user) {
         FABEF.user = user;
         if (loginStatus) loginStatus.textContent = "â³ A carregar a empresa...";
 
-        // NÃƒO existe fallback para perfil inexistente.
+        // Não existe fallback para perfil inexistente.
         await carregarPerfil(user);
         await carregarEmpresa();
         await carregarDados();
@@ -911,17 +914,17 @@ async function iniciarSessaoFABEF(user) {
         abrirAplicacao();
         FABEF.carregado = true;
     } catch (error) {
-        console.error("Erro crÃ­tico ao iniciar a aplicaÃ§Ã£o:", error);
+        console.error("Erro crítico ao iniciar a aplicação:", error);
         const mensagem = mensagemFirebase(error);
-        if (loginStatus) loginStatus.textContent = "ðŸ”´ NÃ£o foi possÃ­vel carregar a conta: " + mensagem;
+        if (loginStatus) loginStatus.textContent = "🔴 Não foi possível carregar a conta: " + mensagem;
 
         const regStatus = elAuth("reg-status");
         if (regStatus && !FABEF_registoEmCurso) {
-            regStatus.textContent = "ðŸ”´ NÃ£o foi possÃ­vel carregar a empresa: " + mensagem;
+            regStatus.textContent = "🔴 Não foi possível carregar a empresa: " + mensagem;
         }
 
-        // MantÃ©m a sessÃ£o autenticada para permitir diagnÃ³stico/retry.
-        // NÃ£o usamos signOut() aqui, porque um erro do Firestore nÃ£o significa senha invÃ¡lida.
+        // Mantém a sessão autenticada para permitir diagnóstico/retry.
+        // Não usamos signOut() aqui, porque um erro do Firestore não significa senha inválida.
         FABEF.carregado = false;
         elAuth("app")?.classList.add("hidden");
         if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
@@ -931,11 +934,11 @@ async function iniciarSessaoFABEF(user) {
 }
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: BLOQUEIO POR PIN LOCAL (funciona offline)
-   Como a sessÃ£o agora fica guardada no dispositivo (para o modo
-   offline funcionar), a seguranÃ§a de "pedir sempre algo ao reabrir"
-   passa a ser um PIN de 4 dÃ­gitos verificado localmente â€” nÃ£o
-   depende de internet, ao contrÃ¡rio de pedir e-mail+senha outra vez.
+   MÓDULO LÓGICO: BLOQUEIO POR PIN LOCAL (funciona offline)
+   Como a sessão agora fica guardada no dispositivo (para o modo
+   offline funcionar), a segurança de "pedir sempre algo ao reabrir"
+   passa a ser um PIN de 4 dígitos verificado localmente — não
+   depende de internet, ao contrário de pedir e-mail+senha outra vez.
 ===================================================== */
 function chavePinLocal(uid) {
     return "fabef_pin_" + uid;
@@ -948,16 +951,16 @@ async function calcularHashPin(pin) {
 }
 
 async function configurarNovoPin(uid) {
-    let pin = prompt("Defina um PIN de 4 dÃ­gitos para desbloquear a aplicaÃ§Ã£o rapidamente da prÃ³xima vez (mesmo sem internet):");
-    if (pin === null) return; // o utilizador optou por nÃ£o definir agora
+    let pin = prompt("Defina um PIN de 4 dígitos para desbloquear a aplicação rapidamente da próxima vez (mesmo sem internet):");
+    if (pin === null) return; // o utilizador optou por não definir agora
     pin = pin.trim();
-    if (!/^\d{4,6}$/.test(pin)) { alert("O PIN deve ter entre 4 e 6 nÃºmeros."); return; }
+    if (!/^\d{4,6}$/.test(pin)) { alert("O PIN deve ter entre 4 e 6 números."); return; }
     const confirmacao = prompt("Confirme o PIN novamente:");
-    if (pin !== (confirmacao || "").trim()) { alert("Os PINs nÃ£o coincidem. Tente novamente mais tarde em ConfiguraÃ§Ãµes."); return; }
+    if (pin !== (confirmacao || "").trim()) { alert("Os PINs não coincidem. Tente novamente mais tarde em Configurações."); return; }
 
     const hash = await calcularHashPin(pin);
     localStorage.setItem(chavePinLocal(uid), hash);
-    alert("PIN definido com sucesso. Da prÃ³xima vez que abrir a aplicaÃ§Ã£o, vai usar este PIN em vez do e-mail e senha.");
+    alert("PIN definido com sucesso. Da próxima vez que abrir a aplicação, vai usar este PIN em vez do e-mail e senha.");
 }
 
 function mostrarEcraPin() {
@@ -985,6 +988,7 @@ document.getElementById("btn-pin-entrar")?.addEventListener("click", async () =>
         // No modo teste, aceita 1234 ou qualquer PIN de 4 dígitos
         if (pinDigitado.length >= 4) {
             esconderEcraPin();
+            document.getElementById("app")?.classList.remove("hidden");
             toast("🔓 Aplicação desbloqueada com sucesso.");
         } else {
             if (statusPin) statusPin.textContent = "🔴 O PIN deve ter pelo menos 4 dígitos (ex: 1234).";
@@ -1000,6 +1004,7 @@ document.getElementById("btn-pin-entrar")?.addEventListener("click", async () =>
     const hashDigitado = await calcularHashPin(pinDigitado);
     if (hashDigitado === hashGuardado) {
         esconderEcraPin();
+        document.getElementById("app")?.classList.remove("hidden");
         await iniciarSessaoFABEF(user);
     } else {
         if (statusPin) statusPin.textContent = "🔴 PIN incorreto. Tente novamente.";
@@ -1067,29 +1072,29 @@ onAuthStateChanged(auth, async user => {
 });
 
 async function carregarPerfil(user) {
-    if (!user?.uid) throw new Error("Utilizador autenticado invÃ¡lido.");
+    if (!user?.uid) throw new Error("Utilizador autenticado inválido.");
 
     const snap = await getDoc(doc(db, "utilizadores", user.uid));
 
     if (!snap.exists()) {
-        throw new Error("Perfil do utilizador nÃ£o encontrado no Firebase. A conta nÃ£o estÃ¡ configurada corretamente.");
+        throw new Error("Perfil do utilizador não encontrado no Firebase. A conta não está configurada corretamente.");
     }
 
     const dados = snap.data();
     const empresaId = dados.empresaId;
 
     if (!empresaId || typeof empresaId !== "string") {
-        throw new Error("O perfil do utilizador nÃ£o possui uma empresaId vÃ¡lida.");
+        throw new Error("O perfil do utilizador não possui uma empresaId válida.");
     }
 
     if (dados.uid && dados.uid !== user.uid) {
-        throw new Error("InconsistÃªncia de seguranÃ§a: o UID do perfil nÃ£o corresponde ao utilizador autenticado.");
+        throw new Error("Inconsistência de segurança: o UID do perfil não corresponde ao utilizador autenticado.");
     }
 
-    // Bloqueia o acesso de contas de funcionÃ¡rio que o gerente tenha desativado
+    // Bloqueia o acesso de contas de funcionário que o gerente tenha desativado
     if (dados.perfil === "funcionario" && dados.estado && dados.estado !== "ATIVO") {
         await signOut(auth);
-        throw new Error("Esta conta foi desativada pelo gerente. Contacte o gerente do negÃ³cio.");
+        throw new Error("Esta conta foi desativada pelo gerente. Contacte o gerente do negócio.");
     }
 
     FABEF.userData = { uid: user.uid, ...dados };
@@ -1101,15 +1106,15 @@ async function carregarEmpresa() {
 
     const snap = await getDoc(empresaRef());
     if (!snap.exists()) {
-        throw new Error("Documento da empresa nÃ£o encontrado na base de dados do Firebase.");
+        throw new Error("Documento da empresa não encontrado na base de dados do Firebase.");
     }
 
     const dados = snap.data();
     if (dados.id && dados.id !== FABEF.empresaId) {
-        throw new Error("InconsistÃªncia de seguranÃ§a: o ID da empresa nÃ£o corresponde ao documento.");
+        throw new Error("Inconsistência de segurança: o ID da empresa não corresponde ao documento.");
     }
     if (dados.gerenteId && FABEF.userData?.perfil === "gerente" && dados.gerenteId !== FABEF.user.uid) {
-        throw new Error("InconsistÃªncia de seguranÃ§a: o gerente da empresa nÃ£o corresponde ao utilizador autenticado.");
+        throw new Error("Inconsistência de segurança: o gerente da empresa não corresponde ao utilizador autenticado.");
     }
 
     FABEF.empresa = { id: FABEF.empresaId, ...dados };
@@ -1134,9 +1139,9 @@ async function carregarDados() {
     await ouvirCaixa();
 }
 
-// Agrupa vÃ¡rias atualizaÃ§Ãµes em tempo real que cheguem quase ao mesmo tempo
-// (normal quando vÃ¡rios dispositivos sincronizam de uma vez) numa Ãºnica
-// renderizaÃ§Ã£o, para nÃ£o sobrecarregar o ecrÃ£ com repaints repetidos.
+// Agrupa várias atualizações em tempo real que cheguem quase ao mesmo tempo
+// (normal quando vários dispositivos sincronizam de uma vez) numa única
+// renderização, para não sobrecarregar o ecrã com repaints repetidos.
 let FABEF_RENDER_PENDENTE = null;
 function pedirRenderTudo() {
     if (FABEF_RENDER_PENDENTE) clearTimeout(FABEF_RENDER_PENDENTE);
@@ -1147,13 +1152,13 @@ function pedirRenderTudo() {
 }
 
 /* =====================================================
-   ESCUTA EM TEMPO REAL DAS COLEÃ‡Ã•ES DA EMPRESA
-   Substitui o antigo carregamento "uma vez sÃ³" (getDocs). Com
-   onSnapshot, qualquer alteraÃ§Ã£o feita noutro dispositivo (outro
-   funcionÃ¡rio, ou o prÃ³prio gerente no telemÃ³vel) aparece aqui
-   automaticamente, sem precisar de recarregar a pÃ¡gina. TambÃ©m
-   Ã© assim que os dados chegam quando o dispositivo estava offline
-   e volta a ligar-se Ã  internet.
+   ESCUTA EM TEMPO REAL DAS COLEÇÕES DA EMPRESA
+   Substitui o antigo carregamento "uma vez só" (getDocs). Com
+   onSnapshot, qualquer alteração feita noutro dispositivo (outro
+   funcionário, ou o próprio gerente no telemóvel) aparece aqui
+   automaticamente, sem precisar de recarregar a página. Também
+   é assim que os dados chegam quando o dispositivo estava offline
+   e volta a ligar-se à internet.
 ===================================================== */
 const COLECOES_POR_RAMO = new Set(["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
 const COLECOES_POR_DIA = new Set(["vendas","despesas","compras","dividas","encomendas","auditoria_logs","sugestoes"]);
@@ -1202,7 +1207,7 @@ function escutarColecao(nome, estado) {
 }
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: INDICADOR DE LIGAÃ‡ÃƒO / MODO OFFLINE
+   MÓDULO LÓGICO: INDICADOR DE LIGAÇão / MODO OFFLINE
 ===================================================== */
 function atualizarIndicadorLigacao() {
     const indicador = document.getElementById("indicador-ligacao");
@@ -1210,11 +1215,11 @@ function atualizarIndicadorLigacao() {
     if (navigator.onLine) {
         indicador.textContent = "ðŸŸ¢ Online";
         indicador.style.color = "#10b981";
-        indicador.title = "Ligado Ã  internet â€” os dados sincronizam em tempo real.";
+        indicador.title = "Ligado à internet — os dados sincronizam em tempo real.";
     } else {
-        indicador.textContent = "ðŸ”´ Offline";
+        indicador.textContent = "🔴 Offline";
         indicador.style.color = "#ef4444";
-        indicador.title = "Sem internet. Pode continuar a vender e a trabalhar â€” tudo serÃ¡ sincronizado assim que a ligaÃ§Ã£o voltar.";
+        indicador.title = "Sem internet. Pode continuar a vender e a trabalhar — tudo será sincronizado assim que a ligação voltar.";
     }
 }
 window.addEventListener("online", () => { atualizarIndicadorLigacao(); if (typeof renderPOS === "function" && FABEF.carregado) renderPOS(); });
@@ -1236,7 +1241,7 @@ function abrirAplicacao() {
     verificarSubscricao();
     atualizarIndicadorLigacao();
 
-    // Primeira vez neste dispositivo: sugere definir um PIN para acesso rÃ¡pido offline
+    // Primeira vez neste dispositivo: sugere definir um PIN para acesso rápido offline
     if (FABEF.user?.uid && !localStorage.getItem(chavePinLocal(FABEF.user.uid))) {
         setTimeout(() => configurarNovoPin(FABEF.user.uid), 600);
     }
@@ -1244,10 +1249,10 @@ function abrirAplicacao() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: CONTROLO DE ACESSO POR PAPEL
-   O gerente Ã© a conta de controlo do negÃ³cio: define preÃ§os,
-   stock, funcionÃ¡rios e vÃª relatÃ³rios â€” mas NÃƒO regista vendas.
-   SÃ³ as contas de funcionÃ¡rio tÃªm acesso Ã  pÃ¡gina "Vender".
+   MÓDULO LÓGICO: CONTROLO DE ACESSO POR PAPEL
+   O gerente é a conta de controlo do negócio: define preços,
+   stock, funcionários e vê relatórios — mas Não regista vendas.
+   Só as contas de funcionário têm acesso à página "Vender".
 ===================================================== */
 function aplicarRestricoesDeAcessoPorPapel() {
     let perfil = "gerente";
@@ -1266,7 +1271,7 @@ function aplicarRestricoesDeAcessoPorPapel() {
     }
 
     // Secções estritamente reservadas ao Gerente:
-    // O funcionário NÃO PODE ver nem alterar os ramos que o gerente está a gerir,
+    // O funcionário Não PODE ver nem alterar os ramos que o gerente está a gerir,
     // nem compras, relatórios, metas, funcionários, subscrição, etc.
     const secoesReservadasAoGerente = ["ramos", "compras", "relatorios", "metas", "desempenho", "funcionarios", "auditoria", "subscricao", "config"];
     secoesReservadasAoGerente.forEach(sec => {
@@ -1418,8 +1423,8 @@ function mostrarSecao(nome) {
     const grupo = botaoAtivo?.closest("details");
     if (grupo) grupo.open = true;
 
-    // AO CLICAR NA OPÇÃO, OS DIZERES DOS 3 PONTOS (SIDEBAR) DESAPARECEM IMEDIATAMENTE
-    // E A TELA PRINCIPAL EXIBE LIMPA A OPÇÃO SELECIONADA
+    // AO CLICAR NA OPÇão, OS DIZERES DOS 3 PONTOS (SIDEBAR) DESAPARECEM IMEDIATAMENTE
+    // E A TELA PRINCIPAL EXIBE LIMPA A OPÇão SELECIONADA
     fecharMenuLateral();
 
     // Disparadores contextuais de atualização de tela
@@ -1437,13 +1442,13 @@ window.mostrarSecao = mostrarSecao;
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: ENCERRAR SESSÃƒO (LOGOUT)
+   MÓDULO LÓGICO: ENCERRAR SESSão (LOGOUT)
 ===================================================== */
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: ALTERAR SENHA (QUALQUER UTILIZADOR)
-   AcessÃ­vel pelo nome no cabeÃ§alho â€” qualquer funcionÃ¡rio ou
-   gerente pode reforÃ§ar a seguranÃ§a da prÃ³pria conta.
+   MÓDULO LÓGICO: ALTERAR SENHA (QUALQUER UTILIZADOR)
+   Acessível pelo nome no cabeçalho — qualquer funcionário ou
+   gerente pode reforçar a segurança da própria conta.
 ===================================================== */
 document.getElementById("header-user")?.addEventListener("click", () => {
     document.getElementById("senha-status").textContent = "";
@@ -1459,9 +1464,9 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
     const confirmar = document.getElementById("senha-nova-confirmar").value;
     const status = document.getElementById("senha-status");
 
-    if (!atual || !nova || !confirmar) { status.textContent = "ðŸ”´ Preencha todos os campos."; return; }
-    if (nova.length < 6) { status.textContent = "ðŸ”´ A nova senha deve ter pelo menos 6 caracteres."; return; }
-    if (nova !== confirmar) { status.textContent = "ðŸ”´ A confirmaÃ§Ã£o nÃ£o coincide com a nova senha."; return; }
+    if (!atual || !nova || !confirmar) { status.textContent = "🔴 Preencha todos os campos."; return; }
+    if (nova.length < 6) { status.textContent = "🔴 A nova senha deve ter pelo menos 6 caracteres."; return; }
+    if (nova !== confirmar) { status.textContent = "🔴 A confirmação não coincide com a nova senha."; return; }
 
     try {
         status.textContent = "â³ A validar...";
@@ -1469,11 +1474,11 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
         await reauthenticateWithCredential(auth.currentUser, credencial);
         await updatePassword(auth.currentUser, nova);
         status.textContent = "ðŸŸ¢ Senha alterada com sucesso!";
-        await gravarAuditoria("Alterou a prÃ³pria senha de acesso.", "INFO");
+        await gravarAuditoria("Alterou a própria senha de acesso.", "INFO");
         setTimeout(() => fecharModal("modal-alterar-senha"), 1500);
     } catch (error) {
         console.error(error);
-        status.textContent = "ðŸ”´ " + mensagemFirebase(error);
+        status.textContent = "🔴 " + mensagemFirebase(error);
     }
 });
 
@@ -1497,7 +1502,7 @@ document.getElementById("btn-logout").addEventListener("click", async () => {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: DICIONÃRIO E SELEÃ‡ÃƒO DE IDIOMA
+   MÓDULO LÓGICO: DICIONÁRIO E SELEÇão DE IDIOMA
 ===================================================== */
 
 document.getElementById("select-idioma").addEventListener("change", e => {
@@ -1517,16 +1522,16 @@ function aplicarIdioma(idioma) {
         compras: d.compras,
         fornecedores: d.fornecedores,
         clientes: d.clientes,
-        dividas: "Fiado / DÃ­vidas",
+        dividas: "Fiado / Dívidas",
         encomendas: "Encomendas",
         caixa: "Caixa / Turnos",
         despesas: "Despesas",
         relatorios: d.relatorios,
-        funcionarios: "FuncionÃ¡rios",
+        funcionarios: "Funcionários",
         ramos: "Ramos",
         auditoria: "Auditoria",
         subscricao: d.subscricao,
-        config: "ConfiguraÃ§Ãµes"
+        config: "Configurações"
     };
 
     Object.entries(mapa).forEach(([id, text]) => {
@@ -1537,14 +1542,14 @@ function aplicarIdioma(idioma) {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: GESTÃƒO MULTIEMPRESA DE RAMOS
+   MÓDULO LÓGICO: GESTão MULTIEMPRESA DE RAMOS
 ===================================================== */
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: VISÃƒO GERAL DE VENDAS POR RAMO
-   Mostra um cartÃ£o por cada ramo que a empresa jÃ¡ usa (tem
+   MÓDULO LÓGICO: VISão GERAL DE VENDAS POR RAMO
+   Mostra um cartão por cada ramo que a empresa já usa (tem
    produtos ou vendas registadas), com as vendas de hoje e do
-   mÃªs, e um botÃ£o para trocar diretamente para esse ramo.
+   mês, e um botão para trocar diretamente para esse ramo.
 ===================================================== */
 function renderVisaoGeralRamos() {
     const container = document.getElementById("visao-geral-ramos");
@@ -1565,7 +1570,7 @@ function renderVisaoGeralRamos() {
 
     container.innerHTML = `
         <div class="card">
-            <h3 style="margin-bottom:10px;">VisÃ£o geral â€” todos os ramos em uso</h3>
+            <h3 style="margin-bottom:10px;">Visão geral — todos os ramos em uso</h3>
             <div class="grid">
                 ${ramosEmUso.map(ramo => {
                     const vendasRamo = FABEF.vendas.filter(v => v.ramo === ramo);
@@ -1576,7 +1581,7 @@ function renderVisaoGeralRamos() {
                     <div class="kpi" style="${ativo ? 'border:2px solid #10b981;' : ''}">
                         <div class="rotulo">${escapeHTML(ramo)}${ativo ? ' (ativo)' : ''}</div>
                         <p style="font-size:13px;margin:6px 0;">Hoje: <strong>${dinheiro(vendasHojeRamo)}</strong></p>
-                        <p style="font-size:13px;margin:6px 0;">Este mÃªs: <strong>${dinheiro(vendasMesRamo)}</strong></p>
+                        <p style="font-size:13px;margin:6px 0;">Este mês: <strong>${dinheiro(vendasMesRamo)}</strong></p>
                         ${!ativo ? `<button class="btn btn-light btn-small" type="button" onclick="mudarRamo('${escapeHTML(ramo)}')">Ver este ramo</button>` : ""}
                     </div>`;
                 }).join("")}
@@ -1587,8 +1592,8 @@ function renderVisaoGeralRamos() {
 
 
 function renderRamos() {
-    // Junta os ramos padrÃ£o com os ramos personalizados que esta empresa
-    // jÃ¡ tenha adicionado (empresa.ramos_atividade), sem duplicados.
+    // Junta os ramos padrão com os ramos personalizados que esta empresa
+    // já tenha adicionado (empresa.ramos_atividade), sem duplicados.
     const personalizados = FABEF.empresa?.ramos_atividade || [];
     RAMOS = Array.from(new Set([...RAMOS_PADRAO, ...personalizados]));
 
@@ -1610,9 +1615,9 @@ function renderRamos() {
         select.value = FABEF.ramo;
     });
 
-    // Injeta as sugestÃµes como checkboxes, para o gerente poder selecionar
-    // vÃ¡rias de uma vez e adicionar tudo junto (evita ter de escrever cada
-    // atividade manualmente quando o ramo jÃ¡ tem sugestÃµes prontas).
+    // Injeta as sugestões como checkboxes, para o gerente poder selecionar
+    // várias de uma vez e adicionar tudo junto (evita ter de escrever cada
+    // atividade manualmente quando o ramo já tem sugestões prontas).
     const sugestoesDoRamo = (SUGESTOES[FABEF.ramo] || []).filter(nome =>
         !FABEF.produtos.some(p => p.ramo === FABEF.ramo && String(p.nome || "").toLowerCase() === nome.toLowerCase())
     );
@@ -1621,8 +1626,8 @@ function renderRamos() {
     if (sugestoesDoRamo.length === 0) {
         const totalSugestoes = (SUGESTOES[FABEF.ramo] || []).length;
         containerSugestoes.innerHTML = totalSugestoes > 0
-            ? `<p style="color:#10b981;font-size:13px;">âœ”ï¸ JÃ¡ adicionou todas as sugestÃµes prontas para este ramo.</p>`
-            : `<p style="color:#64748b;font-size:13px;">Ainda nÃ£o hÃ¡ sugestÃµes rÃ¡pidas para este ramo. Pode criar os seus produtos manualmente na pÃ¡gina "Produtos".</p>`;
+            ? `<p style="color:#10b981;font-size:13px;">âœ”ï¸ Já adicionou todas as sugestões prontas para este ramo.</p>`
+            : `<p style="color:#64748b;font-size:13px;">Ainda não há sugestões rápidas para este ramo. Pode criar os seus produtos manualmente na página "Produtos".</p>`;
     } else {
         containerSugestoes.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
@@ -1645,12 +1650,12 @@ function renderRamos() {
 
         document.getElementById("btn-adicionar-sugestoes-selecionadas")?.addEventListener("click", async () => {
             const selecionadas = Array.from(document.querySelectorAll(".check-sugestao:checked")).map(cb => cb.value);
-            if (selecionadas.length === 0) { alert("Marque pelo menos uma sugestÃ£o para adicionar."); return; }
+            if (selecionadas.length === 0) { alert("Marque pelo menos uma sugestão para adicionar."); return; }
             for (const nome of selecionadas) {
                 await criarProdutoSugestao(nome, true);
             }
             renderRamos();
-            alert(`${selecionadas.length} atividade(s) adicionada(s). VÃ¡ Ã  pÃ¡gina "Produtos" para definir os preÃ§os de cada uma.`);
+            alert(`${selecionadas.length} atividade(s) adicionada(s). Vá à página "Produtos" para definir os preços de cada uma.`);
         });
     }
 }
@@ -1661,9 +1666,9 @@ document.getElementById("ramo-pagina").addEventListener("change", e => mudarRamo
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: RAMOS PERSONALIZADOS
-   Permite ao gerente adicionar um ramo de atividade que nÃ£o
-   estÃ¡ na lista padrÃ£o (ex: um negÃ³cio muito especÃ­fico).
+   MÓDULO LÓGICO: RAMOS PERSONALIZADOS
+   Permite ao gerente adicionar um ramo de atividade que não
+   está na lista padrão (ex: um negócio muito específico).
 ===================================================== */
 document.getElementById("btn-adicionar-ramo")?.addEventListener("click", adicionarRamoPersonalizado);
 
@@ -1677,7 +1682,7 @@ async function adicionarRamoPersonalizado() {
     const nome = input?.value.trim();
     if (!nome) { alert("Introduza o nome do novo ramo."); return; }
     if (RAMOS.some(r => r.toLowerCase() === nome.toLowerCase())) {
-        alert("Este ramo jÃ¡ existe na lista.");
+        alert("Este ramo já existe na lista.");
         return;
     }
 
@@ -1696,7 +1701,7 @@ async function adicionarRamoPersonalizado() {
         await gravarAuditoria("Adicionou um novo ramo de atividade personalizado: " + nome, "INFO");
     } catch (error) {
         console.error(error);
-        alert("NÃ£o foi possÃ­vel adicionar o ramo.\n" + mensagemFirebase(error));
+        alert("Não foi possível adicionar o ramo.\n" + mensagemFirebase(error));
     }
 }
 
@@ -1732,8 +1737,8 @@ async function mudarRamo(ramo) {
     if (!RAMOS.includes(ramo)) return;
 
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("SÃ³ o gerente pode mudar o ramo de atividade.");
-        // RepÃµe o valor visual dos selects para o ramo atual (evita ficar "preso" na opÃ§Ã£o errada)
+        alert("Só o gerente pode mudar o ramo de atividade.");
+        // Repõe o valor visual dos selects para o ramo atual (evita ficar "preso" na opção errada)
         renderRamos();
         return;
     }
@@ -1742,7 +1747,7 @@ async function mudarRamo(ramo) {
 
     const confirmar = confirm(
         `Vai mudar do ramo "${FABEF.ramo}" para "${ramo}".\n\n` +
-        `Produtos, vendas, caixa e relatÃ³rios vÃ£o passar a mostrar apenas os dados deste novo ramo â€” nada Ã© apagado, o ramo anterior continua guardado e pode voltar a ele quando quiser.\n\n` +
+        `Produtos, vendas, caixa e relatórios vão passar a mostrar apenas os dados deste novo ramo — nada é apagado, o ramo anterior continua guardado e pode voltar a ele quando quiser.\n\n` +
         `Deseja continuar?`
     );
     if (!confirmar) {
@@ -1757,20 +1762,20 @@ async function mudarRamo(ramo) {
         });
 
         FABEF.ramo = ramo;
-        await ouvirCaixa(); // reescuta o caixa jÃ¡ isolado para o novo ramo
+        await ouvirCaixa(); // reescuta o caixa já isolado para o novo ramo
         renderTudo();
 
-        // Escreve de forma persistente a alteraÃ§Ã£o nos registos de auditoria
+        // Escreve de forma persistente a alteração nos registos de auditoria
         await gravarAuditoria("Alterou o ramo activo para " + ramo, "INFO");
     } catch (error) {
         console.error(error);
-        alert("NÃ£o foi possÃ­vel alterar o ramo.\n" + mensagemFirebase(error));
+        alert("Não foi possível alterar o ramo.\n" + mensagemFirebase(error));
     }
 }
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: CRIAR PRODUTO VIA SUGESTÃƒO RÃPIDA
+   MÓDULO LÓGICO: CRIAR PRODUTO VIA SUGESTão RÁPIDA
 ===================================================== */
 
 async function criarProdutoSugestao(nome, silencioso) {
@@ -1780,14 +1785,14 @@ async function criarProdutoSugestao(nome, silencioso) {
     );
 
     if (existe) {
-        if (!silencioso) alert("Este produto jÃ¡ existe neste ramo.");
+        if (!silencioso) alert("Este produto já existe neste ramo.");
         return;
     }
 
     try {
         const payload = {
             nome: nome,
-            categoria: "SugestÃ£o",
+            categoria: "Sugestão",
             codigo: "",
             custo: 0,
             preco: 0,
@@ -1801,7 +1806,7 @@ async function criarProdutoSugestao(nome, silencioso) {
 
         const ref = await addDoc(subRef("produtos"), payload);
 
-        // Atualiza a memÃ³ria local mantendo a integridade estrutural
+        // Atualiza a memória local mantendo a integridade estrutural
         FABEF.produtos.push({
             id: ref.id,
             nome: payload.nome,
@@ -1819,11 +1824,11 @@ async function criarProdutoSugestao(nome, silencioso) {
         await gravarAuditoria("Adicionou produto sugerido: " + nome, "INFO");
     } catch (error) {
         console.error(error);
-        if (!silencioso) alert("NÃ£o foi possÃ­vel adicionar o produto.\n" + mensagemFirebase(error));
+        if (!silencioso) alert("Não foi possível adicionar o produto.\n" + mensagemFirebase(error));
     }
 }
 /* =====================================================
-   MÃ“DULO LÃ“GICO: INTERAÃ‡ÃƒO DA JANELA MODAL DE PRODUTOS
+   MÓDULO LÓGICO: INTERAÇão DA JANELA MODAL DE PRODUTOS
 ===================================================== */
 
 document.getElementById("btn-novo-produto").addEventListener("click", () => {
@@ -1836,7 +1841,7 @@ document.getElementById("btn-salvar-produto").addEventListener("click", salvarPr
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: GRAVAÃ‡ÃƒO E VALIDAÃ‡ÃƒO DE PRODUTO
+   MÓDULO LÓGICO: GRAVAÇão E VALIDAÇão DE PRODUTO
 ===================================================== */
 
 async function salvarProduto() {
@@ -1853,20 +1858,20 @@ async function salvarProduto() {
     const cor = document.getElementById("novo-produto-cor")?.value.trim() || "";
     const destaque = document.getElementById("novo-produto-destaque")?.checked || false;
 
-    // ValidaÃ§Ã£o de seguranÃ§a bÃ¡sica para integridade de dados
+    // Validação de segurança básica para integridade de dados
     if (!nome) {
         alert("Introduza o nome do produto.");
         return;
     }
 
     if (stock < 0 || custo < 0 || preco < 0 || minimo < 0) {
-        alert("Os valores monetÃ¡rios ou de inventÃ¡rio nÃ£o podem ser negativos.");
+        alert("Os valores monetários ou de inventário não podem ser negativos.");
         return;
     }
 
     // Alerta de margem de lucro negativa ou nula
     if (preco < custo) {
-        if (!confirm("O preÃ§o de venda Ã© inferior ao custo de aquisiÃ§Ã£o. Deseja continuar mesmo assim?")) {
+        if (!confirm("O preço de venda é inferior ao custo de aquisição. Deseja continuar mesmo assim?")) {
             return;
         }
     }
@@ -1893,7 +1898,7 @@ async function salvarProduto() {
 
         const ref = await addDoc(subRef("produtos"), payload);
 
-        // AtualizaÃ§Ã£o sÃ­ncrona da memÃ³ria em cache do navegador
+        // Atualização síncrona da memória em cache do navegador
         FABEF.produtos.push({
             id: ref.id,
             nome: payload.nome,
@@ -1915,8 +1920,8 @@ async function salvarProduto() {
         fecharModal("modal-produto");
         renderTudo();
 
-        // Registo inalterÃ¡vel do log de auditoria do sistema
-        await gravarAuditoria("Criou o produto no catÃ¡logo: " + nome, "INFO");
+        // Registo inalterável do log de auditoria do sistema
+        await gravarAuditoria("Criou o produto no catálogo: " + nome, "INFO");
         alert("Produto criado com sucesso.");
     } catch (error) {
         console.error(error);
@@ -1946,7 +1951,7 @@ function limparProdutoForm() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: FILTRAGEM E RENDER DO CATÃLOGO
+   MÓDULO LÓGICO: FILTRAGEM E RENDER DO CATÁLOGO
 ===================================================== */
 
 document.getElementById("produto-pesquisa").addEventListener("input", renderProdutos);
@@ -1996,7 +2001,7 @@ document.getElementById("btn-eliminar-produto")?.addEventListener("click",elimin
 function renderProdutos() {
     const pesquisa = document.getElementById("produto-pesquisa").value.toLowerCase();
 
-    // Filtra primeiro pelo ramo activo, depois pela pesquisa de nome/cÃ³digo
+    // Filtra primeiro pelo ramo activo, depois pela pesquisa de nome/código
     const produtosFiltrados = FABEF.produtos.filter(p => {
         return p.ramo === FABEF.ramo && (!pesquisa ||
             String(p.nome || "").toLowerCase().includes(pesquisa) ||
@@ -2017,8 +2022,8 @@ function renderProdutos() {
         return `
         <tr>
             <td><strong>${escapeHTML(p.nome)}</strong></td>
-            <td>${escapeHTML(p.codigo || "â€”")}</td>
-            <td>${ehGerente ? dinheiro(p.custo) : "â€”"}</td>
+            <td>${escapeHTML(p.codigo || "—")}</td>
+            <td>${ehGerente ? dinheiro(p.custo) : "—"}</td>
             <td>${dinheiro(p.preco)}</td>
             <td 
                 class="stock-click" 
@@ -2030,7 +2035,7 @@ function renderProdutos() {
                 ${stock}
             </td>
             <td>${minimo}</td>
-            <td>${escapeHTML(p.ramo || "â€”")}</td>
+            <td>${escapeHTML(p.ramo || "—")}</td>
             <td>
                 ${baixo ? 
                     '<span class="badge badge-red">STOCK BAIXO</span>' : 
@@ -2045,12 +2050,12 @@ function renderProdutos() {
     }).join("") || `
     <tr>
         <td colspan="9" style="text-align: center; color: #64748b;">
-            Nenhum produto encontrado no catÃ¡logo deste ramo.
+            Nenhum produto encontrado no catálogo deste ramo.
         </td>
     </tr>
     `;
 
-    // Vincula dinamicamente os escutadores para o ecrÃ£ de rastreabilidade de lotes
+    // Vincula dinamicamente os escutadores para o ecrã de rastreabilidade de lotes
     document.querySelectorAll("[data-stock-id]").forEach(td => {
         td.addEventListener("click", () => {
             abrirRastreabilidadeDeLotes(td.dataset.stockId, td.dataset.stockNome);
@@ -2058,33 +2063,33 @@ function renderProdutos() {
     });
 }
 /* =====================================================
-   MÃ“DULO LÃ“GICO: CÃLCULOS E RENDERIZAÃ‡ÃƒO DE INVENTÃRIO
+   MÓDULO LÓGICO: CÁLCULOS E RENDERIZAÇão DE INVENTÁRIO
 ===================================================== */
 
 function renderInventario() {
-    // SÃ³ considera o inventÃ¡rio do ramo actualmente ativo
+    // Só considera o inventário do ramo actualmente ativo
     const produtos = FABEF.produtos.filter(p => p.ramo === FABEF.ramo);
 
-    // Calcula de forma somatÃ³ria o total de itens fÃ­sicos em stock
+    // Calcula de forma somatória o total de itens físicos em stock
     const unidades = produtos.reduce((s, p) => s + numero(p.stock), 0);
 
-    // Filtra e contabiliza quantos artigos atingiram o nÃ­vel de stock crÃ­tico (mas ainda tÃªm stock)
+    // Filtra e contabiliza quantos artigos atingiram o nível de stock crítico (mas ainda têm stock)
     const baixos = produtos.filter(p => numero(p.stock) > 0 && numero(p.stock) <= numero(p.stockMinimo)).length;
 
     // Produtos totalmente esgotados (stock zero ou negativo)
     const esgotados = produtos.filter(p => numero(p.stock) <= 0).length;
 
-    // Executa a valoraÃ§Ã£o monetÃ¡ria do stock baseado no preÃ§o de custo
+    // Executa a valoração monetária do stock baseado no preço de custo
     const custo = produtos.reduce((s, p) => s + (numero(p.stock) * numero(p.custo)), 0);
 
     const ehGerenteInv = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
 
-    // Atualiza os cartÃµes de sumÃ¡rio de indicadores no topo do painel
+    // Atualiza os cartões de sumário de indicadores no topo do painel
     document.getElementById("inv-total-artigos").textContent = produtos.length;
     document.getElementById("inv-total-unidades").textContent = unidades;
     document.getElementById("inv-stock-baixo").textContent = baixos;
     if (document.getElementById("inv-esgotados")) document.getElementById("inv-esgotados").textContent = esgotados;
-    document.getElementById("inv-valor-custo").textContent = ehGerenteInv ? dinheiro(custo) : "â€”";
+    document.getElementById("inv-valor-custo").textContent = ehGerenteInv ? dinheiro(custo) : "—";
 
     const tabelaCorpo = document.getElementById("tabela-inventario");
     if (!tabelaCorpo) return;
@@ -2099,7 +2104,7 @@ function renderInventario() {
         return `
         <tr>
             <td><strong>${escapeHTML(p.nome)}</strong></td>
-            <td>${escapeHTML(p.categoria || "â€”")}</td>
+            <td>${escapeHTML(p.categoria || "—")}</td>
             <td 
                 class="stock-click" 
                 style="color: ${corStock}; font-weight: 900;" 
@@ -2109,8 +2114,8 @@ function renderInventario() {
                 ${stock}
             </td>
             <td>${minimo}</td>
-            <td>${ehGerenteInv ? dinheiro(p.custo) : "â€”"}</td>
-            <td>${ehGerenteInv ? dinheiro(stock * numero(p.custo)) : "â€”"}</td>
+            <td>${ehGerenteInv ? dinheiro(p.custo) : "—"}</td>
+            <td>${ehGerenteInv ? dinheiro(stock * numero(p.custo)) : "—"}</td>
             <td>
                 ${esgotado ?
                     '<span class="badge badge-red">ESGOTADO</span>' :
@@ -2125,12 +2130,12 @@ function renderInventario() {
     }).join("") || `
     <tr>
         <td colspan="8" style="text-align: center; color: #64748b;">
-            Nenhum produto cadastrado para inventÃ¡rio neste ramo.
+            Nenhum produto cadastrado para inventário neste ramo.
         </td>
     </tr>
     `;
 
-    // Vincula dinamicamente os escutadores de evento Ã  tabela de inventÃ¡rio
+    // Vincula dinamicamente os escutadores de evento à tabela de inventário
     document.querySelectorAll("#tabela-inventario [data-stock-id]").forEach(td => {
         td.addEventListener("click", () => {
             abrirRastreabilidadeDeLotes(td.dataset.stockId, td.dataset.stockNome);
@@ -2140,22 +2145,22 @@ function renderInventario() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: AJUSTE MANUAL DE STOCK (ENTRADA / SAÃDA / PERDA)
-   SÃ³ o gerente pode autorizar â€” conforme pedido explicitamente.
+   MÓDULO LÓGICO: AJUSTE MANUAL DE STOCK (ENTRADA / SAÍDA / PERDA)
+   Só o gerente pode autorizar — conforme pedido explicitamente.
    Cada ajuste fica gravado em empresas/{id}/ajustes_stock e na
    auditoria, com o valor anterior e o valor novo.
 ===================================================== */
 
 window.abrirModalAjusteStock = function(id) {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("Apenas o gerente pode autorizar ajustes de stock (perdas, avarias ou correÃ§Ãµes manuais).");
+        alert("Apenas o gerente pode autorizar ajustes de stock (perdas, avarias ou correções manuais).");
         return;
     }
     const p = FABEF.produtos.find(x => x.id === id);
     if (!p) return;
 
     document.getElementById("ajuste-produto-id").value = p.id;
-    document.getElementById("ajuste-produto-nome").textContent = p.nome + " â€” stock atual: " + numero(p.stock);
+    document.getElementById("ajuste-produto-nome").textContent = p.nome + " — stock atual: " + numero(p.stock);
     document.getElementById("ajuste-quantidade").value = "";
     document.getElementById("ajuste-motivo").value = "";
     document.getElementById("modal-ajuste-stock")?.classList.add("show");
@@ -2165,7 +2170,7 @@ document.getElementById("btn-confirmar-ajuste-stock")?.addEventListener("click",
 
 async function confirmarAjusteStock() {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("SÃ³ o gerente pode autorizar ajustes de stock (entrada, saÃ­da ou perda/avaria).");
+        alert("Só o gerente pode autorizar ajustes de stock (entrada, saída ou perda/avaria).");
         return;
     }
 
@@ -2178,20 +2183,20 @@ async function confirmarAjusteStock() {
     if (!produto) return;
 
     if (quantidade <= 0) { alert("A quantidade deve ser superior a zero."); return; }
-    if (!motivo) { alert("Descreva o motivo do ajuste (obrigatÃ³rio para auditoria)."); return; }
-    if (!confirm(`Confirma o ajuste de stock de "${produto.nome}"?\n\nEsta aÃ§Ã£o fica registada com o seu nome, data e motivo.`)) return;
+    if (!motivo) { alert("Descreva o motivo do ajuste (obrigatório para auditoria)."); return; }
+    if (!confirm(`Confirma o ajuste de stock de "${produto.nome}"?\n\nEsta ação fica registada com o seu nome, data e motivo.`)) return;
 
     try {
         const stockAnterior = numero(produto.stock);
         const diferenca = (tipo === "entrada") ? quantidade : -quantidade;
         const stockNovo = Math.max(0, stockAnterior + diferenca);
 
-        // COMPATÃVEL COM OFFLINE: increment() em vez de transaÃ§Ã£o
+        // COMPATÍVEL COM OFFLINE: increment() em vez de transação
         await updateDoc(produtoRef(id), { stock: increment(diferenca), atualizadoEm: serverTimestamp() });
 
         produto.stock = stockNovo;
 
-        const tipoTexto = { entrada: "Entrada manual", saida: "SaÃ­da manual", perda: "Perda / Avaria" }[tipo] || tipo;
+        const tipoTexto = { entrada: "Entrada manual", saida: "Saída manual", perda: "Perda / Avaria" }[tipo] || tipo;
 
         await addDoc(subRef("ajustes_stock"), {
             produtoId: id,
@@ -2223,7 +2228,7 @@ async function confirmarAjusteStock() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: RASTREABILIDADE SEGURA DE LOTES (AUDITORIA)
+   MÓDULO LÓGICO: RASTREABILIDADE SEGURA DE LOTES (AUDITORIA)
    =====================================================
 */
 
@@ -2234,13 +2239,13 @@ window.abrirRastreabilidadeDeLotes = function (idProduto, nomeProduto) {
 
     if (!modal || !corpo || !resumo) return;
 
-    document.getElementById("md-titulo-produto").textContent = "ðŸ“‹ HistÃ³rico de Lotes: " + nomeProduto;
+    document.getElementById("md-titulo-produto").textContent = "ðŸ“‹ Histórico de Lotes: " + nomeProduto;
     modal.classList.add("show");
 
-    // Usa diretamente os dados jÃ¡ sincronizados em FABEF.compras (memÃ³ria local),
-    // em vez de fazer uma nova consulta ao Firestore â€” isto garante que funciona
-    // tambÃ©m offline, jÃ¡ que uma consulta nova com where+orderBy nÃ£o Ã© fiÃ¡vel
-    // a partir da cache quando nÃ£o hÃ¡ internet.
+    // Usa diretamente os dados já sincronizados em FABEF.compras (memória local),
+    // em vez de fazer uma nova consulta ao Firestore — isto garante que funciona
+    // também offline, já que uma consulta nova com where+orderBy não é fiável
+    // a partir da cache quando não há internet.
     const produto = FABEF.produtos.find(p => p.id === idProduto);
 
     const lotes = FABEF.compras
@@ -2283,7 +2288,7 @@ window.abrirRastreabilidadeDeLotes = function (idProduto, nomeProduto) {
     resumo.innerHTML = `Stock actual: <strong>${numero(produto?.stock)}</strong> | Total comprado registado: <strong>${totalComprado}</strong>`;
 };
 /* =====================================================
-   MÃ“DULO LÃ“GICO: GESTÃƒO E FILTRAGEM DE COMPRAS / ENTRADAS
+   MÓDULO LÓGICO: GESTão E FILTRAGEM DE COMPRAS / ENTRADAS
 ===================================================== */
 
 function preencherProdutosCompra() {
@@ -2300,7 +2305,7 @@ function preencherProdutosCompra() {
         </option>
         `).join("");
 
-    // SugestÃµes de fornecedores jÃ¡ cadastrados, para evitar erros de digitaÃ§Ã£o
+    // Sugestões de fornecedores já cadastrados, para evitar erros de digitação
     const listaFornecedores = document.getElementById("lista-fornecedores-compra");
     if (listaFornecedores) {
         listaFornecedores.innerHTML = FABEF.fornecedores
@@ -2314,7 +2319,7 @@ document.getElementById("btn-registar-compra").addEventListener("click", regista
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: GRAVAÃ‡ÃƒO ATÃ“MICA DE COMPRA E INVENTÃRIO
+   MÓDULO LÓGICO: GRAVAÇão ATÓMICA DE COMPRA E INVENTÁRIO
 ===================================================== */
 
 async function registarCompra() {
@@ -2324,15 +2329,15 @@ async function registarCompra() {
     const custo = numero(document.getElementById("compra-custo").value);
     const pagamento = document.getElementById("compra-pagamento")?.value || "Dinheiro";
 
-    // ValidaÃ§Ã£o rÃ­gida dos dados de entrada
+    // Validação rígida dos dados de entrada
     if (!produtoId || !fornecedor || quantidade <= 0 || custo < 0) {
-        alert("Preencha correctamente todos os dados obrigatÃ³rios da compra.");
+        alert("Preencha correctamente todos os dados obrigatórios da compra.");
         return;
     }
 
     const produto = FABEF.produtos.find(p => p.id === produtoId);
     if (!produto) {
-        alert("O produto seleccionado nÃ£o foi encontrado no sistema.");
+        alert("O produto seleccionado não foi encontrado no sistema.");
         return;
     }
 
@@ -2353,11 +2358,11 @@ async function registarCompra() {
             criadoEm: serverTimestamp()
         };
 
-        // Grava o histÃ³rico de compras de forma isolada
+        // Grava o histórico de compras de forma isolada
         const ref = await addDoc(subRef("compras"), compra);
         FABEF.compras.push({ id: ref.id, ...compra });
 
-        // Se a compra foi feita a crÃ©dito, regista/atualiza a dÃ­vida ao fornecedor
+        // Se a compra foi feita a crédito, regista/atualiza a dívida ao fornecedor
         if (pagamento === "Credito") {
             const fornecedorExistente = FABEF.fornecedores.find(f => (f.nome || "").toLowerCase() === fornecedor.toLowerCase());
             if (fornecedorExistente) {
@@ -2371,7 +2376,7 @@ async function registarCompra() {
                 const payloadFornecedor = {
                     nome: fornecedor,
                     telefone: "",
-                    observacao: "Criado automaticamente a partir de uma compra a crÃ©dito.",
+                    observacao: "Criado automaticamente a partir de uma compra a crédito.",
                     divida: totalCompra,
                     ramo: FABEF.ramo,
                     criadoPor: FABEF.user.uid,
@@ -2384,8 +2389,8 @@ async function registarCompra() {
         }
 
         /*
-         COMPATÃVEL COM OFFLINE: soma o stock com increment() em vez de uma
-         transaÃ§Ã£o (que precisa de internet). O preÃ§o de custo Ã© atualizado
+         COMPATÍVEL COM OFFLINE: soma o stock com increment() em vez de uma
+         transação (que precisa de internet). O preço de custo é atualizado
          normalmente a seguir.
         */
         await updateDoc(produtoRef(produtoId), {
@@ -2394,30 +2399,30 @@ async function registarCompra() {
             atualizadoEm: serverTimestamp()
         });
 
-        // Atualiza de forma sÃ­ncrona os dados em cache local na memÃ³ria do navegador
+        // Atualiza de forma síncrona os dados em cache local na memória do navegador
         produto.stock = numero(produto.stock) + quantidade;
         produto.custo = custo;
 
-        // Limpa os campos do formulÃ¡rio para o prÃ³ximo registo
+        // Limpa os campos do formulário para o próximo registo
         document.getElementById("compra-fornecedor").value = "";
         document.getElementById("compra-quantidade").value = "";
         document.getElementById("compra-custo").value = "";
 
         renderTudo();
 
-        // Regista a movimentaÃ§Ã£o financeira de entrada nos logs de auditoria
+        // Regista a movimentação financeira de entrada nos logs de auditoria
         await gravarAuditoria("Registou compra de " + quantidade + " unidades do artigo: " + produto.nome, "INFO");
         alert("Compra registada com sucesso e stock atualizado na base de dados.");
 
     } catch (error) {
-        console.error("Erro crÃ­tico ao processar transaÃ§Ã£o de compra:", error);
+        console.error("Erro crítico ao processar transação de compra:", error);
         alert("Erro ao registar a compra de mercadoria:\n" + mensagemFirebase(error));
     }
 }
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: RENDERIZAÃ‡ÃƒO DA TABELA DE ENTRADAS
+   MÓDULO LÓGICO: RENDERIZAÇão DA TABELA DE ENTRADAS
 ===================================================== */
 
 function renderCompras() {
@@ -2431,8 +2436,8 @@ function renderCompras() {
     tabelaCorpo.innerHTML = lista.map(c => `
     <tr>
         <td>${dataTexto(c.data)}</td>
-        <td>${escapeHTML(c.produtoNome || "â€”")}</td>
-        <td>${escapeHTML(c.fornecedorNome || "â€”")}</td>
+        <td>${escapeHTML(c.produtoNome || "—")}</td>
+        <td>${escapeHTML(c.fornecedorNome || "—")}</td>
         <td>${numero(c.quantidade)}</td>
         <td>${dinheiro(c.custoUnitario)}</td>
         <td>${dinheiro(numero(c.quantidade) * numero(c.custoUnitario))}</td>
@@ -2440,7 +2445,7 @@ function renderCompras() {
     `).join("") || `
     <tr>
         <td colspan="6" style="text-align: center; color: #64748b;">
-            Nenhuma operaÃ§Ã£o de compra registada para este negÃ³cio.
+            Nenhuma operação de compra registada para este negócio.
         </td>
     </tr>
     `;
@@ -2448,7 +2453,7 @@ function renderCompras() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: PONTO DE VENDA (POS FLUXO DE CAIXA)
+   MÓDULO LÓGICO: PONTO DE VENDA (POS FLUXO DE CAIXA)
 ===================================================== */
 
 document.getElementById("pos-pesquisa").addEventListener("input", renderPOS);
@@ -2457,18 +2462,18 @@ document.getElementById("pos-pesquisa").addEventListener("input", renderPOS);
 function renderPOS() {
     const pesquisa = document.getElementById("pos-pesquisa").value.toLowerCase();
 
-    // Avisa quando offline: o stock mostrado pode nÃ£o refletir vendas feitas
+    // Avisa quando offline: o stock mostrado pode não refletir vendas feitas
     // por outros dispositivos enquanto ambos estiverem sem internet.
     const avisoOffline = document.getElementById("aviso-pos-offline");
     if (avisoOffline) {
         avisoOffline.innerHTML = navigator.onLine ? "" :
-            `<div class="alert alert-warn">ðŸ”´ EstÃ¡ offline. O stock apresentado Ã© o Ãºltimo conhecido neste aparelho â€”
-            se outro funcionÃ¡rio tambÃ©m estiver offline a vender o mesmo produto, pode haver stock negativo atÃ©
+            `<div class="alert alert-warn">🔴 Está offline. O stock apresentado é o último conhecido neste aparelho —
+            se outro funcionário também estiver offline a vender o mesmo produto, pode haver stock negativo até
             os dois voltarem a ter internet e sincronizarem. Assim que sincronizar, verifique o aviso de
-            reconciliaÃ§Ã£o no InÃ­cio, se aparecer.</div>`;
+            reconciliação no Início, se aparecer.</div>`;
     }
 
-    // Filtra artigos ativos pertencentes estritamente ao ramo de negÃ³cio aberto no ecrÃ£
+    // Filtra artigos ativos pertencentes estritamente ao ramo de negócio aberto no ecrã
     const lista = FABEF.produtos.filter(p => {
         return p.ativo !== false &&
             p.ramo === FABEF.ramo &&
@@ -2482,12 +2487,12 @@ function renderPOS() {
 
     const caixaFechado = !FABEF.turnoId;
 
-    // SugestÃµes rÃ¡pidas marcadas pelo gerente (sÃ³ aparecem quando nÃ£o hÃ¡ pesquisa ativa)
+    // Sugestões rápidas marcadas pelo gerente (só aparecem quando não há pesquisa ativa)
     const containerDestaques = document.getElementById("pos-sugestoes-rapidas");
     if (containerDestaques) {
         const destaques = pesquisa ? [] : FABEF.produtos.filter(p => p.ativo !== false && p.ramo === FABEF.ramo && p.destaque);
         containerDestaques.innerHTML = destaques.length ? `
-            <p style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;">â­ SUGESTÃ•ES RÃPIDAS</p>
+            <p style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;">â­ SUGESTÕES RÁPIDAS</p>
             <div id="pos-sugestoes-rapidas-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));gap:8px;margin-bottom:14px;">
                 ${destaques.map(p => `
                 <button class="produto-pos" data-pos-produto="${escapeHTML(p.id)}" type="button" ${caixaFechado ? "disabled" : ""} style="border-color:#f59e0b;">
@@ -2512,16 +2517,16 @@ function renderPOS() {
     </button>
     `).join("") || `
     <div class="alert alert-info" style="width: 100%; text-align: center;">
-        Nenhum produto disponÃ­vel para faturamento neste ramo.
+        Nenhum produto disponível para faturamento neste ramo.
     </div>
     `;
 
-    // Vincula dinamicamente a aÃ§Ã£o de clique nos cartÃµes injetados para adiÃ§Ã£o rÃ¡pida
+    // Vincula dinamicamente a ação de clique nos cartões injetados para adição rápida
     document.querySelectorAll("[data-pos-produto]").forEach(btn => {
         btn.addEventListener("click", () => adicionarCarrinho(btn.dataset.posProduto));
     });
 
-    // Alimenta a lista de sugestÃ£o de clientes jÃ¡ cadastrados (para ligar a venda a um cliente)
+    // Alimenta a lista de sugestão de clientes já cadastrados (para ligar a venda a um cliente)
     const listaClientesPos = document.getElementById("lista-clientes-pos");
     if (listaClientesPos) {
         listaClientesPos.innerHTML = FABEF.clientes
@@ -2534,7 +2539,7 @@ function renderPOS() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: ADIÃ‡ÃƒO E CONTROLO DE STOCK DO CARRINHO
+   MÓDULO LÓGICO: ADIÇão E CONTROLO DE STOCK DO CARRINHO
 ===================================================== */
 
 async function adicionarCarrinho(id) {
@@ -2743,7 +2748,7 @@ document.getElementById("btn-confirmar-fracionada")?.addEventListener("click", (
 
 
 /* =====================================================
-   MÓDULO LÓGICO: EXECUÇÃO E RENDERIZAÇÃO DO CARRINHO
+   MÓDULO LÓGICO: EXECUÇão E RENDERIZAÇão DO CARRINHO
 ===================================================== */
 
 function renderCarrinho() {
@@ -2810,49 +2815,49 @@ document.getElementById("btn-limpar-carrinho")?.addEventListener("click", () => 
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: FINALIZAR VENDA (TRANSAÃ‡ÃƒO ATÃ“MICA)
+   MÓDULO LÓGICO: FINALIZAR VENDA (TRANSAÇão ATÓMICA)
 ===================================================== */
 
 document.getElementById("btn-finalizar-venda").addEventListener("click", finalizarVenda);
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: LEITURA DE CÃ“DIGO DE BARRAS POR CÃ‚MARA
+   MÓDULO LÓGICO: LEITURA DE CÓDIGO DE BARRAS POR CÂMARA
    Usa a biblioteca html5-qrcode (carregada no index.html), que
-   descodifica os fotogramas da cÃ¢mara em JavaScript puro â€” por
+   descodifica os fotogramas da câmara em JavaScript puro — por
    isso funciona em qualquer navegador (Chrome, Safari/iOS,
-   Firefox), ao contrÃ¡rio da funÃ§Ã£o nativa BarcodeDetector.
+   Firefox), ao contrário da função nativa BarcodeDetector.
 ===================================================== */
 let LEITOR_CODIGO_ATIVO = null;
 
 window.abrirLeitorCodigoBarras = async function() {
     if (typeof Html5Qrcode === "undefined") {
-        alert("A biblioteca de leitura de cÃ³digo de barras nÃ£o carregou. Verifique a ligaÃ§Ã£o Ã  internet e recarregue a pÃ¡gina.");
+        alert("A biblioteca de leitura de código de barras não carregou. Verifique a ligação à internet e recarregue a página.");
         return;
     }
 
     document.getElementById("modal-leitor-codigo")?.classList.add("show");
-    document.getElementById("leitor-codigo-status").textContent = "A iniciar a cÃ¢mara...";
+    document.getElementById("leitor-codigo-status").textContent = "A iniciar a câmara...";
 
     try {
         LEITOR_CODIGO_ATIVO = new Html5Qrcode("leitor-codigo-camera");
         await LEITOR_CODIGO_ATIVO.start(
-            { facingMode: "environment" }, // cÃ¢mara traseira do telemÃ³vel
+            { facingMode: "environment" }, // câmara traseira do telemóvel
             { fps: 10, qrbox: { width: 250, height: 150 } },
             (codigoDetetado) => processarCodigoDetetado(codigoDetetado),
-            () => { /* frame sem cÃ³digo legÃ­vel: ignora e continua a tentar */ }
+            () => { /* frame sem código legível: ignora e continua a tentar */ }
         );
-        document.getElementById("leitor-codigo-status").textContent = "Aponte a cÃ¢mara para o cÃ³digo de barras do produto.";
+        document.getElementById("leitor-codigo-status").textContent = "Aponte a câmara para o código de barras do produto.";
     } catch (error) {
         console.error(error);
         document.getElementById("leitor-codigo-status").textContent =
-            "NÃ£o foi possÃ­vel aceder Ã  cÃ¢mara. Verifique se deu permissÃ£o de cÃ¢mara ao site, e se estÃ¡ a aceder por HTTPS.";
+            "Não foi possível aceder à câmara. Verifique se deu permissão de câmara ao site, e se está a aceder por HTTPS.";
     }
 };
 
 window.fecharLeitorCodigoBarras = async function() {
     if (LEITOR_CODIGO_ATIVO) {
-        try { await LEITOR_CODIGO_ATIVO.stop(); await LEITOR_CODIGO_ATIVO.clear(); } catch (e) { /* jÃ¡ parado */ }
+        try { await LEITOR_CODIGO_ATIVO.stop(); await LEITOR_CODIGO_ATIVO.clear(); } catch (e) { /* já parado */ }
         LEITOR_CODIGO_ATIVO = null;
     }
     document.getElementById("modal-leitor-codigo")?.classList.remove("show");
@@ -2865,8 +2870,8 @@ function processarCodigoDetetado(codigo) {
 
     if (!produto) {
         document.getElementById("leitor-codigo-status").textContent =
-            `CÃ³digo "${codigo}" lido, mas nenhum produto deste ramo tem esse cÃ³digo registado. A continuar a procurar...`;
-        return; // continua a cÃ¢mara ligada para tentar outro cÃ³digo
+            `Código "${codigo}" lido, mas nenhum produto deste ramo tem esse código registado. A continuar a procurar...`;
+        return; // continua a câmara ligada para tentar outro código
     }
 
     fecharLeitorCodigoBarras();
@@ -2899,7 +2904,7 @@ function atualizarRestantePagamentoMisto() {
     const restante = totalComDesconto - soma;
     span.textContent = dinheiro(Math.abs(restante));
     span.style.color = Math.abs(restante) < 0.5 ? "#10b981" : (restante > 0 ? "#ef4444" : "#f59e0b");
-    span.textContent += restante > 0.5 ? " em falta" : (restante < -0.5 ? " a mais" : " â€” tudo atribuÃ­do âœ“");
+    span.textContent += restante > 0.5 ? " em falta" : (restante < -0.5 ? " a mais" : " — tudo atribuído âœ“");
 }
 ["pos-valor-dinheiro", "pos-valor-mpesa", "pos-valor-emola", "pos-valor-cartao", "pos-valor-credito", "pos-desconto"].forEach(id => {
     document.getElementById(id)?.addEventListener("input", atualizarRestantePagamentoMisto);
@@ -2919,21 +2924,21 @@ async function finalizarVenda() {
     }
 
     if (limiteVendasDiariasAtingido()) {
-        avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.vendasDiarias} vendas do plano grÃ¡tis.`);
+        avisoLimiteAtingido(`Atingiu o limite diário de ${LIMITES_PLANO_GRATIS.vendasDiarias} vendas do plano grátis.`);
         return;
     }
 
-    // O estado do caixa jÃ¡ Ã© mantido em tempo real por um listener persistente.
+    // O estado do caixa já é mantido em tempo real por um listener persistente.
     if (!FABEF.turnoId || FABEF.turno?.estado !== "ABERTO") {
         FABEF.carrinho = [];
         renderCarrinho();
         atualizarTelaCaixa();
-        alert("OperaÃ§Ã£o bloqueada: o caixa / turno estÃ¡ fechado. Abra o caixa antes de realizar vendas.");
+        alert("Operação bloqueada: o caixa / turno está fechado. Abra o caixa antes de realizar vendas.");
         return;
     }
 
     if (!FABEF.carrinho || !FABEF.carrinho.length) {
-        alert("O carrinho estÃ¡ vazio. Adicione produtos antes de finalizar.");
+        alert("O carrinho está vazio. Adicione produtos antes de finalizar.");
         return;
     }
 
@@ -2942,7 +2947,7 @@ async function finalizarVenda() {
     const nuitCliente = (document.getElementById("pos-nuit-cliente")?.value.trim() || "Isento");
     const nomeClienteVenda = document.getElementById("pos-cliente-nome")?.value.trim() || "";
     if (nuitCliente !== "Isento" && !/^\d{9}$/.test(nuitCliente)) {
-        alert("O NUIT do cliente deve conter exatamente 9 dÃ­gitos ou ficar em branco.");
+        alert("O NUIT do cliente deve conter exatamente 9 dígitos ou ficar em branco.");
         return;
     }
     const total = FABEF.carrinho.reduce((s, x) => s + (numero(x.preco) * numero(x.quantidade)), 0);
@@ -2951,7 +2956,7 @@ async function finalizarVenda() {
 
     // ---- Pagamento misto: soma das parcelas tem de bater certo com o total ----
     let detalhePagamento = null;
-    let valorDinheiroVenda = pagamento === "NumerÃ¡rio" ? totalComDesconto : 0;
+    let valorDinheiroVenda = pagamento === "Numerário" ? totalComDesconto : 0;
     let valorCreditoVenda = 0;
     if (misto) {
         detalhePagamento = {
@@ -2967,7 +2972,7 @@ async function finalizarVenda() {
             return;
         }
         if (detalhePagamento.credito > 0 && !nomeClienteVenda) {
-            alert("Para deixar uma parte da venda como crÃ©dito/fiado, indique o nome do cliente no campo \"Cliente\".");
+            alert("Para deixar uma parte da venda como crédito/fiado, indique o nome do cliente no campo \"Cliente\".");
             return;
         }
         valorDinheiroVenda = detalhePagamento.dinheiro;
@@ -2978,20 +2983,20 @@ async function finalizarVenda() {
         const vendaRef = doc(subRef("vendas"));
 
         /*
-         COMPATÃVEL COM OFFLINE: em vez de uma transaÃ§Ã£o (que exige ligaÃ§Ã£o
+         COMPATÍVEL COM OFFLINE: em vez de uma transação (que exige ligação
          em tempo real ao servidor e falha sem internet), usamos increment(),
          que o Firestore sabe aplicar corretamente mesmo com o pedido em fila
-         de espera offline, e resolve sozinho quando a ligaÃ§Ã£o voltar.
-         A validaÃ§Ã£o de stock suficiente Ã© feita com os dados mais recentes
-         que jÃ¡ temos em cache (FABEF.produtos) â€” em uso normal com internet
-         isto Ã© sempre atualizado; offline, Ã© o melhor que se pode garantir
+         de espera offline, e resolve sozinho quando a ligação voltar.
+         A validação de stock suficiente é feita com os dados mais recentes
+         que já temos em cache (FABEF.produtos) — em uso normal com internet
+         isto é sempre atualizado; offline, é o melhor que se pode garantir
          sem uma leitura ao servidor.
         */
         const linhas = [];
 
         for (const item of FABEF.carrinho) {
             const produto = FABEF.produtos.find(p => p.id === item.produtoId);
-            if (!produto) throw new Error("Produto nÃ£o encontrado no catÃ¡logo: " + item.nome);
+            if (!produto) throw new Error("Produto não encontrado no catálogo: " + item.nome);
 
             if (numero(produto.stock) < numero(item.quantidade)) {
                 throw new Error("Stock insuficiente no estabelecimento para o artigo: " + item.nome);
@@ -3002,7 +3007,7 @@ async function finalizarVenda() {
                 atualizadoEm: serverTimestamp()
             });
 
-            // Reflete de imediato na cache local, para a prÃ³xima venda jÃ¡ ver o stock correto
+            // Reflete de imediato na cache local, para a próxima venda já ver o stock correto
             produto.stock = numero(produto.stock) - numero(item.quantidade);
 
             linhas.push({
@@ -3015,7 +3020,7 @@ async function finalizarVenda() {
             });
         }
 
-        // Grava o documento definitivo histÃ³rico da venda (funciona offline: fica em fila)
+        // Grava o documento definitivo histórico da venda (funciona offline: fica em fila)
         await setDoc(vendaRef, {
             total: totalComDesconto,
             subtotal: total,
@@ -3034,7 +3039,7 @@ async function finalizarVenda() {
             criadoEm: serverTimestamp()
         });
 
-        // Atualiza de forma somatÃ³ria o fluxo financeiro do Turno de Caixa Ativo
+        // Atualiza de forma somatória o fluxo financeiro do Turno de Caixa Ativo
         if (FABEF.turnoId) {
             const turnoRef = doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId);
             updateDoc(turnoRef, {
@@ -3044,18 +3049,18 @@ async function finalizarVenda() {
             });
         }
 
-        // Se parte da venda ficou a crÃ©dito, lanÃ§a/atualiza a conta corrente do cliente
+        // Se parte da venda ficou a crédito, lança/atualiza a conta corrente do cliente
         if (valorCreditoVenda > 0) {
             try {
                 const clienteExistente = FABEF.clientes.find(c => c.nome.toLowerCase() === nomeClienteVenda.toLowerCase());
                 await registrarOuAtualizarDivida(nomeClienteVenda, clienteExistente?.telefone || "", valorCreditoVenda);
             } catch (erroDivida) {
                 console.error(erroDivida);
-                alert("A venda foi concluÃ­da, mas nÃ£o foi possÃ­vel lanÃ§ar a parcela de crÃ©dito na conta do cliente:\n" + erroDivida.message);
+                alert("A venda foi concluída, mas não foi possível lançar a parcela de crédito na conta do cliente:\n" + erroDivida.message);
             }
         }
 
-        // Limpa o carrinho de compras apÃ³s a persistÃªncia bem-sucedida
+        // Limpa o carrinho de compras após a persistência bem-sucedida
         FABEF.carrinho = [];
         const inputNuit = document.getElementById("pos-nuit-cliente");
         if (inputNuit) inputNuit.value = "";
@@ -3091,14 +3096,14 @@ async function finalizarVenda() {
         document.getElementById("modal-recibo-sucesso")?.classList.add("show");
 
     } catch (error) {
-        console.error("Erro crÃ­tico ao processar faturamento no POS:", error);
-        alert("A venda nÃ£o pÃ´de ser concluÃ­da de forma segura:\n" + error.message);
+        console.error("Erro crítico ao processar faturamento no POS:", error);
+        alert("A venda não pôde ser concluída de forma segura:\n" + error.message);
     }
 }
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: HISTÃ“RICO E RENDERS DE VENDAS
+   MÓDULO LÓGICO: HISTÓRICO E RENDERS DE VENDAS
 ===================================================== */
 
 document.getElementById("vendas-pesquisa").addEventListener("input", renderVendas);
@@ -3159,7 +3164,7 @@ window.imprimirReciboVenda = function(vendaId) {
     if (!v) { alert("Venda não localizada."); return; }
 
     const emp = FABEF.empresa || {};
-    const nomeEmpresa = emp.nome || "FABEF GESTÃO ERP PRO";
+    const nomeEmpresa = emp.nome || "FABEF GESTão ERP PRO";
     const nuitEmpresa = emp.nuit || "Isento / Não registado";
     const telEmpresa = emp.telefone || "+258 84 123 4567";
     const endEmpresa = emp.endereco || "Moçambique";
@@ -3306,7 +3311,7 @@ window.enviarReciboWhatsApp = function(vendaId) {
     if (!v) { alert("Venda não localizada."); return; }
 
     const emp = FABEF.empresa || {};
-    const nomeEmpresa = emp.nome || "FABEF GESTÃO ERP PRO";
+    const nomeEmpresa = emp.nome || "FABEF GESTão ERP PRO";
     const nuitEmpresa = emp.nuit || "Isento";
     const telEmpresa = emp.telefone || "+258 84 123 4567";
 
@@ -3339,17 +3344,17 @@ window.enviarReciboWhatsApp = function(vendaId) {
 };
 
 /* =====================================================
-   EXPORTAÃ‡ÃƒO DE INVENTÃRIO CSV
+   EXPORTAÇão DE INVENTÁRIO CSV
 ===================================================== */
 
 window.exportarInventarioCSV = function() {
     const produtosRamo = FABEF.produtos.filter(p => p.ramo === FABEF.ramo);
-    if (!produtosRamo || produtosRamo.length === 0) { alert("NÃ£o existem produtos no inventÃ¡rio deste ramo para exportar."); return; }
+    if (!produtosRamo || produtosRamo.length === 0) { alert("Não existem produtos no inventário deste ramo para exportar."); return; }
     const cabecalhos = ["Produto","Categoria","Stock Existente","Stock Minimo","Preco Custo (MT)","Valor em Stock (MT)","Estado"];
     const linhas = produtosRamo.map(p => {
         const stock = numero(p.stock), custo = numero(p.custo), minimo = numero(p.stockMinimo);
         const estado = stock <= minimo ? "STOCK BAIXO" : "NORMAL";
-        return [`"${String(p.nome || "").replace(/"/g,'""')}"`,`"${String(p.categoria || "â€”").replace(/"/g,'""')}"`,stock,minimo,custo.toFixed(2),(stock*custo).toFixed(2),estado];
+        return [`"${String(p.nome || "").replace(/"/g,'""')}"`,`"${String(p.categoria || "—").replace(/"/g,'""')}"`,stock,minimo,custo.toFixed(2),(stock*custo).toFixed(2),estado];
     });
     const csv = [cabecalhos.join(";"), ...linhas.map(l => l.join(";"))].join("\n");
     try {
@@ -3357,14 +3362,14 @@ window.exportarInventarioCSV = function() {
         const url = URL.createObjectURL(blob); const link = document.createElement("a");
         link.href=url; link.download=`FABEF_Inventario_${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-        if (typeof gravarAuditoria === "function") gravarAuditoria("Exportou a lista de inventÃ¡rio para formato CSV/Excel.", "INFO");
-    } catch(error) { console.error(error); alert("NÃ£o foi possÃ­vel exportar o inventÃ¡rio."); }
+        if (typeof gravarAuditoria === "function") gravarAuditoria("Exportou a lista de inventário para formato CSV/Excel.", "INFO");
+    } catch(error) { console.error(error); alert("Não foi possível exportar o inventário."); }
 };
 
 document.getElementById("btn-exportar-inventario")?.addEventListener("click", exportarInventarioCSV);
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: GESTÃƒO DE FORNECEDORES
+   MÓDULO LÓGICO: GESTão DE FORNECEDORES
 ===================================================== */
 
 document.getElementById("btn-adicionar-fornecedor").addEventListener("click", adicionarFornecedor);
@@ -3395,7 +3400,7 @@ async function adicionarFornecedor() {
 
         const ref = await addDoc(subRef("fornecedores"), payload);
 
-        // Alimenta de forma sÃ­ncrona a cache interna local
+        // Alimenta de forma síncrona a cache interna local
         FABEF.fornecedores.push({
             id: ref.id,
             nome: payload.nome,
@@ -3406,7 +3411,7 @@ async function adicionarFornecedor() {
             data: payload.data
         });
 
-        // Limpa os elementos de texto do formulÃ¡rio
+        // Limpa os elementos de texto do formulário
         document.getElementById("fornecedor-nome").value = "";
         document.getElementById("fornecedor-telefone").value = "";
         document.getElementById("fornecedor-observacao").value = "";
@@ -3414,7 +3419,7 @@ async function adicionarFornecedor() {
 
         renderFornecedores();
 
-        await gravarAuditoria("Adicionou o fornecedor ao catÃ¡logo: " + nome, "INFO");
+        await gravarAuditoria("Adicionou o fornecedor ao catálogo: " + nome, "INFO");
         alert("Fornecedor guardado com sucesso.");
     } catch (error) {
         console.error(error);
@@ -3433,8 +3438,8 @@ function renderFornecedores() {
         return `
     <tr>
         <td>${escapeHTML(f.nome)}</td>
-        <td>${escapeHTML(f.telefone || "â€”")}</td>
-        <td>${escapeHTML(f.observacao || "â€”")}</td>
+        <td>${escapeHTML(f.telefone || "—")}</td>
+        <td>${escapeHTML(f.observacao || "—")}</td>
         <td style="color:${divida > 0 ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(divida)}</td>
         <td>${compras.length}</td>
         <td>
@@ -3448,7 +3453,7 @@ function renderFornecedores() {
     }).join("") || `
     <tr>
         <td colspan="6" style="text-align: center; color: #64748b;">
-            Nenhum fornecedor registado para este negÃ³cio.
+            Nenhum fornecedor registado para este negócio.
         </td>
     </tr>
     `;
@@ -3456,11 +3461,11 @@ function renderFornecedores() {
 
 window.verComprasFornecedor = function(nomeFornecedor) {
     const compras = FABEF.compras.filter(c => (c.fornecedorNome || "").toLowerCase() === nomeFornecedor.toLowerCase());
-    if (compras.length === 0) { alert("Ainda nÃ£o hÃ¡ compras registadas para " + nomeFornecedor + "."); return; }
+    if (compras.length === 0) { alert("Ainda não há compras registadas para " + nomeFornecedor + "."); return; }
     const linhas = compras
         .slice()
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
-        .map(c => `${dataTexto(c.data)} â€” ${c.produtoNome} x${c.quantidade} â€” ${dinheiro(numero(c.quantidade) * numero(c.custoUnitario))}`)
+        .map(c => `${dataTexto(c.data)} — ${c.produtoNome} x${c.quantidade} — ${dinheiro(numero(c.quantidade) * numero(c.custoUnitario))}`)
         .join("\n");
     alert("Compras a " + nomeFornecedor + ":\n\n" + linhas);
 };
@@ -3468,11 +3473,11 @@ window.verComprasFornecedor = function(nomeFornecedor) {
 window.amortizarDividaFornecedorPrompt = async function(id, nome) {
     const fornecedor = FABEF.fornecedores.find(f => f.id === id);
     if (!fornecedor) return;
-    const quantiaStr = prompt("Valor pago ao fornecedor " + nome + " (dÃ­vida atual: " + dinheiro(fornecedor.divida) + "):");
+    const quantiaStr = prompt("Valor pago ao fornecedor " + nome + " (dívida atual: " + dinheiro(fornecedor.divida) + "):");
     if (!quantiaStr) return;
     const quantia = numero(quantiaStr);
     if (quantia <= 0) { alert("O valor deve ser superior a zero."); return; }
-    if (quantia > numero(fornecedor.divida)) { alert("O valor introduzido Ã© superior Ã  dÃ­vida atual."); return; }
+    if (quantia > numero(fornecedor.divida)) { alert("O valor introduzido é superior à dívida atual."); return; }
 
     try {
         const novaDivida = numero(fornecedor.divida) - quantia;
@@ -3492,7 +3497,7 @@ window.amortizarDividaFornecedorPrompt = async function(id, nome) {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: GESTÃƒO DE CLIENTES
+   MÓDULO LÓGICO: GESTão DE CLIENTES
 ===================================================== */
 
 document.getElementById("btn-adicionar-cliente").addEventListener("click", adicionarCliente);
@@ -3511,7 +3516,7 @@ async function adicionarCliente() {
 
     // Evita clientes duplicados com o mesmo nome neste estabelecimento
     if (FABEF.clientes.some(c => (c.nome || "").toLowerCase() === nome.toLowerCase())) {
-        alert("JÃ¡ existe um cliente registado com este nome.");
+        alert("Já existe um cliente registado com este nome.");
         return;
     }
 
@@ -3569,8 +3574,8 @@ function renderClientes() {
         return `
     <tr>
         <td>${escapeHTML(c.nome)}</td>
-        <td>${escapeHTML(c.telefone || "â€”")}</td>
-        <td>${escapeHTML(c.endereco || "â€”")}</td>
+        <td>${escapeHTML(c.telefone || "—")}</td>
+        <td>${escapeHTML(c.endereco || "—")}</td>
         <td style="color:${saldo > 0 ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(saldo)}</td>
         <td><button class="btn btn-light btn-small" type="button" onclick="verDetalheCliente('${escapeHTML(c.id)}')">ðŸ‘ï¸ Detalhes</button></td>
     </tr>
@@ -3591,33 +3596,33 @@ window.verDetalheCliente = function(id) {
     const divida = FABEF.dividas.find(d => (d.cliente || "").toLowerCase() === (c.nome || "").toLowerCase());
     const encomendasCliente = FABEF.encomendas.filter(e => (e.cliente || "").toLowerCase() === (c.nome || "").toLowerCase());
 
-    // HistÃ³rico de compras: vendas do POS ligadas a este cliente pelo nome
+    // Histórico de compras: vendas do POS ligadas a este cliente pelo nome
     const comprasCliente = FABEF.vendas
         .filter(v => (v.cliente || "").toLowerCase() === (c.nome || "").toLowerCase())
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
 
     const totalPago = comprasCliente.reduce((s, v) => s + numero(v.total), 0);
-    const ultimaCompra = comprasCliente.length ? dataTexto(comprasCliente[0].data) : "â€”";
+    const ultimaCompra = comprasCliente.length ? dataTexto(comprasCliente[0].data) : "—";
 
     document.getElementById("dc-titulo").textContent = c.nome;
     document.getElementById("dc-corpo").innerHTML = `
-        <p><strong>Telefone:</strong> ${escapeHTML(c.telefone || "â€”")}</p>
-        <p><strong>EndereÃ§o:</strong> ${escapeHTML(c.endereco || "â€”")}</p>
-        <p><strong>ObservaÃ§Ã£o:</strong> ${escapeHTML(c.observacao || "â€”")}</p>
-        <p style="margin-top:10px;"><strong>DÃ­vida atual:</strong>
+        <p><strong>Telefone:</strong> ${escapeHTML(c.telefone || "—")}</p>
+        <p><strong>Endereço:</strong> ${escapeHTML(c.endereco || "—")}</p>
+        <p><strong>Observação:</strong> ${escapeHTML(c.observacao || "—")}</p>
+        <p style="margin-top:10px;"><strong>Dívida atual:</strong>
             <span style="color:${numero(divida?.saldo) > 0 ? '#ef4444' : '#10b981'};font-weight:700;">
                 ${dinheiro(numero(divida?.saldo))}
             </span>
         </p>
-        <p><strong>Total jÃ¡ pago (histÃ³rico):</strong> ${dinheiro(totalPago)}</p>
-        <p><strong>Ãšltima compra:</strong> ${ultimaCompra}</p>
-        <p style="margin-top:10px;"><strong>HistÃ³rico de compras (${comprasCliente.length}):</strong></p>
+        <p><strong>Total já pago (histórico):</strong> ${dinheiro(totalPago)}</p>
+        <p><strong>Última compra:</strong> ${ultimaCompra}</p>
+        <p style="margin-top:10px;"><strong>Histórico de compras (${comprasCliente.length}):</strong></p>
         ${comprasCliente.length ? '<ul style="margin-top:6px;padding-left:18px;max-height:160px;overflow-y:auto;">' +
-            comprasCliente.map(v => `<li>${dataTexto(v.data)} â€” ${dinheiro(numero(v.total))} â€” ${escapeHTML(v.pagamento || "â€”")}</li>`).join("") +
-            '</ul>' : '<p style="color:#64748b;">Ainda nÃ£o hÃ¡ compras registadas para este cliente.</p>'}
+            comprasCliente.map(v => `<li>${dataTexto(v.data)} — ${dinheiro(numero(v.total))} — ${escapeHTML(v.pagamento || "—")}</li>`).join("") +
+            '</ul>' : '<p style="color:#64748b;">Ainda não há compras registadas para este cliente.</p>'}
         <p style="margin-top:10px;"><strong>Encomendas registadas:</strong> ${encomendasCliente.length}</p>
         ${encomendasCliente.length ? '<ul style="margin-top:6px;padding-left:18px;">' +
-            encomendasCliente.map(e => `<li>${escapeHTML(e.produto)} â€” x${e.quantidade} â€” ${escapeHTML(e.estado || 'Pendente')}</li>`).join("") +
+            encomendasCliente.map(e => `<li>${escapeHTML(e.produto)} — x${e.quantidade} — ${escapeHTML(e.estado || 'Pendente')}</li>`).join("") +
             '</ul>' : ''}
     `;
     document.getElementById("modal-detalhe-cliente")?.classList.add("show");
@@ -3625,7 +3630,7 @@ window.verDetalheCliente = function(id) {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: GESTÃƒO DE FIADO / DÃVIDAS COM BARREIRA DE CRÃ‰DITO
+   MÓDULO LÓGICO: GESTão DE FIADO / DÍVIDAS COM BARREIRA DE CRÉDITO
 ===================================================== */
 
 document.getElementById("btn-registar-divida").addEventListener("click", registarDivida);
@@ -3641,7 +3646,7 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
 
         // BLINDAGEM FINANCEIRA: Bloqueia a venda fiada se estourar o limite acordado
         if (existente.limite && novoSaldo > numero(existente.limite)) {
-            throw new Error("O limite de crÃ©dito deste cliente foi ultrapassado.");
+            throw new Error("O limite de crédito deste cliente foi ultrapassado.");
         }
 
         await updateDoc(doc(db, "empresas", FABEF.empresaId, "dividas", existente.id), {
@@ -3679,7 +3684,7 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
 
 async function registarDivida() {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
-        alert("A conta de gerente nÃ£o regista novas dÃ­vidas â€” isso Ã© feito pelo funcionÃ¡rio no momento da venda ou do atendimento. O gerente pode consultar e acompanhar aqui.");
+        alert("A conta de gerente não regista novas dívidas — isso é feito pelo funcionário no momento da venda ou do atendimento. O gerente pode consultar e acompanhar aqui.");
         return;
     }
     const cliente = document.getElementById("divida-cliente").value.trim();
@@ -3688,12 +3693,12 @@ async function registarDivida() {
     const limite = numero(document.getElementById("divida-limite").value);
 
     if (!cliente || valor <= 0) {
-        alert("Dados invÃ¡lidos. Introduza um cliente e um valor superior a zero.");
+        alert("Dados inválidos. Introduza um cliente e um valor superior a zero.");
         return;
     }
 
     try {
-        // Se jÃ¡ existir cliente, respeita o limite definido antes; senÃ£o usa o limite agora introduzido
+        // Se já existir cliente, respeita o limite definido antes; senão usa o limite agora introduzido
         const existente = FABEF.dividas.find(d =>
             String(d.cliente || "").toLowerCase() === cliente.toLowerCase()
         );
@@ -3708,23 +3713,23 @@ async function registarDivida() {
             await registrarOuAtualizarDivida(cliente, telefone, valor);
         }
 
-        // Limpa os campos do formulÃ¡rio apÃ³s o registo bem-sucedido
+        // Limpa os campos do formulário após o registo bem-sucedido
         document.getElementById("divida-cliente").value = "";
         document.getElementById("divida-telefone").value = "";
         document.getElementById("divida-valor").value = "";
 
         renderDividas();
 
-        await gravarAuditoria("Registou uma nova dÃ­vida / fiado no valor de " + dinheiro(valor) + " para o cliente: " + cliente, "INFO");
-        alert("DÃ­vida registada e conta corrente atualizada com sucesso.");
+        await gravarAuditoria("Registou uma nova dívida / fiado no valor de " + dinheiro(valor) + " para o cliente: " + cliente, "INFO");
+        alert("Dívida registada e conta corrente atualizada com sucesso.");
 
     } catch (error) {
-        console.error("Erro crÃ­tico ao processar conta corrente de fiado:", error);
-        alert("NÃ£o foi possÃ­vel registar o fiado:\n" + mensagemFirebase(error));
+        console.error("Erro crítico ao processar conta corrente de fiado:", error);
+        alert("Não foi possível registar o fiado:\n" + mensagemFirebase(error));
     }
 }
 /* =====================================================
-   MÃ“DULO LÃ“GICO: RENDERIZAÃ‡ÃƒO DA CONTA CORRENTE DE FIADO (COMPLEMENTO)
+   MÓDULO LÓGICO: RENDERIZAÇão DA CONTA CORRENTE DE FIADO (COMPLEMENTO)
 ===================================================== */
 
 function renderDividas() {
@@ -3735,28 +3740,28 @@ function renderDividas() {
         const botaoCobrar = possuiDivida
             ? `<button class="btn btn-success btn-small" onclick="enviarLembreteDivida('${escapeHTML(d.id)}')" type="button" style="background-color:#25d366;">ðŸ“± Cobrar</button>`
             : `<button class="btn btn-secondary btn-small" type="button" disabled style="opacity:.4;">ðŸ“± Pago</button>`;
-        return `<tr><td><strong>${escapeHTML(d.cliente)}</strong></td><td>${escapeHTML(d.telefone || "â€”")}</td><td style="color:${possuiDivida ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(d.saldo)}</td><td>${dinheiro(d.limite)}</td><td><div style="display:flex;gap:5px;"><button class="btn btn-light btn-small" onclick="amortizarDividaPrompt('${escapeHTML(d.id)}','${escapeHTML(d.cliente)}')" type="button" ${possuiDivida ? '' : 'disabled'}>Amortizar</button>${botaoCobrar}</div></td></tr>`;
+        return `<tr><td><strong>${escapeHTML(d.cliente)}</strong></td><td>${escapeHTML(d.telefone || "—")}</td><td style="color:${possuiDivida ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(d.saldo)}</td><td>${dinheiro(d.limite)}</td><td><div style="display:flex;gap:5px;"><button class="btn btn-light btn-small" onclick="amortizarDividaPrompt('${escapeHTML(d.id)}','${escapeHTML(d.cliente)}')" type="button" ${possuiDivida ? '' : 'disabled'}>Amortizar</button>${botaoCobrar}</div></td></tr>`;
     }).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Nenhum registo de fiado ativo localizado.</td></tr>`;
 }
 
 window.enviarLembreteDivida = function(id) {
     const d = FABEF.dividas.find(x => x.id === id);
     if (!d) return;
-    if (!d.telefone || d.telefone === "â€”") { alert("Este cliente nÃ£o tem um nÃºmero de telefone registado."); return; }
+    if (!d.telefone || d.telefone === "—") { alert("Este cliente não tem um número de telefone registado."); return; }
     let telefoneFormatado = String(d.telefone).trim().replace(/\D/g, "");
     if (telefoneFormatado.length === 9) telefoneFormatado = "258" + telefoneFormatado;
     const nomeEmpresa = FABEF.empresa?.nome || "Nosso Estabelecimento";
-    const mensagem = encodeURIComponent(`OlÃ¡ *${d.cliente}*,\n\nEsperamos que esteja bem. Passamos por aqui para lembrar gentilmente que possui um saldo em aberto no valor de *${dinheiro(d.saldo)}* referente Ã s suas compras a fiado em *${nomeEmpresa}*.\n\nO seu limite de crÃ©dito atual Ã© de ${dinheiro(d.limite)}.\n\nAgradecemos se puder passar pelo estabelecimento para regularizar o valor assim que possÃ­vel. Obrigado pela compreensÃ£o! ðŸ™`);
+    const mensagem = encodeURIComponent(`Olá *${d.cliente}*,\n\nEsperamos que esteja bem. Passamos por aqui para lembrar gentilmente que possui um saldo em aberto no valor de *${dinheiro(d.saldo)}* referente às suas compras a fiado em *${nomeEmpresa}*.\n\nO seu limite de crédito atual é de ${dinheiro(d.limite)}.\n\nAgradecemos se puder passar pelo estabelecimento para regularizar o valor assim que possível. Obrigado pela compreensão! ðŸ™`);
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
 };
 
 window.amortizarDividaPrompt = async function(id, cliente) {
-    const quantiaStr = prompt("Introduza o valor recebido para amortizar a dÃ­vida de " + cliente + ":");
+    const quantiaStr = prompt("Introduza o valor recebido para amortizar a dívida de " + cliente + ":");
     if (!quantiaStr) return;
     
     const quantia = numero(quantiaStr);
     if (quantia <= 0) {
-        alert("O valor de amortizaÃ§Ã£o deve ser superior a zero.");
+        alert("O valor de amortização deve ser superior a zero.");
         return;
     }
 
@@ -3764,7 +3769,7 @@ window.amortizarDividaPrompt = async function(id, cliente) {
     if (!devedor) return;
 
     if (quantia > numero(devedor.saldo)) {
-        alert("O valor introduzido Ã© superior ao saldo devedor atual (" + dinheiro(devedor.saldo) + ").");
+        alert("O valor introduzido é superior ao saldo devedor atual (" + dinheiro(devedor.saldo) + ").");
         return;
     }
 
@@ -3780,16 +3785,16 @@ window.amortizarDividaPrompt = async function(id, cliente) {
         renderDividas();
         
         await gravarAuditoria("Amortizou o valor de " + dinheiro(quantia) + " na conta de: " + cliente, "INFO");
-        alert("AmortizaÃ§Ã£o registada com sucesso.");
+        alert("Amortização registada com sucesso.");
     } catch (error) {
         console.error(error);
-        alert("Erro ao abater a dÃ­vida:\n" + mensagemFirebase(error));
+        alert("Erro ao abater a dívida:\n" + mensagemFirebase(error));
     }
 };
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: GESTÃƒO E FILTRAGEM DE ENCOMENDAS
+   MÓDULO LÓGICO: GESTão E FILTRAGEM DE ENCOMENDAS
 ===================================================== */
 
 document.getElementById("btn-registar-encomenda")?.addEventListener("click", registarEncomenda);
@@ -3798,7 +3803,7 @@ document.getElementById("btn-registar-encomenda")?.addEventListener("click", reg
 async function registarEncomenda() {
     if (!window.FABEF?.isDemoMode && perfilFABEF() === "gerente") { alert("O Gerente não pode registar encomendas. Esta operação é exclusiva do Funcionário."); return; }
     if (limiteEncomendasDiariasAtingido()) {
-        avisoLimiteAtingido(`Atingiu o limite diÃ¡rio de ${LIMITES_PLANO_GRATIS.encomendasDiarias} encomendas do plano grÃ¡tis.`);
+        avisoLimiteAtingido(`Atingiu o limite diário de ${LIMITES_PLANO_GRATIS.encomendasDiarias} encomendas do plano grátis.`);
         return;
     }
 
@@ -3811,11 +3816,11 @@ async function registarEncomenda() {
     const valorPago = numero(document.getElementById("encomenda-valor-pago")?.value);
 
     if (!cliente || !produto || quantidade <= 0) {
-        alert("Preencha correctamente todos os dados necessÃ¡rios da encomenda.");
+        alert("Preencha correctamente todos os dados necessários da encomenda.");
         return;
     }
     if (valorPago > valorTotal) {
-        alert("O valor jÃ¡ pago nÃ£o pode ser maior do que o valor total da encomenda.");
+        alert("O valor já pago não pode ser maior do que o valor total da encomenda.");
         return;
     }
 
@@ -3841,7 +3846,7 @@ async function registarEncomenda() {
 
         // O onSnapshot adiciona o registo à lista local; não duplicar aqui.
 
-        // Esvazia os campos para prevenir submissÃµes duplicadas
+        // Esvazia os campos para prevenir submissões duplicadas
         [
             "encomenda-cliente",
             "encomenda-telefone",
@@ -3869,7 +3874,7 @@ async function registarEncomenda() {
 const ESTADOS_ENCOMENDA = ["PENDENTE", "EM_PREPARACAO", "PRONTA", "ENTREGUE", "CANCELADA"];
 const ROTULO_ESTADO_ENCOMENDA = {
     PENDENTE: "Pendente",
-    EM_PREPARACAO: "Em preparaÃ§Ã£o",
+    EM_PREPARACAO: "Em preparação",
     PRONTA: "Pronta",
     ENTREGUE: "Entregue",
     CANCELADA: "Cancelada"
@@ -3892,13 +3897,13 @@ function renderEncomendas() {
 
         let botoesAcao = "";
         if (e.estado === "PENDENTE") {
-            botoesAcao = `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','EM_PREPARACAO')" type="button">ðŸ› ï¸ Em preparaÃ§Ã£o</button>`;
+            botoesAcao = `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','EM_PREPARACAO')" type="button">ðŸ› ï¸ Em preparação</button>`;
         } else if (e.estado === "EM_PREPARACAO") {
             botoesAcao = `<button class="btn btn-success btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','PRONTA')" type="button">âœ”ï¸ Marcar pronta</button>`;
         } else if (e.estado === "PRONTA") {
-            botoesAcao = `<button class="btn btn-danger btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','ENTREGUE')" type="button">ðŸ“¦ Entregar</button>`;
+            botoesAcao = `<button class="btn btn-danger btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','ENTREGUE')" type="button">📦 Entregar</button>`;
         } else {
-            botoesAcao = `<span style="color:#64748b;font-size:12px;font-weight:600;">${e.estado === "CANCELADA" ? "Cancelada" : "ConcluÃ­da"}</span>`;
+            botoesAcao = `<span style="color:#64748b;font-size:12px;font-weight:600;">${e.estado === "CANCELADA" ? "Cancelada" : "Concluída"}</span>`;
         }
 
         if (e.estado !== "ENTREGUE" && e.estado !== "CANCELADA") {
@@ -3943,7 +3948,7 @@ window.mudarEstadoEncomenda = async function(id, novoEstado) {
 window.enviarAvisoEncomenda = function(id) {
     const e = FABEF.encomendas.find(x => x.id === id);
     if (!e) return;
-    if (!e.telefone || e.telefone === "â€”") { alert("Esta encomenda nÃ£o possui um nÃºmero de telefone registado."); return; }
+    if (!e.telefone || e.telefone === "—") { alert("Esta encomenda não possui um número de telefone registado."); return; }
     let telefoneFormatado = String(e.telefone).trim().replace(/\D/g, "");
     if (telefoneFormatado.length === 9) telefoneFormatado = "258" + telefoneFormatado;
     const nomeEmpresa = FABEF.empresa?.nome || "Nosso Estabelecimento";
@@ -3951,30 +3956,30 @@ window.enviarAvisoEncomenda = function(id) {
 
     let corpoMensagem;
     if (e.estado === "PRONTA") {
-        corpoMensagem = `Temos boas notÃ­cias! A sua encomenda do artigo *${e.produto}* (Quantidade: ${e.quantidade}) jÃ¡ estÃ¡ pronta e disponÃ­vel para levantamento na *${nomeEmpresa}*.`;
+        corpoMensagem = `Temos boas notícias! A sua encomenda do artigo *${e.produto}* (Quantidade: ${e.quantidade}) já está pronta e disponível para levantamento na *${nomeEmpresa}*.`;
     } else {
         corpoMensagem = `Passamos para lembrar sobre a sua encomenda do artigo *${e.produto}* (Quantidade: ${e.quantidade}), com estado atual: *${ROTULO_ESTADO_ENCOMENDA[e.estado] || e.estado}*.` +
-            (e.dataPrevista ? `\nPrevisÃ£o de entrega: *${e.dataPrevista}*.` : "");
+            (e.dataPrevista ? `\nPrevisão de entrega: *${e.dataPrevista}*.` : "");
     }
     if (valorRestante > 0) {
         corpoMensagem += `\n\nValor pendente para esta encomenda: *${dinheiro(valorRestante)}*.`;
     }
 
-    const mensagem = encodeURIComponent(`OlÃ¡ *${e.cliente}*,\n\n${corpoMensagem}\n\nEstamos Ã  sua espera! Muito obrigado. ðŸ›ï¸`);
+    const mensagem = encodeURIComponent(`Olá *${e.cliente}*,\n\n${corpoMensagem}\n\nEstamos à sua espera! Muito obrigado. ðŸ›ï¸`);
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
 };
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: CONTROLO FINANCEIRO DE CAIXA / TURNOS
+   MÓDULO LÓGICO: CONTROLO FINANCEIRO DE CAIXA / TURNOS
 ===================================================== */
 
 let FABEF_UNSUB_CAIXA = null;
 
 function ouvirCaixa() {
     return new Promise((resolve) => {
-        // Se jÃ¡ havia uma escuta ativa (ex: estava a ouvir o caixa de outro
-        // ramo antes de trocar), termina-a primeiro â€” nunca ficam duas em
-        // simultÃ¢neo, senÃ£o o estado do caixa ficaria instÃ¡vel.
+        // Se já havia uma escuta ativa (ex: estava a ouvir o caixa de outro
+        // ramo antes de trocar), termina-a primeiro — nunca ficam duas em
+        // simultâneo, senão o estado do caixa ficaria instável.
         if (FABEF_UNSUB_CAIXA) {
             try { FABEF_UNSUB_CAIXA(); } catch (_) {}
             FABEF_UNSUB_CAIXA = null;
@@ -3982,7 +3987,7 @@ function ouvirCaixa() {
 
         let primeiraVez = true;
         try {
-            // Query de seguranÃ§a: Busca se existe algum caixa com estado ativo aberto para este operador e ramo
+            // Query de segurança: Busca se existe algum caixa com estado ativo aberto para este operador e ramo
             const q = query(
                 subRef("caixas_turnos"),
                 where("ramo", "==", FABEF.ramo),
@@ -4005,7 +4010,7 @@ function ouvirCaixa() {
                 if (primeiraVez) { primeiraVez = false; resolve(); }
                 else pedirRenderTudo();
             }, (erro) => {
-                console.error("Erro crÃ­tico na escuta do estado do caixa:", erro);
+                console.error("Erro crítico na escuta do estado do caixa:", erro);
                 FABEF.turnoId = null;
                 FABEF.turno = null;
                 atualizarTelaCaixa();
@@ -4014,7 +4019,7 @@ function ouvirCaixa() {
 
             FABEF.listeners.push(FABEF_UNSUB_CAIXA);
         } catch (error) {
-            console.error("Erro crÃ­tico na escuta do estado do caixa:", error);
+            console.error("Erro crítico na escuta do estado do caixa:", error);
             FABEF.turnoId = null;
             FABEF.turno = null;
             atualizarTelaCaixa();
@@ -4029,12 +4034,12 @@ document.getElementById("btn-abrir-caixa").addEventListener("click", abrirCaixa)
 
 async function abrirCaixa() {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("SÃ³ o gerente pode abrir o caixa. PeÃ§a ao gerente para autenticar-se e abrir o turno antes de comeÃ§ar a vender.");
+        alert("Só o gerente pode abrir o caixa. Peça ao gerente para autenticar-se e abrir o turno antes de começar a vender.");
         return;
     }
 
     if (FABEF.turnoId) {
-        alert("OperaÃ§Ã£o bloqueada: JÃ¡ existe um turno de caixa em execuÃ§Ã£o.");
+        alert("Operação bloqueada: Já existe um turno de caixa em execução.");
         return;
     }
 
@@ -4099,7 +4104,7 @@ async function registarSangria() {
     if (!FABEF.turnoId) return;
     const valor = numero(prompt("Valor da sangria (retirada de dinheiro do caixa):", "0"));
     if (!valor || valor <= 0) return;
-    const motivo = prompt("Motivo da sangria (ex: pagamento a fornecedor, depÃ³sito no banco):", "") || "Sem motivo indicado";
+    const motivo = prompt("Motivo da sangria (ex: pagamento a fornecedor, depósito no banco):", "") || "Sem motivo indicado";
 
     try {
         const movimento = {
@@ -4122,9 +4127,9 @@ async function registarSangria() {
 
 async function registarReforco() {
     if (!FABEF.turnoId) return;
-    const valor = numero(prompt("Valor do reforÃ§o (entrada extra de dinheiro no caixa):", "0"));
+    const valor = numero(prompt("Valor do reforço (entrada extra de dinheiro no caixa):", "0"));
     if (!valor || valor <= 0) return;
-    const motivo = prompt("Motivo do reforÃ§o (ex: troco adicional trazido pelo gerente):", "") || "Sem motivo indicado";
+    const motivo = prompt("Motivo do reforço (ex: troco adicional trazido pelo gerente):", "") || "Sem motivo indicado";
 
     try {
         const movimento = {
@@ -4137,10 +4142,10 @@ async function registarReforco() {
         await updateDoc(turnoRef, { reforcos: arrayUnion(movimento), atualizadoEm: serverTimestamp() });
         FABEF.turno.reforcos = [...(FABEF.turno.reforcos || []), movimento];
         atualizarTelaCaixa();
-        await gravarAuditoria(`Registou um reforÃ§o de caixa de ${dinheiro(valor)}. Motivo: ${motivo}`, "INFO");
+        await gravarAuditoria(`Registou um reforço de caixa de ${dinheiro(valor)}. Motivo: ${motivo}`, "INFO");
     } catch (error) {
         console.error(error);
-        alert("Erro ao registar o reforÃ§o:\n" + mensagemFirebase(error));
+        alert("Erro ao registar o reforço:\n" + mensagemFirebase(error));
     }
 }
 
@@ -4148,15 +4153,15 @@ async function registarReforco() {
 async function fecharCaixa() {
     if (!FABEF.turnoId) return;
 
-    // Fecho de caixa Ã© uma aÃ§Ã£o de controlo: sÃ³ o gerente confirma o fecho.
+    // Fecho de caixa é uma ação de controlo: só o gerente confirma o fecho.
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("Apenas o gerente pode confirmar o fecho do caixa. PeÃ§a ao gerente para autenticar-se e fechar o turno.");
+        alert("Apenas o gerente pode confirmar o fecho do caixa. Peça ao gerente para autenticar-se e fechar o turno.");
         return;
     }
 
     const esperado = saldoEsperadoCaixa();
     const contadoTexto = prompt(
-        `Saldo esperado em dinheiro no caixa: ${dinheiro(esperado)}\n\nConte o dinheiro fÃ­sico na gaveta e introduza o valor contado:`,
+        `Saldo esperado em dinheiro no caixa: ${dinheiro(esperado)}\n\nConte o dinheiro físico na gaveta e introduza o valor contado:`,
         esperado.toFixed(2)
     );
     if (contadoTexto === null) return; // cancelou
@@ -4165,7 +4170,7 @@ async function fecharCaixa() {
 
     if (Math.abs(diferenca) > 0.5) {
         const confirmar = confirm(
-            `AtenÃ§Ã£o: existe uma diferenÃ§a de caixa de ${dinheiro(diferenca)} (${diferenca > 0 ? "sobra" : "falta"}).\n\nDeseja continuar e fechar o turno mesmo assim?`
+            `Atenção: existe uma diferença de caixa de ${dinheiro(diferenca)} (${diferenca > 0 ? "sobra" : "falta"}).\n\nDeseja continuar e fechar o turno mesmo assim?`
         );
         if (!confirmar) return;
     } else if (!confirm("Aviso Financeiro: Deseja realmente encerrar o caixa e fechar o turno atual de faturamento?")) {
@@ -4184,14 +4189,14 @@ async function fecharCaixa() {
         });
 
         await gravarAuditoria(
-            `Fechou o turno de caixa. Esperado: ${dinheiro(esperado)} | Contado: ${dinheiro(contado)} | DiferenÃ§a: ${dinheiro(diferenca)}`,
+            `Fechou o turno de caixa. Esperado: ${dinheiro(esperado)} | Contado: ${dinheiro(contado)} | Diferença: ${dinheiro(diferenca)}`,
             Math.abs(diferenca) > 0.5 ? "ALERTA" : "INFO"
         );
 
         FABEF.turnoId = null;
         FABEF.turno = null;
 
-        // Limpa tambÃ©m o formulÃ¡rio inicial para o prÃ³ximo turno
+        // Limpa também o formulário inicial para o próximo turno
         const inputInicial = document.getElementById("caixa-valor-inicial");
         if (inputInicial) inputInicial.value = "0";
 
@@ -4226,18 +4231,18 @@ function atualizarTelaCaixa() {
 
     const listaMovimentos = document.getElementById("caixa-movimentos");
     if (listaMovimentos) {
-        const sangrias = (FABEF.turno?.sangrias || []).map(m => `<li style="color:#ef4444;">âˆ’ ${dinheiro(m.valor)} (Sangria) â€” ${escapeHTML(m.motivo)} â€” ${escapeHTML(m.operadorNome || "")}</li>`);
-        const reforcos = (FABEF.turno?.reforcos || []).map(m => `<li style="color:#10b981;">+ ${dinheiro(m.valor)} (ReforÃ§o) â€” ${escapeHTML(m.motivo)} â€” ${escapeHTML(m.operadorNome || "")}</li>`);
+        const sangrias = (FABEF.turno?.sangrias || []).map(m => `<li style="color:#ef4444;">âˆ’ ${dinheiro(m.valor)} (Sangria) — ${escapeHTML(m.motivo)} — ${escapeHTML(m.operadorNome || "")}</li>`);
+        const reforcos = (FABEF.turno?.reforcos || []).map(m => `<li style="color:#10b981;">+ ${dinheiro(m.valor)} (Reforço) — ${escapeHTML(m.motivo)} — ${escapeHTML(m.operadorNome || "")}</li>`);
         const todos = [...sangrias, ...reforcos];
-        listaMovimentos.innerHTML = todos.length ? `<ul style="padding-left:18px;">${todos.join("")}</ul>` : `<p style="color:#64748b;font-size:13px;">Sem sangrias ou reforÃ§os neste turno.</p>`;
+        listaMovimentos.innerHTML = todos.length ? `<ul style="padding-left:18px;">${todos.join("")}</ul>` : `<p style="color:#64748b;font-size:13px;">Sem sangrias ou reforços neste turno.</p>`;
     }
 
-    // Gerencia dinamicamente a visibilidade dos ecrÃ£s de aÃ§Ã£o com a classe hidden blindada
+    // Gerencia dinamicamente a visibilidade dos ecrãs de ação com a classe hidden blindada
     document.getElementById("caixa-abertura")?.classList.toggle("hidden", aberto);
     document.getElementById("caixa-fecho")?.classList.toggle("hidden", !aberto);
     document.getElementById("aviso-pos-caixa")?.classList.toggle("hidden", aberto);
 
-    // Abrir/fechar o caixa Ã© uma aÃ§Ã£o exclusiva do gerente â€” o funcionÃ¡rio sÃ³
+    // Abrir/fechar o caixa é uma ação exclusiva do gerente — o funcionário só
     // consulta o estado, para ficar claro quem tem de agir.
     const ehGerenteCaixa = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
     const btnAbrir = document.getElementById("btn-abrir-caixa");
@@ -4250,7 +4255,7 @@ function atualizarTelaCaixa() {
     }
 }
 /* =====================================================
-   MÃ“DULO LÃ“GICO: REGISTO E LANÃ‡AMENTO DE DESPESAS
+   MÓDULO LÓGICO: REGISTO E LANÇAMENTO DE DESPESAS
 ===================================================== */
 
 document.getElementById("btn-registar-despesa").addEventListener("click", registarDespesa);
@@ -4258,14 +4263,14 @@ document.getElementById("btn-registar-despesa").addEventListener("click", regist
 
 async function registarDespesa() {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
-        alert("A conta de gerente nÃ£o regista despesas diretamente â€” isso Ã© feito pelo funcionÃ¡rio. O gerente pode consultar aqui.");
+        alert("A conta de gerente não regista despesas diretamente — isso é feito pelo funcionário. O gerente pode consultar aqui.");
         return;
     }
     const descricao = document.getElementById("despesa-descricao").value.trim();
     const valor = numero(document.getElementById("despesa-valor").value);
 
     if (!descricao || valor <= 0) {
-        alert("Introduza uma descriÃ§Ã£o vÃ¡lida e um valor superior a zero.");
+        alert("Introduza uma descrição válida e um valor superior a zero.");
         return;
     }
 
@@ -4282,7 +4287,7 @@ async function registarDespesa() {
 
         const ref = await addDoc(subRef("despesas"), payload);
 
-        // Alimenta de forma sÃ­ncrona a cache local na memÃ³ria do navegador
+        // Alimenta de forma síncrona a cache local na memória do navegador
         FABEF.despesas.push({
             id: ref.id,
             descricao: payload.descricao,
@@ -4292,13 +4297,13 @@ async function registarDespesa() {
             data: payload.data
         });
 
-        // Limpa os campos do formulÃ¡rio para o prÃ³ximo lanÃ§amento
+        // Limpa os campos do formulário para o próximo lançamento
         document.getElementById("despesa-descricao").value = "";
         document.getElementById("despesa-valor").value = "";
 
         renderDespesas();
 
-        // Regista a saÃ­da financeira nos logs inalterÃ¡veis de auditoria
+        // Regista a saída financeira nos logs inalteráveis de auditoria
         await gravarAuditoria("Registou despesa comercial: " + descricao + " no valor de " + dinheiro(valor), "INFO");
     } catch (error) {
         console.error(error);
@@ -4311,7 +4316,7 @@ function renderDespesas() {
     const tabelaCorpo = document.getElementById("tabela-despesas");
     if (!tabelaCorpo) return;
 
-    // Ordena as despesas de forma decrescente pela data de lanÃ§amento
+    // Ordena as despesas de forma decrescente pela data de lançamento
     const listaOrdenada = FABEF.despesas
         .slice()
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
@@ -4321,12 +4326,12 @@ function renderDespesas() {
         <td>${dataTexto(d.data)}</td>
         <td>${escapeHTML(d.descricao)}</td>
         <td style="color: #dc2626; font-weight: 600;">${dinheiro(d.valor)}</td>
-        <td>${escapeHTML(d.utilizadorNome || "â€”")}</td>
+        <td>${escapeHTML(d.utilizadorNome || "—")}</td>
     </tr>
     `).join("") || `
     <tr>
         <td colspan="4" style="text-align: center; color: #64748b;">
-            Nenhuma despesa registada para este negÃ³cio.
+            Nenhuma despesa registada para este negócio.
         </td>
     </tr>
     `;
@@ -4334,7 +4339,7 @@ function renderDespesas() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: MOTOR DINÃ‚MICO DE RELATÃ“RIOS FINANCEIROS
+   MÓDULO LÓGICO: MOTOR DINÂMICO DE RELATÓRIOS FINANCEIROS
 ===================================================== */
 
 document.getElementById("btn-atualizar-relatorio").addEventListener("click", renderRelatorios);
@@ -4349,7 +4354,7 @@ function renderRelatorios() {
     if (periodo === "7") inicio = diasAtras(7);
     if (periodo === "30") inicio = diasAtras(30);
 
-    // Filtra vendas e despesas aplicando os limites cronolÃ³gicos selecionados na interface
+    // Filtra vendas e despesas aplicando os limites cronológicos selecionados na interface
     const vendasFiltradas = FABEF.vendas.filter(v => {
         const d = new Date(v.data || v.date || 0);
         return !inicio || d >= inicio;
@@ -4360,12 +4365,12 @@ function renderRelatorios() {
         return !inicio || dataDespesa >= inicio;
     });
 
-    // Executa as somas dos indicadores financeiros bÃ¡sicos
+    // Executa as somas dos indicadores financeiros básicos
     const faturamento = vendasFiltradas.reduce((s, v) => s + numero(v.total), 0);
     const totalDespesas = despesasFiltradas.reduce((s, d) => s + numero(d.valor), 0);
     const resultado = faturamento - totalDespesas;
 
-    // Alimenta os elementos grÃ¡ficos da pÃ¡gina de relatÃ³rios
+    // Alimenta os elementos gráficos da página de relatórios
     document.getElementById("rel-faturamento").textContent = dinheiro(faturamento);
     document.getElementById("rel-despesas").textContent = dinheiro(totalDespesas);
     
@@ -4375,7 +4380,7 @@ function renderRelatorios() {
         resultadoSpan.style.color = resultado >= 0 ? "#16a34a" : "#dc2626";
     }
 
-    // Soma quantos kg/litros foram vendidos no perÃ­odo (produtos vendidos a peso/volume)
+    // Soma quantos kg/litros foram vendidos no período (produtos vendidos a peso/volume)
     let kgPeriodo = 0, litroPeriodo = 0;
     vendasFiltradas.forEach(v => (v.itens || []).forEach(item => {
         if (item.unidade === "kg") kgPeriodo += numero(item.quantidade);
@@ -4389,26 +4394,26 @@ function renderRelatorios() {
         painelKgRelatorio.textContent = partes.length ? partes.join(" + ") : "0 kg";
     }
 
-    // Guarda o relatÃ³rio atual em memÃ³ria para as funÃ§Ãµes de exportaÃ§Ã£o (PDF/Word/WhatsApp)
+    // Guarda o relatório atual em memória para as funções de exportação (PDF/Word/WhatsApp)
     FABEF_RELATORIO_ATUAL = {
-        periodo: periodo === "hoje" ? "Hoje" : periodo === "7" ? "Ãšltimos 7 dias" : periodo === "30" ? "Ãšltimos 30 dias" : "Todo o perÃ­odo",
+        periodo: periodo === "hoje" ? "Hoje" : periodo === "7" ? "Últimos 7 dias" : periodo === "30" ? "Últimos 30 dias" : "Todo o período",
         faturamento, totalDespesas, resultado, kgPeriodo, litroPeriodo,
         numVendas: vendasFiltradas.length
     };
 
-    // Curva ABC e AnÃ¡lise Inteligente sÃ£o funcionalidades avanÃ§adas â€”
-    // sÃ³ disponÃ­veis no Plano Pago (ou durante o perÃ­odo de teste).
+    // Curva ABC e Análise Inteligente são funcionalidades avançadas —
+    // só disponíveis no Plano Pago (ou durante o período de teste).
     const planoRelatorios = obterPlanoAtual();
     const avisoAvancado = document.getElementById("aviso-relatorios-avancados");
     if (planoRelatorios === "GRATIS") {
-        if (avisoAvancado) avisoAvancado.innerHTML = `<div class="alert alert-warning">ðŸ”’ A Curva ABC e a AnÃ¡lise Inteligente sÃ£o funcionalidades do Plano Pago. <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')">â­ Atualizar por 250 MT</button></div>`;
-        document.getElementById("tabela-abc").innerHTML = `<tr><td colspan="5" style="text-align:center;color:#64748b;">DisponÃ­vel no Plano Pago.</td></tr>`;
+        if (avisoAvancado) avisoAvancado.innerHTML = `<div class="alert alert-warning">ðŸ”’ A Curva ABC e a Análise Inteligente são funcionalidades do Plano Pago. <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')">â­ Atualizar por 250 MT</button></div>`;
+        document.getElementById("tabela-abc").innerHTML = `<tr><td colspan="5" style="text-align:center;color:#64748b;">Disponível no Plano Pago.</td></tr>`;
         document.getElementById("analise-inteligente").innerHTML = "";
     } else {
         if (avisoAvancado) avisoAvancado.innerHTML = "";
-        // Invoca o motor matemÃ¡tico da Curva ABC de produtos baseado nas vendas filtradas
+        // Invoca o motor matemático da Curva ABC de produtos baseado nas vendas filtradas
         renderABC(vendasFiltradas);
-        // AnÃ¡lise inteligente adicional
+        // Análise inteligente adicional
         renderAnaliseInteligente(vendasFiltradas, despesasFiltradas);
     }
 }
@@ -4416,65 +4421,65 @@ function renderRelatorios() {
 let FABEF_RELATORIO_ATUAL = null;
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: EXPORTAÃ‡ÃƒO DE RELATÃ“RIOS
+   MÓDULO LÓGICO: EXPORTAÇão DE RELATÓRIOS
 ===================================================== */
 function textoResumoRelatorio() {
     if (!FABEF_RELATORIO_ATUAL) return "";
     const r = FABEF_RELATORIO_ATUAL;
     const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
-    let texto = `ðŸ“Š RelatÃ³rio â€” ${nomeEmpresa} (${escapeHTML(FABEF.ramo)})\n`;
-    texto += `PerÃ­odo: ${r.periodo}\n\n`;
+    let texto = `ðŸ“Š Relatório — ${nomeEmpresa} (${escapeHTML(FABEF.ramo)})\n`;
+    texto += `Período: ${r.periodo}\n\n`;
     texto += `Faturamento: ${dinheiro(r.faturamento)}\n`;
     texto += `Despesas: ${dinheiro(r.totalDespesas)}\n`;
     texto += `Resultado: ${dinheiro(r.resultado)}\n`;
-    texto += `NÃºmero de vendas: ${r.numVendas}\n`;
+    texto += `Número de vendas: ${r.numVendas}\n`;
     if (r.kgPeriodo > 0) texto += `Total vendido em kg: ${r.kgPeriodo.toFixed(2)} kg\n`;
     if (r.litroPeriodo > 0) texto += `Total vendido em litros: ${r.litroPeriodo.toFixed(2)} L\n`;
     return texto;
 }
 
 window.enviarRelatorioWhatsApp = function() {
-    if (!FABEF_RELATORIO_ATUAL) { alert("Aguarde o relatÃ³rio carregar."); return; }
+    if (!FABEF_RELATORIO_ATUAL) { alert("Aguarde o relatório carregar."); return; }
     const mensagem = encodeURIComponent(textoResumoRelatorio());
     window.open(`https://wa.me/?text=${mensagem}`, "_blank");
 };
 
 window.exportarRelatorioPDF = function() {
-    if (!FABEF_RELATORIO_ATUAL) { alert("Aguarde o relatÃ³rio carregar."); return; }
+    if (!FABEF_RELATORIO_ATUAL) { alert("Aguarde o relatório carregar."); return; }
     const r = FABEF_RELATORIO_ATUAL;
     const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
     const janela = window.open("", "_blank");
-    janela.document.write(`<html><head><title>RelatÃ³rio - ${escapeHTML(nomeEmpresa)}</title>
+    janela.document.write(`<html><head><title>Relatório - ${escapeHTML(nomeEmpresa)}</title>
     <style>body{font-family:Arial;padding:24px;color:#0f172a;} h2{margin-bottom:4px;} table{width:100%;border-collapse:collapse;margin-top:14px;} td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left;}</style>
     </head><body>
     <h2>${escapeHTML(nomeEmpresa)}</h2>
-    <p>Ramo: ${escapeHTML(FABEF.ramo)} | PerÃ­odo: ${escapeHTML(r.periodo)}</p>
+    <p>Ramo: ${escapeHTML(FABEF.ramo)} | Período: ${escapeHTML(r.periodo)}</p>
     <table>
         <tr><td><strong>Faturamento</strong></td><td>${dinheiro(r.faturamento)}</td></tr>
         <tr><td><strong>Despesas</strong></td><td>${dinheiro(r.totalDespesas)}</td></tr>
         <tr><td><strong>Resultado</strong></td><td>${dinheiro(r.resultado)}</td></tr>
-        <tr><td><strong>NÃºmero de vendas</strong></td><td>${r.numVendas}</td></tr>
+        <tr><td><strong>Número de vendas</strong></td><td>${r.numVendas}</td></tr>
         ${r.kgPeriodo > 0 ? `<tr><td><strong>Total vendido em kg</strong></td><td>${r.kgPeriodo.toFixed(2)} kg</td></tr>` : ""}
         ${r.litroPeriodo > 0 ? `<tr><td><strong>Total vendido em litros</strong></td><td>${r.litroPeriodo.toFixed(2)} L</td></tr>` : ""}
     </table>
-    <p style="margin-top:20px;color:#64748b;font-size:12px;">Gerado pelo FABEF GestÃ£o ERP PRO</p>
+    <p style="margin-top:20px;color:#64748b;font-size:12px;">Gerado pelo FABEF Gestão ERP PRO</p>
     <script>window.print();<\/script>
     </body></html>`);
     janela.document.close();
 };
 
 window.exportarRelatorioWord = function() {
-    if (!FABEF_RELATORIO_ATUAL) { alert("Aguarde o relatÃ³rio carregar."); return; }
+    if (!FABEF_RELATORIO_ATUAL) { alert("Aguarde o relatório carregar."); return; }
     const r = FABEF_RELATORIO_ATUAL;
     const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
     const html = `<html><head><meta charset="utf-8"></head><body>
     <h2>${escapeHTML(nomeEmpresa)}</h2>
-    <p>Ramo: ${escapeHTML(FABEF.ramo)} | PerÃ­odo: ${escapeHTML(r.periodo)}</p>
+    <p>Ramo: ${escapeHTML(FABEF.ramo)} | Período: ${escapeHTML(r.periodo)}</p>
     <table border="1" cellpadding="6" style="border-collapse:collapse;">
         <tr><td><b>Faturamento</b></td><td>${dinheiro(r.faturamento)}</td></tr>
         <tr><td><b>Despesas</b></td><td>${dinheiro(r.totalDespesas)}</td></tr>
         <tr><td><b>Resultado</b></td><td>${dinheiro(r.resultado)}</td></tr>
-        <tr><td><b>NÃºmero de vendas</b></td><td>${r.numVendas}</td></tr>
+        <tr><td><b>Número de vendas</b></td><td>${r.numVendas}</td></tr>
         ${r.kgPeriodo > 0 ? `<tr><td><b>Total vendido em kg</b></td><td>${r.kgPeriodo.toFixed(2)} kg</td></tr>` : ""}
         ${r.litroPeriodo > 0 ? `<tr><td><b>Total vendido em litros</b></td><td>${r.litroPeriodo.toFixed(2)} L</td></tr>` : ""}
     </table>
@@ -4510,7 +4515,7 @@ function renderAnaliseInteligente(vendasFiltradas, despesasFiltradas) {
     });
     const melhorDia = Object.entries(porDia).sort((a, b) => b[1] - a[1])[0];
 
-    // HorÃ¡rio com maior movimento (por hora do dia)
+    // Horário com maior movimento (por hora do dia)
     const porHora = {};
     vendasFiltradas.forEach(v => {
         const hora = new Date(v.data || 0).getHours();
@@ -4518,7 +4523,7 @@ function renderAnaliseInteligente(vendasFiltradas, despesasFiltradas) {
     });
     const melhorHora = Object.entries(porHora).sort((a, b) => b[1] - a[1])[0];
 
-    // Clientes com maior frequÃªncia de compra
+    // Clientes com maior frequência de compra
     const porCliente = {};
     vendasFiltradas.forEach(v => {
         if (!v.cliente) return;
@@ -4526,32 +4531,32 @@ function renderAnaliseInteligente(vendasFiltradas, despesasFiltradas) {
     });
     const clienteFrequente = Object.entries(porCliente).sort((a, b) => b[1] - a[1])[0];
 
-    // DÃ­vidas pendentes (global, nÃ£o depende do perÃ­odo)
+    // Dívidas pendentes (global, não depende do período)
     const dividasPendentes = FABEF.dividas.filter(d => numero(d.saldo) > 0);
     const totalDividasPendentes = dividasPendentes.reduce((s, d) => s + numero(d.saldo), 0);
 
-    // Produtos prÃ³ximos de acabar (do ramo ativo)
+    // Produtos próximos de acabar (do ramo ativo)
     const produtosBaixos = FABEF.produtos.filter(p => p.ramo === FABEF.ramo && numero(p.stock) > 0 && numero(p.stock) <= numero(p.stockMinimo));
 
-    // Despesa mais elevada do perÃ­odo
+    // Despesa mais elevada do período
     const despesaMaisAlta = [...despesasFiltradas].sort((a, b) => numero(b.valor) - numero(a.valor))[0];
 
     const linha = (rotulo, valor) => `<p style="margin-bottom:8px;"><strong>${rotulo}:</strong> ${valor}</p>`;
 
     painel.innerHTML =
-        linha("Produto mais vendido", maisVendido ? `${escapeHTML(maisVendido[0])} (${maisVendido[1]} unidades)` : "Sem dados no perÃ­odo") +
+        linha("Produto mais vendido", maisVendido ? `${escapeHTML(maisVendido[0])} (${maisVendido[1]} unidades)` : "Sem dados no período") +
         linha("Produto menos vendido", menosVendido && listaProdutos.length > 1 ? `${escapeHTML(menosVendido[0])} (${menosVendido[1]} unidades)` : "Sem dados suficientes") +
-        linha("Melhor dia de vendas", melhorDia ? `${escapeHTML(melhorDia[0])} â€” ${dinheiro(melhorDia[1])}` : "Sem dados no perÃ­odo") +
-        linha("HorÃ¡rio com maior movimento", melhorHora ? `${melhorHora[0]}h â€” ${melhorHora[1]} venda(s)` : "Sem dados no perÃ­odo") +
+        linha("Melhor dia de vendas", melhorDia ? `${escapeHTML(melhorDia[0])} — ${dinheiro(melhorDia[1])}` : "Sem dados no período") +
+        linha("Horário com maior movimento", melhorHora ? `${melhorHora[0]}h — ${melhorHora[1]} venda(s)` : "Sem dados no período") +
         linha("Cliente mais frequente", clienteFrequente ? `${escapeHTML(clienteFrequente[0])} (${clienteFrequente[1]} compras)` : "Ainda sem vendas ligadas a clientes") +
-        linha("DÃ­vidas pendentes (total)", `${dinheiro(totalDividasPendentes)} em ${dividasPendentes.length} cliente(s)`) +
-        linha("Produtos prÃ³ximos de acabar", produtosBaixos.length ? produtosBaixos.map(p => escapeHTML(p.nome)).join(", ") : "Nenhum, tudo em ordem") +
-        linha("Despesa mais elevada do perÃ­odo", despesaMaisAlta ? `${escapeHTML(despesaMaisAlta.descricao)} â€” ${dinheiro(despesaMaisAlta.valor)}` : "Sem despesas no perÃ­odo");
+        linha("Dívidas pendentes (total)", `${dinheiro(totalDividasPendentes)} em ${dividasPendentes.length} cliente(s)`) +
+        linha("Produtos próximos de acabar", produtosBaixos.length ? produtosBaixos.map(p => escapeHTML(p.nome)).join(", ") : "Nenhum, tudo em ordem") +
+        linha("Despesa mais elevada do período", despesaMaisAlta ? `${escapeHTML(despesaMaisAlta.descricao)} — ${dinheiro(despesaMaisAlta.valor)}` : "Sem despesas no período");
 }
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: MOTOR ANALÃTICO DE CURVA ABC (PARETO)
+   MÓDULO LÓGICO: MOTOR ANALÍTICO DE CURVA ABC (PARETO)
 ===================================================== */
 
 function renderABC(vendas) {
@@ -4591,9 +4596,9 @@ function renderABC(vendas) {
         const percent = totalGeral > 0 ? acumulado / totalGeral : 0;
 
         /*
-         CLASSIFICAÃ‡ÃƒO DE PARETO:
-         Classe A: AtÃ© 80% do faturamento (Artigos mais importantes/crÃ­ticos)
-         Classe B: De 80% a 95% do faturamento (ImportÃ¢ncia intermÃ©dia)
+         CLASSIFICAÇão DE PARETO:
+         Classe A: Até 80% do faturamento (Artigos mais importantes/críticos)
+         Classe B: De 80% a 95% do faturamento (Importância intermédia)
          Classe C: Acima de 95% do faturamento (Baixo impacto financeiro)
         */
         let classe = "C";
@@ -4623,13 +4628,13 @@ function renderABC(vendas) {
     }).join("") || `
     <tr>
         <td colspan="5" style="text-align: center; color: #64748b;">
-            Nenhuma operaÃ§Ã£o comercial localizada no perÃ­odo para compor a Curva ABC.
+            Nenhuma operação comercial localizada no período para compor a Curva ABC.
         </td>
     </tr>
     `;
 }
 /* =====================================================
-   MÃ“DULO LÃ“GICO: CONFIGURAÃ‡Ã•ES CORPORATIVAS DO NEGÃ“CIO
+   MÓDULO LÓGICO: CONFIGURAÇÕES CORPORATIVAS DO NEGÓCIO
 ===================================================== */
 
 function renderConfiguracoes() {
@@ -4720,33 +4725,33 @@ async function guardarConfiguracoes() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: RENDERS E INDICADORES DO DASHBOARD (INÃCIO)
+   MÓDULO LÓGICO: RENDERS E INDICADORES DO DASHBOARD (INÍCIO)
 ===================================================== */
 
 /* =====================================================
-   GESTÃƒO DE FUNCIONÃRIOS / UTILIZADORES
+   GESTão DE FUNCIONÁRIOS / UTILIZADORES
 ===================================================== */
 
 async function cadastrarNovoFuncionario() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") { alert("Apenas o gerente pode cadastrar funcionÃ¡rios."); return; }
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") { alert("Apenas o gerente pode cadastrar funcionários."); return; }
 
-    // Limite depende do plano: GrÃ¡tis = 1 funcionÃ¡rio; Pago/Teste = 2 funcionÃ¡rios
+    // Limite depende do plano: Grátis = 1 funcionário; Pago/Teste = 2 funcionários
     // (3 utilizadores no total, incluindo o gerente). A partir do 3Âº
-    // funcionÃ¡rio, Ã© preciso pagar uma taxa extra de 20% por cada um.
+    // funcionário, é preciso pagar uma taxa extra de 20% por cada um.
     const plano = obterPlanoAtual();
     const limiteBase = plano === "GRATIS" ? LIMITES_PLANO_GRATIS.funcionarios : 2;
     const funcionariosAtivos = (FABEF.funcionarios || []).filter(f => (f.estado || "ATIVO") === "ATIVO").length;
 
     if (plano === "GRATIS" && funcionariosAtivos >= limiteBase) {
-        avisoLimiteAtingido(`O Plano GrÃ¡tis inclui apenas ${limiteBase} funcionÃ¡rio.`);
+        avisoLimiteAtingido(`O Plano Grátis inclui apenas ${limiteBase} funcionário.`);
         return;
     }
 
     if (funcionariosAtivos >= limiteBase) {
         alert(
-            `O seu plano atual inclui atÃ© ${limiteBase} funcionÃ¡rios (${limiteBase + 1} utilizadores no total, incluindo o gerente).\n\n` +
-            "Para adicionar mais um funcionÃ¡rio, Ã© necessÃ¡ria uma taxa adicional de 20% do valor da subscriÃ§Ã£o por cada funcionÃ¡rio extra.\n\n" +
-            "Contacte o suporte para ativar esta funcionÃ¡rio extra na sua subscriÃ§Ã£o antes de continuar."
+            `O seu plano atual inclui até ${limiteBase} funcionários (${limiteBase + 1} utilizadores no total, incluindo o gerente).\n\n` +
+            "Para adicionar mais um funcionário, é necessária uma taxa adicional de 20% do valor da subscrição por cada funcionário extra.\n\n" +
+            "Contacte o suporte para ativar esta funcionário extra na sua subscrição antes de continuar."
         );
         return;
     }
@@ -4756,8 +4761,8 @@ async function cadastrarNovoFuncionario() {
     const telefone=document.getElementById("func-telefone")?.value.trim();
     const senha=document.getElementById("func-senha")?.value || "";
     const foto=document.getElementById("func-foto")?.value.trim() || "";
-    if(!nome || !email || !senha){ alert("Por favor, preencha os campos obrigatÃ³rios (Nome, E-mail e Senha)."); return; }
-    if(senha.length<6){ alert("A senha do funcionÃ¡rio deve conter pelo menos 6 caracteres."); return; }
+    if(!nome || !email || !senha){ alert("Por favor, preencha os campos obrigatórios (Nome, E-mail e Senha)."); return; }
+    if(senha.length<6){ alert("A senha do funcionário deve conter pelo menos 6 caracteres."); return; }
     let secondaryApp=null;
     try {
         secondaryApp=initializeApp(firebaseConfig, "funcionario-"+Date.now());
@@ -4770,9 +4775,9 @@ async function cadastrarNovoFuncionario() {
         FABEF.funcionarios.push({id:uidFuncionario,...perfil});
         ["func-nome","func-email","func-telefone","func-senha","func-foto"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
         renderFuncionarios();
-        await gravarAuditoria(`Cadastrou um novo funcionÃ¡rio na equipa: ${nome} (${email})`,"INFO");
-        alert("FuncionÃ¡rio cadastrado com sucesso.");
-    } catch(error) { console.error(error); alert("NÃ£o foi possÃ­vel criar a conta do funcionÃ¡rio:\n"+mensagemFirebase(error)); }
+        await gravarAuditoria(`Cadastrou um novo funcionário na equipa: ${nome} (${email})`,"INFO");
+        alert("Funcionário cadastrado com sucesso.");
+    } catch(error) { console.error(error); alert("Não foi possível criar a conta do funcionário:\n"+mensagemFirebase(error)); }
     finally { if(secondaryApp){ try{await deleteApp(secondaryApp);}catch(e){} } }
 }
 
@@ -4783,11 +4788,11 @@ function renderFuncionarios(){
     const gerente = `
         <tr style="background:#f8fafc;">
             <td><strong>${escapeHTML(FABEF.userData?.nome || "Gerente Principal")}</strong></td>
-            <td>${escapeHTML(FABEF.user?.email || "â€”")}</td>
-            <td>${escapeHTML(FABEF.empresa?.telefone || "â€”")}</td>
+            <td>${escapeHTML(FABEF.user?.email || "—")}</td>
+            <td>${escapeHTML(FABEF.empresa?.telefone || "—")}</td>
             <td><span class="badge badge-green" style="background-color:#0f172a;color:#fff;">GERENTE</span></td>
             <td><span class="badge badge-green">ATIVO</span></td>
-            <td>â€”</td>
+            <td>—</td>
         </tr>`;
 
     const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
@@ -4797,14 +4802,14 @@ function renderFuncionarios(){
         const acoes = souGerente ? `
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
                 <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario('${escapeHTML(f.id)}')">âœï¸ Editar</button>
-                <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario('${escapeHTML(f.id)}')">${ativo ? 'ðŸš« Desativar' : 'âœ… Reativar'}</button>
-            </div>` : "â€”";
+                <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario('${escapeHTML(f.id)}')">${ativo ? 'ðŸš« Desativar' : '✅ Reativar'}</button>
+            </div>` : "—";
 
         return `
         <tr>
-            <td>${f.foto ? `<img src="${escapeHTML(f.foto)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none';">` : ""}<strong>${escapeHTML(f.nome || "â€”")}</strong></td>
-            <td>${escapeHTML(f.email || "â€”")}</td>
-            <td>${escapeHTML(f.telefone || "â€”")}</td>
+            <td>${f.foto ? `<img src="${escapeHTML(f.foto)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none';">` : ""}<strong>${escapeHTML(f.nome || "—")}</strong></td>
+            <td>${escapeHTML(f.email || "—")}</td>
+            <td>${escapeHTML(f.telefone || "—")}</td>
             <td><span class="badge badge-yellow">OPERADOR</span></td>
             <td><span class="badge ${ativo ? 'badge-green' : 'badge-red'}">${escapeHTML(f.estado || "ATIVO")}</span></td>
             <td>${acoes}</td>
@@ -4828,7 +4833,7 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
     const id = document.getElementById("edit-func-id").value;
     const nome = document.getElementById("edit-func-nome").value.trim();
     const telefone = document.getElementById("edit-func-telefone").value.trim();
-    if (!id || !nome) { alert("O nome do funcionÃ¡rio Ã© obrigatÃ³rio."); return; }
+    if (!id || !nome) { alert("O nome do funcionário é obrigatório."); return; }
 
     try {
         const dadosAtualizados = { nome, telefone, atualizadoEm: serverTimestamp() };
@@ -4840,11 +4845,11 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
 
         fecharModal("modal-editar-funcionario");
         renderFuncionarios();
-        await gravarAuditoria("Editou os dados do funcionÃ¡rio: " + nome, "INFO");
-        alert("Dados do funcionÃ¡rio atualizados com sucesso.");
+        await gravarAuditoria("Editou os dados do funcionário: " + nome, "INFO");
+        alert("Dados do funcionário atualizados com sucesso.");
     } catch (error) {
         console.error(error);
-        alert("Erro ao atualizar funcionÃ¡rio:\n" + mensagemFirebase(error));
+        alert("Erro ao atualizar funcionário:\n" + mensagemFirebase(error));
     }
 });
 
@@ -4854,27 +4859,27 @@ window.alternarEstadoFuncionario = async function(id) {
     const novoEstado = (f.estado || "ATIVO") === "ATIVO" ? "INATIVO" : "ATIVO";
     const acao = novoEstado === "INATIVO" ? "desativar" : "reativar";
 
-    if (!confirm(`Tem a certeza que deseja ${acao} o acesso de "${f.nome}"?` + (novoEstado === "INATIVO" ? "\n\nO funcionÃ¡rio deixarÃ¡ de conseguir entrar no sistema imediatamente." : ""))) return;
+    if (!confirm(`Tem a certeza que deseja ${acao} o acesso de "${f.nome}"?` + (novoEstado === "INATIVO" ? "\n\nO funcionário deixará de conseguir entrar no sistema imediatamente." : ""))) return;
 
     try {
         await updateDoc(doc(db, "utilizadores", id), { estado: novoEstado, atualizadoEm: serverTimestamp() });
         await updateDoc(doc(db, "empresas", FABEF.empresaId, "funcionarios", id), { estado: novoEstado, atualizadoEm: serverTimestamp() });
         f.estado = novoEstado;
         renderFuncionarios();
-        await gravarAuditoria(`${novoEstado === "INATIVO" ? "Desativou" : "Reativou"} o acesso do funcionÃ¡rio: ${f.nome}`, "ALERTA");
-        alert(`FuncionÃ¡rio ${novoEstado === "INATIVO" ? "desativado" : "reativado"} com sucesso.`);
+        await gravarAuditoria(`${novoEstado === "INATIVO" ? "Desativou" : "Reativou"} o acesso do funcionário: ${f.nome}`, "ALERTA");
+        alert(`Funcionário ${novoEstado === "INATIVO" ? "desativado" : "reativado"} com sucesso.`);
     } catch (error) {
         console.error(error);
-        alert("Erro ao alterar o estado do funcionÃ¡rio:\n" + mensagemFirebase(error));
+        alert("Erro ao alterar o estado do funcionário:\n" + mensagemFirebase(error));
     }
 };
 
-/* CONTROLO DE SUBSCRIÃ‡ÃƒO */
+/* CONTROLO DE SUBSCRIÇão */
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: PLANO GRÃTIS COM LIMITES (FREEMIUM)
+   MÓDULO LÓGICO: PLANO GRÁTIS COM LIMITES (FREEMIUM)
    Dias 1-7: acesso total (teste). A partir do dia 8, sem
-   pagamento, passa a Plano GrÃ¡tis com limites â€” em vez de
+   pagamento, passa a Plano Grátis com limites — em vez de
    ficar totalmente bloqueado. Pagando 250 MT, os limites
    desaparecem.
 ===================================================== */
@@ -4904,7 +4909,7 @@ function obterPlanoAtual() {
 }
 
 function avisoLimiteAtingido(mensagem) {
-    alert((mensagem || "Atingiu o limite diÃ¡rio do plano grÃ¡tis.") + "\n\nAtualize para o plano premium por apenas 250 MT para continuar!");
+    alert((mensagem || "Atingiu o limite diário do plano grátis.") + "\n\nAtualize para o plano premium por apenas 250 MT para continuar!");
     mostrarSecao("subscricao");
 }
 
@@ -4935,9 +4940,9 @@ function renderAvisoPlano() {
 
     container.innerHTML = `
         <div class="alert alert-warning">
-            <strong>ðŸ†“ Plano GrÃ¡tis</strong> â€” Vendas hoje: ${vendasHoje}/${LIMITES_PLANO_GRATIS.vendasDiarias} Â·
+            <strong>ðŸ†“ Plano Grátis</strong> — Vendas hoje: ${vendasHoje}/${LIMITES_PLANO_GRATIS.vendasDiarias} Â·
             Encomendas hoje: ${encomendasHoje}/${LIMITES_PLANO_GRATIS.encomendasDiarias} Â·
-            FuncionÃ¡rios: ${LIMITES_PLANO_GRATIS.funcionarios} mÃ¡x.
+            Funcionários: ${LIMITES_PLANO_GRATIS.funcionarios} máx.
             <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')" style="margin-left:8px;">â­ Passar a Premium (250 MT)</button>
         </div>
     `;
@@ -4969,11 +4974,11 @@ function verificarSubscricao(){
     if (ativa) {
         if (aviso) {
             aviso.className = "alert alert-success";
-            aviso.textContent = `âœ… LicenÃ§a Comercial Activa atÃ©: ${new Date(validade).toLocaleDateString("pt-MZ")}`;
+            aviso.textContent = `✅ Licença Comercial Activa até: ${new Date(validade).toLocaleDateString("pt-MZ")}`;
         }
         if (estadoSpan) {
             estadoSpan.className = "alert alert-success";
-            estadoSpan.textContent = "SubscriÃ§Ã£o Regularizada. Obrigado por escolher o FABEF ERP!";
+            estadoSpan.textContent = "Subscrição Regularizada. Obrigado por escolher o FABEF ERP!";
         }
         if (bloqueio) {
             bloqueio.classList.remove("show");
@@ -4987,11 +4992,11 @@ function verificarSubscricao(){
         const dias = Math.max(0, Math.ceil((fim - Date.now()) / 86400000));
         if (aviso) {
             aviso.className = "alert alert-warning";
-            aviso.textContent = `ðŸ’¡ PerÃ­odo de teste gratuito: Restam aproximadamente ${dias} dia(s).`;
+            aviso.textContent = `ðŸ’¡ Período de teste gratuito: Restam aproximadamente ${dias} dia(s).`;
         }
         if (estadoSpan) {
             estadoSpan.className = "alert alert-warning";
-            estadoSpan.textContent = "PerÃ­odo de teste gratuito activo.";
+            estadoSpan.textContent = "Período de teste gratuito activo.";
         }
         if (bloqueio) {
             bloqueio.classList.remove("show");
@@ -5000,11 +5005,11 @@ function verificarSubscricao(){
     } else {
         if (aviso) {
             aviso.className = "alert alert-warning";
-            aviso.textContent = "ðŸ†“ EstÃ¡ no Plano GrÃ¡tis (limites diÃ¡rios de vendas/encomendas e 1 funcionÃ¡rio). Pague 250 MT para desbloquear tudo.";
+            aviso.textContent = "ðŸ†“ Está no Plano Grátis (limites diários de vendas/encomendas e 1 funcionário). Pague 250 MT para desbloquear tudo.";
         }
         if (estadoSpan) {
             estadoSpan.className = "alert alert-warning";
-            estadoSpan.textContent = "Plano GrÃ¡tis â€” com limites diÃ¡rios.";
+            estadoSpan.textContent = "Plano Grátis — com limites diários.";
         }
         if (bloqueio) {
             bloqueio.classList.remove("show");
@@ -5012,7 +5017,7 @@ function verificarSubscricao(){
         }
     }
 
-    FABEF_LICENCA_BLOQUEADA = false; // o plano grÃ¡tis nunca bloqueia tudo, sÃ³ limita
+    FABEF_LICENCA_BLOQUEADA = false; // o plano grátis nunca bloqueia tudo, só limita
     renderAvisoPlano();
 }
 
@@ -5024,11 +5029,11 @@ const FABEF_PIPEDREAM_COBRANCA_URL = "https://eoworwel5cr2z9j.m.pipedream.net";
 
 async function solicitarPagamentoBackend(operadora, telefone) {
     if (!FABEF_PIPEDREAM_COBRANCA_URL || FABEF_PIPEDREAM_COBRANCA_URL.includes("SEU-LINK-AQUI")) {
-        throw new Error("O endereÃ§o do servidor de pagamentos ainda nÃ£o foi configurado.");
+        throw new Error("O endereço do servidor de pagamentos ainda não foi configurado.");
     }
 
     const token = await auth.currentUser?.getIdToken();
-    if (!token) throw new Error("SessÃ£o Firebase invÃ¡lida.");
+    if (!token) throw new Error("Sessão Firebase inválida.");
 
     const resposta = await fetch(FABEF_PIPEDREAM_COBRANCA_URL, {
         method: "POST",
@@ -5055,22 +5060,22 @@ async function solicitarSubscricaoMovel(){
     const resultado = document.getElementById("resultado-pagamento");
     const botao = document.getElementById("btn-solicitar-pagamento");
 
-    if (!telefone) { alert("Por favor, introduza o nÃºmero de telefone."); return; }
-    if (!/^\d{9}$/.test(telefone)) { alert("O nÃºmero de telefone deve conter exatamente 9 dÃ­gitos."); return; }
-    if (operadora === "MPESA" && !/^8[45]/.test(telefone)) { alert("NÃºmero invÃ¡lido para M-Pesa. Deve comeÃ§ar com 84 ou 85."); return; }
-    if (operadora === "EMOLA" && !/^8[67]/.test(telefone)) { alert("NÃºmero invÃ¡lido para e-Mola. Deve comeÃ§ar com 86 ou 87."); return; }
+    if (!telefone) { alert("Por favor, introduza o número de telefone."); return; }
+    if (!/^\d{9}$/.test(telefone)) { alert("O número de telefone deve conter exatamente 9 dígitos."); return; }
+    if (operadora === "MPESA" && !/^8[45]/.test(telefone)) { alert("Número inválido para M-Pesa. Deve começar com 84 ou 85."); return; }
+    if (operadora === "EMOLA" && !/^8[67]/.test(telefone)) { alert("Número inválido para e-Mola. Deve começar com 86 ou 87."); return; }
 
     try {
         if (botao) botao.disabled = true;
         const backendResult = await solicitarPagamentoBackend(operadora, telefone);
 
-        // O prÃ³prio servidor (Pipedream) jÃ¡ regista o pedido em "pagamentos" â€”
-        // aqui sÃ³ mostramos o estado, sem duplicar o registo.
+        // O próprio servidor (Pipedream) já regista o pedido em "pagamentos" —
+        // aqui só mostramos o estado, sem duplicar o registo.
         if (resultado) {
             resultado.className = "alert alert-warning";
-            resultado.innerHTML = `â³ Pedido enviado. Confirme o PIN no seu telemÃ³vel.<br>ReferÃªncia: <strong>${escapeHTML(backendResult?.referencia || backendResult?.sourceId || "â€”")}</strong><br><small>A licenÃ§a Ã© activada automaticamente assim que o pagamento for confirmado.</small>`;
+            resultado.innerHTML = `â³ Pedido enviado. Confirme o PIN no seu telemóvel.<br>Referência: <strong>${escapeHTML(backendResult?.referencia || backendResult?.sourceId || "—")}</strong><br><small>A licença é activada automaticamente assim que o pagamento for confirmado.</small>`;
         }
-        await gravarAuditoria("Solicitou subscriÃ§Ã£o mensal via " + operadora, "INFO");
+        await gravarAuditoria("Solicitou subscrição mensal via " + operadora, "INFO");
     } catch (error) {
         console.error(error);
         if (resultado) {
@@ -5413,7 +5418,7 @@ document.getElementById("btn-salvar-ramo-pasta")?.addEventListener("click", asyn
 
 
 /* =====================================================
-   MÓDULO LÓGICO: CALCULADORA & SUBSCRIÇÃO (250 MT - 30 DIAS)
+   MÓDULO LÓGICO: CALCULADORA & SUBSCRIÇão (250 MT - 30 DIAS)
 ===================================================== */
 let qtdFuncionariosExtras = 0;
 
@@ -5445,7 +5450,7 @@ document.getElementById("btn-calc-mais-func")?.addEventListener("click", () => {
 
 
 // O botão de subscrição usa apenas solicitarSubscricaoMovel().
-// A licença NÃO é activada no navegador: somente o backend/webhook, após confirmação real do pagamento, deve actualizar o Firestore.
+// A licença Não é activada no navegador: somente o backend/webhook, após confirmação real do pagamento, deve actualizar o Firestore.
 
 
 /* =====================================================
@@ -5591,12 +5596,12 @@ document.getElementById("btn-toggle-dark")?.addEventListener("click",()=>{
 try{if(localStorage.getItem("FABEF_dark_mode")==="1"){document.body.classList.add("dark-mode");const b=document.getElementById("btn-toggle-dark");if(b)b.textContent="â˜€ï¸ Modo Claro";}}catch(e){}
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: RECONCILIAÃ‡ÃƒO DE STOCK (CONFLITOS OFFLINE)
+   MÓDULO LÓGICO: RECONCILIAÇão DE STOCK (CONFLITOS OFFLINE)
    Se dois dispositivos venderem offline o mesmo produto ao
-   mesmo tempo, cada um sÃ³ via o stock que tinha guardado
-   localmente â€” quando ambos sincronizam, o stock real pode
+   mesmo tempo, cada um só via o stock que tinha guardado
+   localmente — quando ambos sincronizam, o stock real pode
    ficar negativo. Isto avisa o gerente para poder confirmar
-   a quantidade fÃ­sica real e corrigir.
+   a quantidade física real e corrigir.
 ===================================================== */
 const FABEF_STOCK_NEGATIVO_ALERTADO = new Set();
 
@@ -5606,16 +5611,16 @@ function verificarReconciliacaoStock() {
     negativos.forEach(p => {
         if (!FABEF_STOCK_NEGATIVO_ALERTADO.has(p.id)) {
             FABEF_STOCK_NEGATIVO_ALERTADO.add(p.id);
-            // SÃ³ grava o alerta de auditoria uma vez por produto/ocorrÃªncia,
-            // para nÃ£o encher o histÃ³rico com o mesmo aviso repetido.
+            // Só grava o alerta de auditoria uma vez por produto/ocorrência,
+            // para não encher o histórico com o mesmo aviso repetido.
             gravarAuditoria(
-                `âš ï¸ ReconciliaÃ§Ã£o necessÃ¡ria: o produto "${p.nome}" ficou com stock negativo (${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + p.unidade : ""}). Isto normalmente acontece quando dois dispositivos venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar.`,
+                `âš ï¸ Reconciliação necessária: o produto "${p.nome}" ficou com stock negativo (${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + p.unidade : ""}). Isto normalmente acontece quando dois dispositivos venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar.`,
                 "ALERTA"
             );
         }
     });
 
-    // Esquece os que jÃ¡ foram corrigidos (stock voltou a 0 ou mais), para
+    // Esquece os que já foram corrigidos (stock voltou a 0 ou mais), para
     // que se voltarem a ficar negativos no futuro sejam avisados de novo.
     Array.from(FABEF_STOCK_NEGATIVO_ALERTADO).forEach(id => {
         const produto = FABEF.produtos.find(p => p.id === id);
@@ -5641,11 +5646,11 @@ function renderAvisoReconciliacao() {
 
     container.innerHTML = `
         <div class="alert alert-warn">
-            <strong>âš ï¸ ReconciliaÃ§Ã£o de stock necessÃ¡ria (${negativos.length})</strong>
+            <strong>âš ï¸ Reconciliação de stock necessária (${negativos.length})</strong>
             <p style="margin:6px 0;font-size:13px;">
-                Estes produtos ficaram com stock negativo â€” normalmente porque dois dispositivos
+                Estes produtos ficaram com stock negativo — normalmente porque dois dispositivos
                 venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar. Confirme a
-                quantidade real na loja e corrija em InventÃ¡rio â†’ "âš™ï¸ Ajustar".
+                quantidade real na loja e corrija em Inventário â†’ "âš™ï¸ Ajustar".
             </p>
             <ul style="margin:6px 0 0 18px;font-size:13px;">
                 ${negativos.map(p => `<li><strong>${escapeHTML(p.nome)}</strong>: stock atual ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</li>`).join("")}
@@ -5664,15 +5669,15 @@ function renderDashboard() {
     const painelUtilizador = document.getElementById("inicio-utilizador");
     const painelRamo = document.getElementById("inicio-ramo");
 
-    if (indicadorEmpresa) indicadorEmpresa.textContent = FABEF.empresa?.nome || "â€”";
-    if (painelNomeNegocio) painelNomeNegocio.textContent = FABEF.empresa?.nome || "â€”";
-    if (painelIdEmpresa) painelIdEmpresa.textContent = FABEF.empresaId || "â€”";
-    if (painelUtilizador) painelUtilizador.textContent = FABEF.user?.email || "â€”";
+    if (indicadorEmpresa) indicadorEmpresa.textContent = FABEF.empresa?.nome || "—";
+    if (painelNomeNegocio) painelNomeNegocio.textContent = FABEF.empresa?.nome || "—";
+    if (painelIdEmpresa) painelIdEmpresa.textContent = FABEF.empresaId || "—";
+    if (painelUtilizador) painelUtilizador.textContent = FABEF.user?.email || "—";
     if (painelRamo) painelRamo.textContent = FABEF.ramo;
 
     const hoje = dataHoje();
 
-    // Filtra transaÃ§Ãµes realizadas no dia atual para o somatÃ³rio rÃ¡pido do balcÃ£o
+    // Filtra transações realizadas no dia atual para o somatório rápido do balcão
     const vendasHoje = FABEF.vendas.filter(v => {
         const dataVenda = new Date(v.data || v.date || 0);
         return dataVenda >= hoje;
@@ -5683,7 +5688,7 @@ function renderDashboard() {
     const painelVendas = document.getElementById("inicio-vendas");
     if (painelVendas) painelVendas.textContent = dinheiro(totalHoje);
 
-    // Soma quantos KGs (e litros) foram vendidos hoje, alÃ©m do valor em MT
+    // Soma quantos KGs (e litros) foram vendidos hoje, além do valor em MT
     let kgHoje = 0, litroHoje = 0;
     vendasHoje.forEach(v => (v.itens || []).forEach(item => {
         if (item.unidade === "kg") kgHoje += numero(item.quantidade);
@@ -5707,19 +5712,19 @@ function renderDashboard() {
 
 
 /* =====================================================
-   MÃ“DULO CENTRAL: INTERCONEXÃƒO E REFRESH EM MASSA (RENDER TUDO)
+   MÓDULO CENTRAL: INTERCONEXão E REFRESH EM MASSA (RENDER TUDO)
 ===================================================== */
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: HISTÃ“RICO DE AUDITORIA (VISUALIZAÃ‡ÃƒO)
+   MÓDULO LÓGICO: HISTÓRICO DE AUDITORIA (VISUALIZAÇão)
 ===================================================== */
 /* =====================================================
-   MÃ“DULO LÃ“GICO: METAS (LOJA E POR FUNCIONÃRIO)
+   MÓDULO LÓGICO: METAS (LOJA E POR FUNCIONÁRIO)
 ===================================================== */
 function inicioDaSemana(data) {
     const d = new Date(data);
     const diaSemana = d.getDay(); // 0=domingo
-    const diff = (diaSemana === 0 ? -6 : 1) - diaSemana; // segunda-feira como inÃ­cio
+    const diff = (diaSemana === 0 ? -6 : 1) - diaSemana; // segunda-feira como início
     d.setDate(d.getDate() + diff);
     d.setHours(0, 0, 0, 0);
     return d;
@@ -5753,13 +5758,13 @@ function renderMetas() {
     const painel = document.getElementById("metas-progresso-loja");
     if (painel) {
         painel.innerHTML = `
-            <div class="kpi"><div class="rotulo">Meta diÃ¡ria</div>${barraHtml(somaTotais(vendasHoje), metaDiaria)}</div>
+            <div class="kpi"><div class="rotulo">Meta diária</div>${barraHtml(somaTotais(vendasHoje), metaDiaria)}</div>
             <div class="kpi"><div class="rotulo">Meta semanal</div>${barraHtml(somaTotais(vendasSemana), metaSemanal)}</div>
             <div class="kpi"><div class="rotulo">Meta mensal</div>${barraHtml(somaTotais(vendasMes), metaMensal)}</div>
         `;
     }
 
-    // FormulÃ¡rio de metas gerais (sÃ³ o gerente edita)
+    // Formulário de metas gerais (só o gerente edita)
     const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
     ["metas-input-diaria", "metas-input-semanal", "metas-input-mensal"].forEach(id => {
         const el = document.getElementById(id);
@@ -5771,7 +5776,7 @@ function renderMetas() {
     const btnGuardarMetas = document.getElementById("btn-guardar-metas-loja");
     if (btnGuardarMetas) btnGuardarMetas.style.display = souGerente ? "" : "none";
 
-    // Metas por funcionÃ¡rio
+    // Metas por funcionário
     const tabela = document.getElementById("tabela-metas-funcionarios");
     if (tabela) {
         const metasFunc = FABEF.empresa?.metasFuncionarios || {};
@@ -5786,7 +5791,7 @@ function renderMetas() {
                 </td>
                 <td style="min-width:160px;">${barraHtml(totalFunc, metaFunc)}</td>
             </tr>`;
-        }).join("") || `<tr><td colspan="3" style="text-align:center;color:#64748b;">Sem funcionÃ¡rios cadastrados.</td></tr>`;
+        }).join("") || `<tr><td colspan="3" style="text-align:center;color:#64748b;">Sem funcionários cadastrados.</td></tr>`;
     }
 }
 
@@ -5819,13 +5824,13 @@ window.salvarMetaFuncionario = async function(funcionarioId, valor) {
         renderMetas();
     } catch (error) {
         console.error(error);
-        alert("Erro ao guardar meta do funcionÃ¡rio:\n" + mensagemFirebase(error));
+        alert("Erro ao guardar meta do funcionário:\n" + mensagemFirebase(error));
     }
 };
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: DESEMPENHO DOS FUNCIONÃRIOS
+   MÓDULO LÓGICO: DESEMPENHO DOS FUNCIONÁRIOS
 ===================================================== */
 function renderDesempenho() {
     const corpo = document.getElementById("tabela-desempenho");
@@ -5858,11 +5863,11 @@ function renderDesempenho() {
 
 
 /* =====================================================
-   MÃ“DULO LÃ“GICO: SUGESTÃ•ES DO FUNCIONÃRIO
+   MÓDULO LÓGICO: SUGESTÕES DO FUNCIONÁRIO
 ===================================================== */
 document.getElementById("btn-enviar-sugestao")?.addEventListener("click", async () => {
     const texto = document.getElementById("sugestao-texto")?.value.trim();
-    if (!texto) { alert("Escreva a sua sugestÃ£o antes de enviar."); return; }
+    if (!texto) { alert("Escreva a sua sugestão antes de enviar."); return; }
 
     try {
         const payload = {
@@ -5878,10 +5883,10 @@ document.getElementById("btn-enviar-sugestao")?.addEventListener("click", async 
         FABEF.sugestoes.push({ id: ref.id, ...payload, criadoEm: undefined });
         document.getElementById("sugestao-texto").value = "";
         renderSugestoes();
-        alert("SugestÃ£o enviada ao gerente. Obrigado!");
+        alert("Sugestão enviada ao gerente. Obrigado!");
     } catch (error) {
         console.error(error);
-        alert("Erro ao enviar sugestÃ£o:\n" + mensagemFirebase(error));
+        alert("Erro ao enviar sugestão:\n" + mensagemFirebase(error));
     }
 });
 
@@ -5894,14 +5899,14 @@ function renderSugestoes() {
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
         .map(s => `<tr>
             <td>${dataTexto(s.data)}</td>
-            <td>${escapeHTML(s.criadoPorNome || "â€”")}</td>
+            <td>${escapeHTML(s.criadoPorNome || "—")}</td>
             <td>${escapeHTML(s.texto)}</td>
             <td><span class="badge ${s.estado === 'ADICIONADA' ? 'badge-green' : (s.estado === 'REJEITADA' ? 'badge-red' : 'badge-yellow')}">${escapeHTML(s.estado || "NOVA")}</span></td>
             <td>${souGerente && s.estado === "NOVA" ? `
-                <button class="btn btn-success btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','ADICIONADA')">âœ”ï¸ Adicionar ao catÃ¡logo</button>
+                <button class="btn btn-success btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','ADICIONADA')">âœ”ï¸ Adicionar ao catálogo</button>
                 <button class="btn btn-light btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','REJEITADA')">âœ–ï¸ Rejeitar</button>
-            ` : "â€”"}</td>
-        </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Ainda nÃ£o hÃ¡ sugestÃµes enviadas.</td></tr>`;
+            ` : "—"}</td>
+        </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Ainda não há sugestões enviadas.</td></tr>`;
 }
 
 window.marcarSugestao = async function(id, novoEstado) {
@@ -5910,13 +5915,13 @@ window.marcarSugestao = async function(id, novoEstado) {
         const s = FABEF.sugestoes.find(x => x.id === id);
         if (s) s.estado = novoEstado;
         renderSugestoes();
-        await gravarAuditoria(`Marcou uma sugestÃ£o de funcionÃ¡rio como: ${novoEstado}`, "INFO");
+        await gravarAuditoria(`Marcou uma sugestão de funcionário como: ${novoEstado}`, "INFO");
         if (novoEstado === "ADICIONADA") {
-            alert('SugestÃ£o marcada como adicionada. VÃ¡ Ã  pÃ¡gina "Produtos" para criar o novo artigo/serviÃ§o, se ainda nÃ£o o fez.');
+            alert('Sugestão marcada como adicionada. Vá à página "Produtos" para criar o novo artigo/serviço, se ainda não o fez.');
         }
     } catch (error) {
         console.error(error);
-        alert("Erro ao atualizar sugestÃ£o:\n" + mensagemFirebase(error));
+        alert("Erro ao atualizar sugestão:\n" + mensagemFirebase(error));
     }
 };
 
@@ -5932,14 +5937,14 @@ function renderAuditoria() {
             String(a.mensagem || "").toLowerCase().includes(filtroTexto) ||
             String(a.utilizadorNome || "").toLowerCase().includes(filtroTexto))
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
-        .slice(0, 300); // Limita a exibiÃ§Ã£o Ã s 300 entradas mais recentes por performance
+        .slice(0, 300); // Limita a exibição às 300 entradas mais recentes por performance
 
     corpo.innerHTML = registos.map(a => {
         const cor = a.nivel === "ALERTA" ? "#ef4444" : (a.nivel === "AVISO" ? "#f59e0b" : "#2563eb");
         return `<tr>
             <td style="white-space:nowrap;">${dataTexto(a.data)}</td>
-            <td>${escapeHTML(a.utilizadorNome || "â€”")}</td>
-            <td>${escapeHTML(a.mensagem || "â€”")}</td>
+            <td>${escapeHTML(a.utilizadorNome || "—")}</td>
+            <td>${escapeHTML(a.mensagem || "—")}</td>
             <td><span class="badge" style="background:${cor}22;color:${cor};">${escapeHTML(a.nivel || "INFO")}</span></td>
         </tr>`;
     }).join("") || `<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem registos de auditoria ainda.</td></tr>`;
@@ -5948,7 +5953,7 @@ document.getElementById("auditoria-pesquisa")?.addEventListener("input", renderA
 
 
 function renderTudo() {
-    // Executa em cadeia sequencial a renderizaÃ§Ã£o e o desenho de cada bloco da SPA
+    // Executa em cadeia sequencial a renderização e o desenho de cada bloco da SPA
     renderDashboard();
     renderRamos();
     renderProdutos();
@@ -5965,7 +5970,7 @@ function renderTudo() {
     renderDespesas();
     renderRelatorios();
 
-    // ProteÃ§Ãµes de seguranÃ§a contra erros de inicializaÃ§Ã£o de funÃ§Ãµes secundÃ¡rias
+    // Proteções de segurança contra erros de inicialização de funções secundárias
     if (typeof renderFuncionarios === "function") renderFuncionarios();
     if (typeof renderAuditoria === "function") renderAuditoria();
     if (typeof renderMetas === "function") renderMetas();
@@ -5977,7 +5982,7 @@ function renderTudo() {
 
 
 /* =====================================================
-   MÃ“DULO TRADUTOR: CENTRAL DE TRATAMENTO DE ERROS DO FIREBASE
+   MÓDULO TRADUTOR: CENTRAL DE TRATAMENTO DE ERROS DO FIREBASE
 ===================================================== */
 
 function mensagemFirebase(error) {
@@ -5986,21 +5991,21 @@ function mensagemFirebase(error) {
     const code = error.code || "";
 
     const mensagens = {
-        "auth/invalid-credential": "E-mail ou palavra-passe introduzidos estÃ£o incorretos.",
-        "auth/email-already-in-use": "Aviso de SeguranÃ§a: Este endereÃ§o de e-mail jÃ¡ se encontra registado.",
-        "auth/invalid-email": "O formato de e-mail introduzido nÃ£o Ã© considerado vÃ¡lido.",
-        "auth/weak-password": "A senha introduzida Ã© demasiado fraca. Use pelo menos 6 caracteres.",
-        "permission-denied": "Acesso Recusado: PermissÃµes insuficientes para ler ou escrever no Firebase.",
-        "failed-precondition": "A base de dados do Firebase exige a criaÃ§Ã£o de Ã­ndices de consulta.",
-        "unavailable": "O servidor do Firebase encontra-se temporariamente indisponÃ­vel. Verifique a internet."
+        "auth/invalid-credential": "E-mail ou palavra-passe introduzidos estão incorretos.",
+        "auth/email-already-in-use": "Aviso de Segurança: Este endereço de e-mail já se encontra registado.",
+        "auth/invalid-email": "O formato de e-mail introduzido não é considerado válido.",
+        "auth/weak-password": "A senha introduzida é demasiado fraca. Use pelo menos 6 caracteres.",
+        "permission-denied": "Acesso Recusado: Permissões insuficientes para ler ou escrever no Firebase.",
+        "failed-precondition": "A base de dados do Firebase exige a criação de índices de consulta.",
+        "unavailable": "O servidor do Firebase encontra-se temporariamente indisponível. Verifique a internet."
     };
 
-    return mensagens[code] || error.message || code || "Falha operacional nÃ£o catalogada.";
+    return mensagens[code] || error.message || code || "Falha operacional não catalogada.";
 }
 
 
 /* =====================================================
-   INICIALIZAÃ‡ÃƒO SISTÃ‰MICA E CONFIGURAÃ‡Ã•ES VISUAIS
+   INICIALIZAÇão SISTÉMICA E CONFIGURAÇÕES VISUAIS
 ===================================================== */
 
 const diaAtivoElement = document.getElementById("fabef-dia-ativo");
@@ -6015,13 +6020,13 @@ if (selectIdiomaElement) {
 }
 
 /*
- OBSERVAÃ‡ÃƒO CRÃTICA DE PROCESSO:
- A interface da aplicaÃ§Ã£o permanece totalmente oculta (.hidden) atÃ© que o 
- gatilho onAuthStateChanged confirme o token do utilizador junto Ã  nuvem.
+ OBSERVAÇão CRÍTICA DE PROCESSO:
+ A interface da aplicação permanece totalmente oculta (.hidden) até que o 
+ gatilho onAuthStateChanged confirme o token do utilizador junto à nuvem.
 */
 
 /* =====================================================
-   MODO DEMONSTRAÇÃO (TESTE RÁPIDO 1-CLIQUE)
+   MODO DEMONSTRAÇão (TESTE RÁPIDO 1-CLIQUE)
 ===================================================== */
 async function entrarModoDemo() {
     const telaLogin = document.getElementById("tela-login");
@@ -6210,7 +6215,7 @@ window.alternarPerfilDemo = function(novoPerfil) {
 };
 
 /* =====================================================
-   EXPORTAÇÃO COMPLETA DO PROJETO EM FICHEIRO ZIP
+   EXPORTAÇão COMPLETA DO PROJETO EM FICHEIRO ZIP
 ===================================================== */
 window.baixarProjetoZip = async function() {
     const btn = document.getElementById("btn-baixar-projeto-zip");
@@ -6224,18 +6229,18 @@ window.baixarProjetoZip = async function() {
         const zip = new JSZip();
         
         // Obter index.html atual
-        const resHtml = await fetch("/index.html");
+        const resHtml = await fetch("./index.html");
         const htmlContent = await resHtml.text();
         zip.file("index.html", htmlContent);
 
         // Obter src/app.js atual
-        const resApp = await fetch("/src/app.js");
+        const resApp = await fetch("./src/app.js");
         const appContent = await resApp.text();
         zip.folder("src").file("app.js", appContent);
 
         // Obter package.json
         try {
-            const resPkg = await fetch("/package.json");
+            const resPkg = await fetch("./package.json");
             if (resPkg.ok) {
                 zip.file("package.json", await resPkg.text());
             }
@@ -6244,7 +6249,7 @@ window.baixarProjetoZip = async function() {
         // README explicativo com instruções de instalação e substituição
         zip.file("LEIA-ME-INSTALACAO.txt", 
 `=============================================================
-  FABEF GESTÃO ERP PRO - PACOTE COMPLETO DE CÓDIGO FONTE
+  FABEF GESTão ERP PRO - PACOTE COMPLETO DE CÓDIGO FONTE
 =============================================================
 
 Este arquivo ZIP contém a versão atualizada do FABEF Gestão ERP PRO com todas as melhorias solicitadas:
@@ -6293,12 +6298,18 @@ document.getElementById("btn-demo-mode")?.addEventListener("click", entrarModoDe
 document.getElementById("btn-abrir-sugestoes")?.addEventListener("click", () => {
     document.getElementById("modal-sugestoes")?.classList.add("show");
 });
-document.getElementById("btn-recibo-imprimir-direto")?.addEventListener("click", () => {
+// Suporte aos botões de impressão de recibo direto e do modal de sucesso
+const bindImprimirRecibo = () => {
     if (window.FABEF_ultimaVendaId) window.imprimirReciboVenda(window.FABEF_ultimaVendaId);
-});
-document.getElementById("btn-recibo-whatsapp-direto")?.addEventListener("click", () => {
+};
+document.getElementById("btn-recibo-imprimir-direto")?.addEventListener("click", bindImprimirRecibo);
+document.getElementById("btn-recibo-imprimir")?.addEventListener("click", bindImprimirRecibo);
+// Suporte aos botões de WhatsApp de recibo direto e do modal de sucesso
+const bindWhatsAppRecibo = () => {
     if (window.FABEF_ultimaVendaId) window.enviarReciboWhatsApp(window.FABEF_ultimaVendaId);
-});
+};
+document.getElementById("btn-recibo-whatsapp-direto")?.addEventListener("click", bindWhatsAppRecibo);
+document.getElementById("btn-recibo-whatsapp")?.addEventListener("click", bindWhatsAppRecibo);
 document.getElementById("btn-recibo-fechar")?.addEventListener("click", () => {
     fecharModal("modal-recibo-sucesso");
 });
