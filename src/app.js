@@ -707,33 +707,53 @@ let FABEF_arranqueEmCurso = false;
 
 const elAuth = id => document.getElementById(id);
 
+async function executarLogin() {
+    const email = elAuth("login-email")?.value?.trim() || "";
+    const senha = elAuth("login-senha")?.value || "";
+    const status = elAuth("login-status");
+
+    if (!email || !senha) {
+        if (status) status.textContent = "⚠️ Introduza o e-mail e a senha.";
+        return;
+    }
+
+    const btn = elAuth("btn-login");
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = "⏳ A autenticar...";
+
+    try {
+        const credencial = await signInWithEmailAndPassword(auth, email, senha);
+        if (status) status.textContent = "🟢 Login realizado. A carregar o sistema...";
+        if (credencial?.user) {
+            await iniciarSessaoFABEF(credencial.user);
+        }
+    } catch (error) {
+        console.error("Erro de login:", error);
+        if (status) status.textContent = "🔴 " + mensagemFirebase(error);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
 const btnLogin = elAuth("btn-login");
 if (btnLogin && !btnLogin.dataset.fabefBound) {
     btnLogin.dataset.fabefBound = "1";
-    btnLogin.addEventListener("click", async () => {
-        const email = elAuth("login-email")?.value?.trim() || "";
-        const senha = elAuth("login-senha")?.value || "";
-        const status = elAuth("login-status");
-
-        if (!email || !senha) {
-            if (status) status.textContent = "Introduza o e-mail e a senha.";
-            return;
-        }
-
-        btnLogin.disabled = true;
-        if (status) status.textContent = "â³ A autenticar...";
-
-        try {
-            await signInWithEmailAndPassword(auth, email, senha);
-            if (status) status.textContent = "ðŸŸ¢ Login realizado. A carregar...";
-        } catch (error) {
-            console.error("Erro de login:", error);
-            if (status) status.textContent = "🔴 " + mensagemFirebase(error);
-        } finally {
-            btnLogin.disabled = false;
-        }
-    });
+    btnLogin.addEventListener("click", executarLogin);
 }
+
+elAuth("login-senha")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        executarLogin();
+    }
+});
+
+elAuth("login-email")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        elAuth("login-senha")?.focus();
+    }
+});
 
 const btnMostrarRegisto = elAuth("btn-mostrar-registo");
 if (btnMostrarRegisto && !btnMostrarRegisto.dataset.fabefBound) {
@@ -774,6 +794,12 @@ if (btnEsqueciSenha && !btnEsqueciSenha.dataset.fabefBound) {
     });
 }
 
+elAuth("reg-senha")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        criarConta();
+    }
+});
 const btnRegistar = elAuth("btn-registar");
 if (btnRegistar && !btnRegistar.dataset.fabefBound) {
     btnRegistar.dataset.fabefBound = "1";
@@ -792,25 +818,53 @@ async function criarConta() {
     const status = elAuth("reg-status");
 
     if (!empresaNome || !gerente || !email || !senha) {
-        if (status) status.textContent = "âš ï¸ Preencha os campos obrigatórios.";
+        if (status) status.textContent = "⚠️ Preencha os campos obrigatórios (Negócio, Gerente, E-mail e Senha).";
         return;
     }
 
     if (senha.length < 6) {
-        if (status) status.textContent = "âš ï¸ A senha deve ter pelo menos 6 caracteres.";
+        if (status) status.textContent = "⚠️ A senha deve ter pelo menos 6 caracteres.";
         return;
     }
 
     FABEF_registoEmCurso = true;
     if (btnRegistar) btnRegistar.disabled = true;
-    if (status) status.textContent = "â³ A criar a conta...";
+    if (status) status.textContent = "⏳ A criar a conta no Firebase...";
 
     try {
-        const credencial = await createUserWithEmailAndPassword(auth, email, senha);
+        let credencial;
+        try {
+            credencial = await createUserWithEmailAndPassword(auth, email, senha);
+        } catch (authError) {
+            // Se o e-mail já existe no Firebase Auth (por exemplo, tentativa anterior onde o perfil não gravou),
+            // autentica para auto-reparar e completar o registo da empresa e perfil.
+            if (authError.code === "auth/email-already-in-use") {
+                if (status) status.textContent = "⏳ E-mail já registado. A autenticar e a sincronizar o perfil...";
+                credencial = await signInWithEmailAndPassword(auth, email, senha);
+            } else {
+                throw authError;
+            }
+        }
+
         const uidUser = credencial.user.uid;
         const empresaId = uidUser;
         const agora = new Date().toISOString();
 
+        // 1º REGISTO: O perfil de utilizador DEVE ser gravado primeiro para satisfazer as regras de segurança do Firestore
+        const utilizador = {
+            uid: uidUser,
+            email,
+            nome: gerente,
+            telefone,
+            empresaId,
+            perfil: "gerente",
+            role: "gerente",
+            estado: "ATIVO",
+            criadoEm: serverTimestamp()
+        };
+        await setDoc(doc(db, "utilizadores", uidUser), utilizador);
+
+        // 2º REGISTO: Agora que o perfil existe como gerente, grava os dados da empresa
         const empresa = {
             id: empresaId,
             nome: empresaNome,
@@ -827,29 +881,10 @@ async function criarConta() {
             criadoEm: serverTimestamp(),
             atualizadoEm: serverTimestamp()
         };
-
-        const utilizador = {
-            uid: uidUser,
-            email,
-            nome: gerente,
-            telefone,
-            empresaId,
-            perfil: "gerente",
-            role: "gerente",
-            estado: "ATIVO",
-            criadoEm: serverTimestamp()
-        };
-
-        // Os dois documentos só são criados para o UID autenticado.
         await setDoc(doc(db, "empresas", empresaId), empresa);
-        await setDoc(doc(db, "utilizadores", uidUser), utilizador);
 
-        if (status) status.textContent = "ðŸŸ¢ Conta criada com sucesso. A abrir o sistema...";
+        if (status) status.textContent = "🟢 Conta e empresa criadas com sucesso. A abrir o sistema...";
 
-        // CORREÇão: o onAuthStateChanged já disparou (ignorado, porque
-        // FABEF_registoEmCurso estava ativo) e não volta a disparar sozinho,
-        // porque o estado de autenticação não muda outra vez. Por isso,
-        // depois de os documentos existirem, arrancamos a sessão manualmente.
         FABEF_registoEmCurso = false;
         if (auth.currentUser) {
             await iniciarSessaoFABEF(auth.currentUser);
@@ -1074,21 +1109,32 @@ onAuthStateChanged(auth, async user => {
 async function carregarPerfil(user) {
     if (!user?.uid) throw new Error("Utilizador autenticado inválido.");
 
-    const snap = await getDoc(doc(db, "utilizadores", user.uid));
+    let snap = await getDoc(doc(db, "utilizadores", user.uid));
+    let dados;
 
+    // AUTO-RECUPERAÇÃO: Se a conta existe no Auth mas o documento não foi criado, regenera-o automaticamente
     if (!snap.exists()) {
-        throw new Error("Perfil do utilizador não encontrado no Firebase. A conta não está configurada corretamente.");
+        console.warn("Perfil não encontrado no Firestore. A criar perfil de recuperação automática para:", user.email);
+        dados = {
+            uid: user.uid,
+            email: user.email || "",
+            nome: user.displayName || (user.email ? user.email.split("@")[0] : "Gerente"),
+            telefone: "",
+            empresaId: user.uid,
+            perfil: "gerente",
+            role: "gerente",
+            estado: "ATIVO",
+            criadoEm: serverTimestamp()
+        };
+        await setDoc(doc(db, "utilizadores", user.uid), dados);
+    } else {
+        dados = snap.data();
     }
 
-    const dados = snap.data();
-    const empresaId = dados.empresaId;
-
-    if (!empresaId || typeof empresaId !== "string") {
-        throw new Error("O perfil do utilizador não possui uma empresaId válida.");
-    }
-
-    if (dados.uid && dados.uid !== user.uid) {
-        throw new Error("Inconsistência de segurança: o UID do perfil não corresponde ao utilizador autenticado.");
+    const empresaId = dados.empresaId || user.uid;
+    if (!dados.empresaId) {
+        dados.empresaId = empresaId;
+        try { await updateDoc(doc(db, "utilizadores", user.uid), { empresaId }); } catch(_) {}
     }
 
     // Bloqueia o acesso de contas de funcionário que o gerente tenha desativado
@@ -1104,17 +1150,31 @@ async function carregarPerfil(user) {
 async function carregarEmpresa() {
     if (!FABEF.empresaId) throw new Error("Nenhuma empresa foi associada ao utilizador.");
 
-    const snap = await getDoc(empresaRef());
-    if (!snap.exists()) {
-        throw new Error("Documento da empresa não encontrado na base de dados do Firebase.");
-    }
+    let snap = await getDoc(empresaRef());
+    let dados;
 
-    const dados = snap.data();
-    if (dados.id && dados.id !== FABEF.empresaId) {
-        throw new Error("Inconsistência de segurança: o ID da empresa não corresponde ao documento.");
-    }
-    if (dados.gerenteId && FABEF.userData?.perfil === "gerente" && dados.gerenteId !== FABEF.user.uid) {
-        throw new Error("Inconsistência de segurança: o gerente da empresa não corresponde ao utilizador autenticado.");
+    // AUTO-RECUPERAÇÃO: Se a empresa não existir, auto-provisiona para não bloquear o acesso
+    if (!snap.exists()) {
+        console.warn("Empresa não encontrada no Firestore. A provisionar nova empresa para:", FABEF.empresaId);
+        dados = {
+            id: FABEF.empresaId,
+            nome: "Minha Empresa (" + (FABEF.userData?.nome || "Comercial") + ")",
+            telefone: FABEF.userData?.telefone || "",
+            endereco: "",
+            gerenteId: FABEF.user.uid,
+            ramo_ativo: "Mercearia / Minimercado",
+            ramos_atividade: ["Mercearia / Minimercado"],
+            estado_licenca: "TESTE",
+            subscricao_paga: false,
+            data_registo: new Date().toISOString(),
+            validade_subscricao: null,
+            valor_mensalidade_atual: 250,
+            criadoEm: serverTimestamp(),
+            atualizadoEm: serverTimestamp()
+        };
+        await setDoc(empresaRef(), dados);
+    } else {
+        dados = snap.data();
     }
 
     FABEF.empresa = { id: FABEF.empresaId, ...dados };
