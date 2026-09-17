@@ -1220,7 +1220,7 @@ function pedirRenderTudo() {
    é assim que os dados chegam quando o dispositivo estava offline
    e volta a ligar-se à internet.
 ===================================================== */
-const COLECOES_POR_RAMO = new Set(["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
+const COLECOES_POR_RAMO = new Set(["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
 const COLECOES_POR_DIA = new Set(["vendas","despesas","compras","dividas","encomendas","auditoria_logs","sugestoes"]);
 function referenciaColecaoFiltrada(nome) {
     const ref = subRef(nome);
@@ -1455,14 +1455,6 @@ document.addEventListener("click", (e) => {
         }
         mostrarSecao(secNome);
     }
-
-    const btnZip = e.target.closest(".btn-acao-baixar-zip");
-    if (btnZip && !btnZip.dataset.downloadTratado) {
-        btnZip.dataset.downloadTratado = "1";
-        if (window.baixarProjetoZip) {
-            window.baixarProjetoZip();
-        }
-    }
 });
 
 function mostrarSecao(nome) {
@@ -1662,7 +1654,9 @@ function renderRamos() {
 
     const selects = [
         document.getElementById("select-ramo"),
-        document.getElementById("ramo-pagina")
+        document.getElementById("ramo-pagina"),
+        document.getElementById("func-ramo"),
+        document.getElementById("edit-func-ramo")
     ];
 
     selects.forEach(select => {
@@ -1785,6 +1779,7 @@ async function recarregarDadosDoRamoAtual() {
     FABEF.despesas = [];
     FABEF.dividas = [];
     FABEF.encomendas = [];
+    FABEF.funcionarios = [];
     FABEF.auditoria = [];
     FABEF.sugestoes = [];
     FABEF.carrinho = [];
@@ -1816,13 +1811,15 @@ async function mudarRamo(ramo) {
     }
 
     try {
-        await updateDoc(empresaRef(), {
-            ramo_ativo: ramo,
-            atualizadoEm: serverTimestamp()
-        });
+        if (!window.FABEF?.isDemoMode) {
+            await updateDoc(empresaRef(), {
+                ramo_ativo: ramo,
+                atualizadoEm: serverTimestamp()
+            });
+        }
 
         FABEF.ramo = ramo;
-        await ouvirCaixa(); // reescuta o caixa já isolado para o novo ramo
+        await recarregarDadosDoRamoAtual(); // Fecha listeners do ramo anterior e subscreve todos os dados do novo ramo
         renderTudo();
 
         // Escreve de forma persistente a alteração nos registos de auditoria
@@ -2487,7 +2484,7 @@ async function registarCompra() {
 
 function renderCompras() {
     const lista = FABEF.compras
-        .slice()
+        .filter(c => !c.ramo || c.ramo === FABEF.ramo)
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
 
     const tabelaCorpo = document.getElementById("tabela-compras");
@@ -4819,6 +4816,7 @@ async function cadastrarNovoFuncionario() {
     const nome=document.getElementById("func-nome")?.value.trim();
     const email=document.getElementById("func-email")?.value.trim();
     const telefone=document.getElementById("func-telefone")?.value.trim();
+    const ramoFunc=document.getElementById("func-ramo")?.value || FABEF.ramo || "";
     const senha=document.getElementById("func-senha")?.value || "";
     const foto=document.getElementById("func-foto")?.value.trim() || "";
     if(!nome || !email || !senha){ alert("Por favor, preencha os campos obrigatórios (Nome, E-mail e Senha)."); return; }
@@ -4829,14 +4827,16 @@ async function cadastrarNovoFuncionario() {
         const secondaryAuth=getAuth(secondaryApp);
         const cred=await createUserWithEmailAndPassword(secondaryAuth,email,senha);
         const uidFuncionario=cred.user.uid;
-        const perfil={uid:uidFuncionario,nome,email,telefone,foto,empresaId:FABEF.empresaId,perfil:"funcionario",role:"operador",estado:"ATIVO",criadoPor:FABEF.user.uid,criadoEm:serverTimestamp()};
+        const perfil={uid:uidFuncionario,nome,email,telefone,foto,ramo:ramoFunc,empresaId:FABEF.empresaId,perfil:"funcionario",role:"operador",estado:"ATIVO",criadoPor:FABEF.user.uid,criadoEm:serverTimestamp()};
         await setDoc(doc(db,"utilizadores",uidFuncionario),perfil);
         await setDoc(doc(db,"empresas",FABEF.empresaId,"funcionarios",uidFuncionario),perfil);
-        FABEF.funcionarios.push({id:uidFuncionario,...perfil});
+        if (ramoFunc === FABEF.ramo) {
+            FABEF.funcionarios.push({id:uidFuncionario,...perfil});
+        }
         ["func-nome","func-email","func-telefone","func-senha","func-foto"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
         renderFuncionarios();
-        await gravarAuditoria(`Cadastrou um novo funcionário na equipa: ${nome} (${email})`,"INFO");
-        alert("Funcionário cadastrado com sucesso.");
+        await gravarAuditoria(`Cadastrou um novo funcionário na equipa: ${nome} (${email}) no ramo ${ramoFunc}`,"INFO");
+        alert("Funcionário cadastrado com sucesso para o ramo: " + ramoFunc);
     } catch(error) { console.error(error); alert("Não foi possível criar a conta do funcionário:\n"+mensagemFirebase(error)); }
     finally { if(secondaryApp){ try{await deleteApp(secondaryApp);}catch(e){} } }
 }
@@ -4850,6 +4850,7 @@ function renderFuncionarios(){
             <td><strong>${escapeHTML(FABEF.userData?.nome || "Gerente Principal")}</strong></td>
             <td>${escapeHTML(FABEF.user?.email || "—")}</td>
             <td>${escapeHTML(FABEF.empresa?.telefone || "—")}</td>
+            <td><span class="badge" style="background:#0284c7;color:#fff;">Todos os Ramos</span></td>
             <td><span class="badge badge-green" style="background-color:#0f172a;color:#fff;">GERENTE</span></td>
             <td><span class="badge badge-green">ATIVO</span></td>
             <td>—</td>
@@ -4857,12 +4858,15 @@ function renderFuncionarios(){
 
     const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
 
-    const funcionarios = (FABEF.funcionarios || []).map(f => {
+    // Mostra apenas os funcionários pertencentes ao ramo atual ou que tenham sido cadastrados neste ramo
+    const listaFuncionariosDoRamo = (FABEF.funcionarios || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
+
+    const funcionarios = listaFuncionariosDoRamo.map(f => {
         const ativo = (f.estado || "ATIVO") === "ATIVO";
         const acoes = souGerente ? `
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario('${escapeHTML(f.id)}')">âœï¸ Editar</button>
-                <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario('${escapeHTML(f.id)}')">${ativo ? 'ðŸš« Desativar' : '✅ Reativar'}</button>
+                <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario('${escapeHTML(f.id)}')">✏️ Editar</button>
+                <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario('${escapeHTML(f.id)}')">${ativo ? '🚫 Desativar' : '✅ Reativar'}</button>
             </div>` : "—";
 
         return `
@@ -4870,6 +4874,7 @@ function renderFuncionarios(){
             <td>${f.foto ? `<img src="${escapeHTML(f.foto)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none';">` : ""}<strong>${escapeHTML(f.nome || "—")}</strong></td>
             <td>${escapeHTML(f.email || "—")}</td>
             <td>${escapeHTML(f.telefone || "—")}</td>
+            <td><span class="badge badge-blue">${escapeHTML(f.ramo || FABEF.ramo || "—")}</span></td>
             <td><span class="badge badge-yellow">OPERADOR</span></td>
             <td><span class="badge ${ativo ? 'badge-green' : 'badge-red'}">${escapeHTML(f.estado || "ATIVO")}</span></td>
             <td>${acoes}</td>
@@ -4886,6 +4891,10 @@ window.abrirEdicaoFuncionario = function(id) {
     document.getElementById("edit-func-id").value = f.id;
     document.getElementById("edit-func-nome").value = f.nome || "";
     document.getElementById("edit-func-telefone").value = f.telefone || "";
+    const selectRamo = document.getElementById("edit-func-ramo");
+    if (selectRamo) {
+        selectRamo.value = f.ramo || FABEF.ramo;
+    }
     document.getElementById("modal-editar-funcionario")?.classList.add("show");
 };
 
@@ -4893,19 +4902,24 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
     const id = document.getElementById("edit-func-id").value;
     const nome = document.getElementById("edit-func-nome").value.trim();
     const telefone = document.getElementById("edit-func-telefone").value.trim();
+    const ramo = document.getElementById("edit-func-ramo")?.value || FABEF.ramo;
     if (!id || !nome) { alert("O nome do funcionário é obrigatório."); return; }
 
     try {
-        const dadosAtualizados = { nome, telefone, atualizadoEm: serverTimestamp() };
+        const dadosAtualizados = { nome, telefone, ramo, atualizadoEm: serverTimestamp() };
         await updateDoc(doc(db, "utilizadores", id), dadosAtualizados);
         await updateDoc(doc(db, "empresas", FABEF.empresaId, "funcionarios", id), dadosAtualizados);
 
         const f = FABEF.funcionarios.find(x => x.id === id);
-        if (f) { f.nome = nome; f.telefone = telefone; }
+        if (f) { 
+            f.nome = nome; 
+            f.telefone = telefone;
+            f.ramo = ramo;
+        }
 
         fecharModal("modal-editar-funcionario");
         renderFuncionarios();
-        await gravarAuditoria("Editou os dados do funcionário: " + nome, "INFO");
+        await gravarAuditoria("Editou os dados do funcionário: " + nome + (ramo ? ` (Ramo: ${ramo})` : ""), "INFO");
         alert("Dados do funcionário atualizados com sucesso.");
     } catch (error) {
         console.error(error);
@@ -6234,8 +6248,13 @@ async function entrarModoDemo() {
     ];
 
     window.FABEF.funcionarios = [
-        { id: "func-1", nome: "Faruque Abílio", email: "gerente@fabef.mz", role: "gerente", perfil: "gerente", telefone: "84 000 0001", estado: "ATIVO" },
-        { id: "func-2", nome: "Maria Santos", email: "caixa1@fabef.mz", role: "funcionario", perfil: "funcionario", telefone: "84 000 0002", estado: "ATIVO" }
+        { id: "func-1", nome: "Faruque Abílio", email: "gerente@fabef.mz", role: "gerente", perfil: "gerente", telefone: "84 000 0001", estado: "ATIVO", ramo: "Mercearia / Minimercado" },
+        { id: "func-2", nome: "Maria Santos", email: "caixa1@fabef.mz", role: "funcionario", perfil: "funcionario", telefone: "84 000 0002", estado: "ATIVO", ramo: "Mercearia / Minimercado" }
+    ];
+
+    window.FABEF.compras = [
+        { id: "compra-demo-1", produtoNome: "Arroz Basmati Cigala 25kg", fornecedorNome: "Distribuidora Nacional de Produtos Lda", quantidade: 50, custoUnitario: 1320, pagamento: "Dinheiro", data: new Date(Date.now() - 48 * 3600 * 1000).toISOString(), ramo: "Mercearia / Minimercado" },
+        { id: "compra-demo-2", produtoNome: "Carne de Novilho / Alcatra Fresca", fornecedorNome: "Moçambique Alimentos & Cereais SA", quantidade: 60, custoUnitario: 320, pagamento: "M-Pesa", data: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), ramo: "Mercearia / Minimercado" }
     ];
 
     window.FABEF.auditoria = [
