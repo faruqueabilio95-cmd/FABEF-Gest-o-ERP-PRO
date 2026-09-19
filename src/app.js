@@ -1178,7 +1178,12 @@ async function carregarEmpresa() {
     }
 
     FABEF.empresa = { id: FABEF.empresaId, ...dados };
-    FABEF.ramo = FABEF.empresa.ramo_ativo || FABEF.empresa.ramoAtivo || "Mercearia / Minimercado";
+    // Se o utilizador for funcionário e tiver um ramo atribuído, o seu ramo ativo é estritamente o atribuído pelo gerente
+    if (FABEF.userData?.perfil === "funcionario" && FABEF.userData?.ramo) {
+        FABEF.ramo = FABEF.userData.ramo;
+    } else {
+        FABEF.ramo = FABEF.empresa.ramo_ativo || FABEF.empresa.ramoAtivo || "Mercearia / Minimercado";
+    }
 }
 
 async function carregarDados() {
@@ -1301,8 +1306,10 @@ function abrirAplicacao() {
     verificarSubscricao();
     atualizarIndicadorLigacao();
 
-    // Primeira vez neste dispositivo: sugere definir um PIN para acesso rápido offline
-    if (FABEF.user?.uid && !localStorage.getItem(chavePinLocal(FABEF.user.uid))) {
+    // Pergunta UMA ÚNICA VEZ neste dispositivo se deseja configurar PIN
+    const chavePerguntado = "fabef_pin_perguntado_" + FABEF.user.uid;
+    if (FABEF.user?.uid && !localStorage.getItem(chavePinLocal(FABEF.user.uid)) && !localStorage.getItem(chavePerguntado)) {
+        localStorage.setItem(chavePerguntado, "true");
         setTimeout(() => configurarNovoPin(FABEF.user.uid), 600);
     }
 }
@@ -6392,3 +6399,45 @@ document.getElementById("btn-recibo-whatsapp")?.addEventListener("click", bindWh
 document.getElementById("btn-recibo-fechar")?.addEventListener("click", () => {
     fecharModal("modal-recibo-sucesso");
 });
+
+// Suporte para descarregar o projeto em ZIP a partir do botão da interface
+document.getElementById("btn-baixar-projeto-zip")?.addEventListener("click", window.baixarProjetoZip);
+
+// Suporte para abrir o modal de alteração de senha a partir da barra lateral
+document.getElementById("btn-sidebar-alterar-senha")?.addEventListener("click", () => {
+    document.getElementById("senha-status").textContent = "";
+    document.getElementById("senha-atual").value = "";
+    document.getElementById("senha-nova").value = "";
+    document.getElementById("senha-nova-confirmar").value = "";
+    document.getElementById("modal-alterar-senha")?.classList.add("show");
+});
+
+// Suporte para instalação PWA
+let deferredPromptInstalacao = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPromptInstalacao = e;
+});
+
+const acionarInstalacaoPWA = async () => {
+    if (deferredPromptInstalacao) {
+        deferredPromptInstalacao.prompt();
+        const { outcome } = await deferredPromptInstalacao.userChoice;
+        if (outcome === "accepted") {
+            toast("✅ Aplicativo adicionado ao seu ecrã!");
+        }
+        deferredPromptInstalacao = null;
+    } else {
+        alert(
+            "📱 Como colocar o FABEF ERP no ecrã do seu celular:\n\n" +
+            "• No Android (Chrome):\n" +
+            "Toque no menu ⋮ (3 pontos) no canto superior direito e selecione 'Instalar aplicativo' ou 'Adicionar ao ecrã principal'.\n\n" +
+            "• No iPhone / iPad (Safari):\n" +
+            "Toque no botão Partilhar 📤 na barra inferior e toque em 'Adicionar ao Ecrã Principal ➕'."
+        );
+    }
+};
+
+document.getElementById("btn-instalar-app")?.addEventListener("click", acionarInstalacaoPWA);
+document.getElementById("btn-sidebar-instalar")?.addEventListener("click", acionarInstalacaoPWA);
+
