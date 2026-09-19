@@ -346,6 +346,15 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <button data-sec="subscricao">💳 Subscrição</button>
     </details>
 
+    <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:6px;">
+      <button id="btn-sidebar-alterar-senha" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;font-size:12px;font-weight:600;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
+        🔑 <span>Alterar Minha Senha</span>
+      </button>
+      <button id="btn-sidebar-instalar" style="background:#1e3a8a;border:1px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
+        📲 <span>Instalar Aplicativo no Celular</span>
+      </button>
+    </div>
+
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;gap:8px;align-items:center;">
       <select id="select-idioma" style="flex:1;background:#1e293b;color:#fff;border:1px solid #334155;border-radius:6px;padding:6px;font-size:12px;">
         <option value="pt">Português</option>
@@ -1111,6 +1120,39 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           Ao minimizar a aplicação no telemóvel ou computador, o sistema exige o PIN de 4 dígitos para proteger o caixa e os dados. Ao clicar em "Sair", o sistema exige e-mail e palavra-passe.
         </p>
         <button id="btn-alterar-pin" class="btn btn-light" type="button" style="width:auto;padding:10px 20px;">🔑 Definir/Alterar PIN deste dispositivo</button>
+      </div>
+
+      <div class="card" style="border: 2px solid #10b981; background: #f0fdf4;">
+        <h3 style="color:#065f46; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+          📦 Transferência Completa do Código (Ficheiro ZIP)
+        </h3>
+        <p style="font-size:13px; color:#166534; margin-bottom:12px;">
+          Transfira todos os ficheiros do FABEF ERP PRO (HTML, JavaScript, Manifest, Ícones e pacote completo) num ficheiro <strong>.ZIP</strong> para ter backup offline ou hospedar no seu servidor.
+        </p>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <button id="btn-baixar-projeto-zip" class="btn" style="background:#059669; color:#fff; font-weight:700; padding:10px 22px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+            📥 Descarregar Projeto Completo (.ZIP)
+          </button>
+          <a href="./FABEF_ERP_PRO_Completo.zip" download="FABEF_ERP_PRO_Completo.zip" class="btn btn-light" style="font-weight:700; padding:10px 18px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#fff; border:1.5px solid #059669; color:#065f46;">
+            ⚡ Transferência Direta Imediata (.ZIP)
+          </a>
+        </div>
+      </div>
+
+      <div class="card" style="border: 2px solid #3b82f6; background: #eff6ff;">
+        <h3 style="color:#1e40af; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+          📲 Aplicativo no Telemóvel / Computador (PWA)
+        </h3>
+        <p style="font-size:13px; color:#1e3a8a; margin-bottom:12px;">
+          Instale o FABEF ERP diretamente no ecrã principal do seu celular Android ou iPhone para usar como aplicativo nativo rápido em tela cheia:
+        </p>
+        <ul style="font-size:13px; color:#1e40af; margin-bottom:14px; margin-left:18px;">
+          <li><strong>No Android (Chrome):</strong> Toque no menu <strong>⋮ (3 pontos)</strong> no canto superior do navegador e selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar ao ecrã principal"</strong>.</li>
+          <li><strong>No iPhone (Safari):</strong> Toque no botão de <strong>Partilhar 📤</strong> na barra inferior do Safari e escolha <strong>"Adicionar ao Ecrã Principal ➕"</strong>.</li>
+        </ul>
+        <button id="btn-instalar-app" class="btn" style="background:#2563eb; color:#fff; font-weight:700; padding:10px 20px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+          📲 Instalar no Ecrã Principal do Celular
+        </button>
       </div>
     </section>
 
