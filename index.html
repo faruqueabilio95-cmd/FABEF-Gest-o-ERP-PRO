@@ -7,7 +7,6 @@
     "firebase/app": "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js",
-    "jszip": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm",
     "canvas-confetti": "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/+esm"
   }
 }
@@ -629,8 +628,10 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- FORNECEDORES -->
     <section class="secao" id="sec-fornecedores">
       <h2>Fornecedores</h2>
-      <div class="card">
+      <div class="card" id="card-adicionar-fornecedor">
+        <h3 style="margin-bottom:12px;color:#1e3a8a;font-size:15px;">➕ Adicionar Fornecedor (Exclusivo do Gerente)</h3>
         <div class="grid">
+          <div class="form-group"><label for="fornecedor-id-custom">ID / Código do Fornecedor</label><input type="text" id="fornecedor-id-custom" placeholder="Ex: FORN-01"></div>
           <div class="form-group"><label for="fornecedor-nome">Nome</label><input type="text" id="fornecedor-nome"></div>
           <div class="form-group"><label for="fornecedor-telefone">Telefone (WhatsApp)</label><input type="text" id="fornecedor-telefone"></div>
           <div class="form-group"><label for="fornecedor-divida">Dívida inicial (se houver)</label><input type="number" id="fornecedor-divida" min="0" step="0.01" value="0"></div>
@@ -640,7 +641,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Telefone</th><th>Observação</th><th>Dívida atual</th><th>Compras</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome / ID</th><th>Telefone</th><th>Observação</th><th>Dívida atual</th><th>Compras</th><th>Ações</th></tr></thead>
           <tbody id="tabela-fornecedores"></tbody>
         </table></div>
       </div>
@@ -650,7 +651,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <section class="secao" id="sec-clientes">
       <h2>Clientes</h2>
       <div class="card">
+        <h3 style="margin-bottom:12px;color:#1e3a8a;font-size:15px;">➕ Adicionar Cliente</h3>
         <div class="grid">
+          <div class="form-group"><label for="cliente-id-custom">ID / Código do Cliente (opcional)</label><input type="text" id="cliente-id-custom" placeholder="Ex: CLI-01"></div>
           <div class="form-group"><label for="cliente-nome">Nome</label><input type="text" id="cliente-nome"></div>
           <div class="form-group"><label for="cliente-telefone">Telefone (WhatsApp)</label><input type="text" id="cliente-telefone"></div>
           <div class="form-group"><label for="cliente-endereco">Endereço / localização</label><input type="text" id="cliente-endereco"></div>
@@ -660,7 +663,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Telefone</th><th>Endereço</th><th>Dívida atual</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome / ID</th><th>Telefone</th><th>Endereço</th><th>Dívida atual</th><th>Ações</th></tr></thead>
           <tbody id="tabela-clientes"></tbody>
         </table></div>
       </div>
@@ -888,94 +891,108 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <section class="secao" id="sec-ramos">
       <h2>Ramos de Atividade & Filiais da Empresa</h2>
 
-      <!-- PASTA DE RAMOS DA EMPRESA -->
+      <!-- PASTA DE RAMOS EM USO NO SISTEMA -->
       <div class="card" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #fff; border: 1.5px solid #3b82f6; border-radius: 12px; padding: 18px; margin-bottom: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
           <div>
             <div style="display:inline-block; background:#2563eb; color:#fff; font-size:11px; font-weight:800; padding:3px 8px; border-radius:12px; margin-bottom:4px; text-transform:uppercase;">
-              Multi-Ramos Integrados
+              ⭐ Filiais & Ramos em Uso
             </div>
             <h3 style="font-size:18px; font-weight:800; color:#fff; margin:0;">
-              📁 Pasta de Ramos da Empresa (Gestão Centralizada)
+              🏬 Todos os Ramos em Atividade nesta Empresa (Acesso Direto)
             </h3>
             <p style="font-size:12px; color:#cbd5e1; margin:4px 0 0 0;">
-              O gerente pode gerir vários negócios/filiais na mesma aplicação. Clique sobre a pasta de qualquer ramo para alternar instantaneamente.
+              Os seus ramos activos estão reunidos aqui. Não precisa pesquisar em listas: clique no ramo desejado para alternar imediatamente no sistema com total segurança.
             </p>
           </div>
           <button type="button" id="btn-abrir-modal-novo-ramo" class="btn" style="background:#10b981; color:#fff; font-weight:800; padding:9px 16px; border-radius:8px; border:none; cursor:pointer; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
-            ➕ Criar / Adicionar Ramo com Senha
+            ➕ Novo Ramo / Filial com PIN
           </button>
         </div>
 
         <!-- Grade de Pastas dos Ramos -->
-        <div id="pasta-ramos-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:12px; margin-top:14px;">
+        <div id="pasta-ramos-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap:12px; margin-top:14px;">
           <!-- Pastas geradas dinamicamente com ícone, vendas, produtos e botão de troca direta -->
         </div>
       </div>
 
       <div id="visao-geral-ramos"></div>
+
       <div class="card">
-        <div class="form-group" style="max-width:320px;"><label for="ramo-pagina">Ramo ativo</label><select id="ramo-pagina">
-          <option value="Mercearia / Minimercado">Mercearia / Minimercado</option>
-          <option value="Supermercado">Supermercado</option>
-          <option value="Boutique / Moda">Boutique / Moda</option>
-          <option value="Calçados">Calçados</option>
-          <option value="Salão de Beleza">Salão de Beleza</option>
-          <option value="Barbearia">Barbearia</option>
-          <option value="Restaurante">Restaurante</option>
-          <option value="Lanchonete">Lanchonete</option>
-          <option value="Bar / Bebidas">Bar / Bebidas</option>
-          <option value="Pastelaria">Pastelaria</option>
-          <option value="Padaria">Padaria</option>
-          <option value="Talho / Açougue">Talho / Açougue</option>
-          <option value="Peixaria">Peixaria</option>
-          <option value="Frutaria">Frutaria</option>
-          <option value="Hortícola">Hortícola</option>
-          <option value="Farmácia / Perfumaria">Farmácia / Perfumaria</option>
-          <option value="Cosméticos">Cosméticos</option>
-          <option value="Material de Construção">Material de Construção</option>
-          <option value="Ferragem">Ferragem</option>
-          <option value="Elétrica">Elétrica</option>
-          <option value="Canalização">Canalização</option>
-          <option value="Informática">Informática</option>
-          <option value="Telemóveis e Acessórios">Telemóveis e Acessórios</option>
-          <option value="Electrónica">Electrónica</option>
-          <option value="Papelaria">Papelaria</option>
-          <option value="Livraria">Livraria</option>
-          <option value="Móveis">Móveis</option>
-          <option value="Electrodomésticos">Electrodomésticos</option>
-          <option value="Oficina Auto">Oficina Auto</option>
-          <option value="Peças Auto">Peças Auto</option>
-          <option value="Mecânica">Mecânica</option>
-          <option value="Motorizadas">Motorizadas</option>
-          <option value="Aluguer de Equipamentos">Aluguer de Equipamentos</option>
-          <option value="Hotel / Hospedagem">Hotel / Hospedagem</option>
-          <option value="Agência de Viagens">Agência de Viagens</option>
-          <option value="Transporte">Transporte</option>
-          <option value="Taxi / Moto-Taxi">Taxi / Moto-Taxi</option>
-          <option value="Serviços de Limpeza">Serviços de Limpeza</option>
-          <option value="Serviços de Impressão">Serviços de Impressão</option>
-          <option value="Gráfica">Gráfica</option>
-          <option value="Fotografia">Fotografia</option>
-          <option value="Florista">Florista</option>
-          <option value="Pet Shop">Pet Shop</option>
-          <option value="Agropecuária">Agropecuária</option>
-          <option value="Loja de Sementes">Loja de Sementes</option>
-          <option value="Restaurante / Catering">Restaurante / Catering</option>
-          <option value="Comércio Geral">Comércio Geral</option>
-          <option value="Outro">Outro</option>
-        </select></div>
-        <p style="margin:10px 0;color:#64748b;font-size:13px;">Sugestões rápidas de produtos para este ramo:</p>
-        <div id="sugestoes-ramo"></div>
-      </div>
-      <div class="card">
-        <h3 style="margin-bottom:10px;">Adicionar ramo personalizado</h3>
-        <p style="margin-bottom:10px;color:#64748b;font-size:13px;">Não encontrou o seu tipo de negócio na lista? Crie o seu próprio ramo (apenas o gerente pode fazer isto).</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="text" id="novo-ramo-nome" placeholder="Nome do novo ramo" style="flex:1;min-width:200px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-          <button id="btn-adicionar-ramo" class="btn btn-primary">+ Adicionar ramo</button>
+        <h3 style="margin-bottom:8px;color:#1e3a8a;">➕ Adicionar Novo Ramo / Filial à Empresa</h3>
+        <p style="margin-bottom:12px;color:#64748b;font-size:13px;">Registe um novo negócio ou filial para gerir tudo na mesma conta (ex: Mercearia Central, Boutique, Farmácia, etc.) protegido por PIN.</p>
+        <div class="grid">
+          <div class="form-group">
+            <label for="novo-ramo-nome">Nome do novo ramo / filial</label>
+            <input type="text" id="novo-ramo-nome" placeholder="Ex: Filial Bairro Central">
+          </div>
+          <div class="form-group">
+            <label for="novo-ramo-senha-inline">PIN de Acesso (opcional, 4 a 6 dígitos)</label>
+            <input type="password" id="novo-ramo-senha-inline" placeholder="Deixe vazio para acesso livre" maxlength="8">
+          </div>
         </div>
+        <button id="btn-adicionar-ramo" class="btn btn-primary" style="width:auto;padding:10px 22px;">+ Adicionar Ramo à Empresa</button>
       </div>
+
+      <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-top:16px;">
+        <summary style="font-size:13px;font-weight:700;color:#475569;cursor:pointer;">
+          🔍 Catálogo de sugestões rápidas de artigos por ramo pré-definido
+        </summary>
+        <div style="margin-top:12px;">
+          <div class="form-group" style="max-width:320px;"><label for="ramo-pagina">Modelo padrão</label><select id="ramo-pagina">
+            <option value="Mercearia / Minimercado">Mercearia / Minimercado</option>
+            <option value="Supermercado">Supermercado</option>
+            <option value="Boutique / Moda">Boutique / Moda</option>
+            <option value="Calçados">Calçados</option>
+            <option value="Salão de Beleza">Salão de Beleza</option>
+            <option value="Barbearia">Barbearia</option>
+            <option value="Restaurante">Restaurante</option>
+            <option value="Lanchonete">Lanchonete</option>
+            <option value="Bar / Bebidas">Bar / Bebidas</option>
+            <option value="Pastelaria">Pastelaria</option>
+            <option value="Padaria">Padaria</option>
+            <option value="Talho / Açougue">Talho / Açougue</option>
+            <option value="Peixaria">Peixaria</option>
+            <option value="Frutaria">Frutaria</option>
+            <option value="Hortícola">Hortícola</option>
+            <option value="Farmácia / Perfumaria">Farmácia / Perfumaria</option>
+            <option value="Cosméticos">Cosméticos</option>
+            <option value="Material de Construção">Material de Construção</option>
+            <option value="Ferragem">Ferragem</option>
+            <option value="Elétrica">Elétrica</option>
+            <option value="Canalização">Canalização</option>
+            <option value="Informática">Informática</option>
+            <option value="Telemóveis e Acessórios">Telemóveis e Acessórios</option>
+            <option value="Electrónica">Electrónica</option>
+            <option value="Papelaria">Papelaria</option>
+            <option value="Livraria">Livraria</option>
+            <option value="Móveis">Móveis</option>
+            <option value="Electrodomésticos">Electrodomésticos</option>
+            <option value="Oficina Auto">Oficina Auto</option>
+            <option value="Peças Auto">Peças Auto</option>
+            <option value="Mecânica">Mecânica</option>
+            <option value="Motorizadas">Motorizadas</option>
+            <option value="Aluguer de Equipamentos">Aluguer de Equipamentos</option>
+            <option value="Hotel / Hospedagem">Hotel / Hospedagem</option>
+            <option value="Agência de Viagens">Agência de Viagens</option>
+            <option value="Transporte">Transporte</option>
+            <option value="Taxi / Moto-Taxi">Taxi / Moto-Taxi</option>
+            <option value="Serviços de Limpeza">Serviços de Limpeza</option>
+            <option value="Serviços de Impressão">Serviços de Impressão</option>
+            <option value="Gráfica">Gráfica</option>
+            <option value="Fotografia">Fotografia</option>
+            <option value="Florista">Florista</option>
+            <option value="Pet Shop">Pet Shop</option>
+            <option value="Agropecuária">Agropecuária</option>
+            <option value="Loja de Sementes">Loja de Sementes</option>
+            <option value="Restaurante / Catering">Restaurante / Catering</option>
+            <option value="Comércio Geral">Comércio Geral</option>
+            <option value="Outro">Outro</option>
+          </select></div>
+          <p style="margin:10px 0;color:#64748b;font-size:13px;">Sugestões rápidas de produtos para este ramo:</p>
+          <div id="sugestoes-ramo"></div>
+        </div>
+      </details>
     </section>
 
     <!-- AUDITORIA -->
@@ -1077,9 +1094,15 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
           O gerente define aqui os dados que aparecem em todos os recibos térmicos (80mm/A4) e no envio por WhatsApp ao cliente.
         </p>
-        <div class="form-group">
-          <label for="config-nome">Nome do negócio / Estabelecimento</label>
-          <input type="text" id="config-nome" placeholder="Ex: Supermercado & Talho Central FABEF PRO">
+        <div class="grid">
+          <div class="form-group">
+            <label for="config-id-empresa">ID da Empresa / Código do Sistema</label>
+            <input type="text" id="config-id-empresa" placeholder="Ex: EMP-101 ou LOJA-CENTRAL">
+          </div>
+          <div class="form-group">
+            <label for="config-nome">Nome do negócio / Estabelecimento</label>
+            <input type="text" id="config-nome" placeholder="Ex: Supermercado & Talho Central FABEF PRO">
+          </div>
         </div>
         <div class="grid">
           <div class="form-group">
@@ -1129,23 +1152,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <button id="btn-alterar-pin" class="btn btn-light" type="button" style="width:auto;padding:10px 20px;">🔑 Definir/Alterar PIN deste dispositivo</button>
       </div>
 
-      <div class="card" style="border: 2px solid #10b981; background: #f0fdf4;">
-        <h3 style="color:#065f46; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-          📦 Transferência Completa do Código (Ficheiro ZIP)
-        </h3>
-        <p style="font-size:13px; color:#166534; margin-bottom:12px;">
-          Transfira todos os ficheiros do FABEF ERP PRO (HTML, JavaScript, Manifest, Ícones e pacote completo) num ficheiro <strong>.ZIP</strong> para ter backup offline ou hospedar no seu servidor.
-        </p>
-        <div style="display:flex; flex-wrap:wrap; gap:10px;">
-          <button id="btn-baixar-projeto-zip" class="btn" style="background:#059669; color:#fff; font-weight:700; padding:10px 22px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
-            📥 Descarregar Projeto Completo (.ZIP)
-          </button>
-          <a href="./FABEF_ERP_PRO_Completo.zip" download="FABEF_ERP_PRO_Completo.zip" class="btn btn-light" style="font-weight:700; padding:10px 18px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#fff; border:1.5px solid #059669; color:#065f46;">
-            ⚡ Transferência Direta Imediata (.ZIP)
-          </a>
-        </div>
-      </div>
-
       <div class="card" style="border: 2px solid #3b82f6; background: #eff6ff;">
         <h3 style="color:#1e40af; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
           📲 Aplicativo no Telemóvel / Computador (PWA)
@@ -1169,9 +1175,12 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
   <div class="modal-overlay" id="modal-produto">
     <div class="modal-box">
       <h3>Novo produto</h3>
+      <div class="grid">
+        <div class="form-group"><label for="novo-produto-id-custom">ID / Código do Produto (opcional)</label><input type="text" id="novo-produto-id-custom" placeholder="Ex: PROD-01"></div>
+        <div class="form-group"><label for="novo-produto-codigo">Código de barras (opcional)</label><input type="text" id="novo-produto-codigo" placeholder="Ex: 789123456789"></div>
+      </div>
       <div class="form-group"><label for="novo-produto-nome">Nome</label><input type="text" id="novo-produto-nome"></div>
       <div class="form-group"><label for="novo-produto-categoria">Categoria</label><input type="text" id="novo-produto-categoria"></div>
-      <div class="form-group"><label for="novo-produto-codigo">Código</label><input type="text" id="novo-produto-codigo"></div>
       <div class="form-group"><label for="novo-produto-custo">Custo</label><input type="number" id="novo-produto-custo" min="0" step="0.01"></div>
       <div class="form-group"><label for="novo-produto-preco">Preço</label><input type="number" id="novo-produto-preco" min="0" step="0.01"></div>
       <div class="form-group"><label for="novo-produto-stock">Stock inicial</label><input type="number" id="novo-produto-stock" min="0" step="any" placeholder="Ex: 50 ou 12.5"></div>
@@ -1205,9 +1214,12 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <div class="modal-box">
       <h3>Editar produto</h3>
       <input type="hidden" id="edit-produto-id">
+      <div class="grid">
+        <div class="form-group"><label for="edit-produto-id-custom">ID / Código Único do Produto</label><input type="text" id="edit-produto-id-custom" placeholder="Ex: PROD-01"></div>
+        <div class="form-group"><label for="edit-produto-codigo">Código de Barras</label><input type="text" id="edit-produto-codigo"></div>
+      </div>
       <div class="form-group"><label for="edit-produto-nome">Nome</label><input type="text" id="edit-produto-nome"></div>
       <div class="form-group"><label for="edit-produto-categoria">Categoria</label><input type="text" id="edit-produto-categoria"></div>
-      <div class="form-group"><label for="edit-produto-codigo">Código</label><input type="text" id="edit-produto-codigo"></div>
       <div class="form-group"><label for="edit-produto-custo">Custo</label><input type="number" id="edit-produto-custo" min="0" step="0.01"></div>
       <div class="form-group"><label for="edit-produto-preco">Preço</label><input type="number" id="edit-produto-preco" min="0" step="0.01"></div>
       <div class="form-group"><label for="edit-produto-stock">Stock</label><input type="number" id="edit-produto-stock" min="0" step="any" placeholder="Ex: 50 ou 12.5"></div>
@@ -1277,6 +1289,26 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <h3 id="dc-titulo">Detalhes do cliente</h3>
       <div id="dc-corpo" style="font-size:13px;"></div>
       <div class="modal-acoes"><button class="btn btn-light" type="button" onclick="fecharModal('modal-detalhe-cliente')" style="flex:1;">Fechar</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-editar-cliente">
+    <div class="modal-box">
+      <h3>Editar Cliente</h3>
+      <input type="hidden" id="edit-cliente-id">
+      <div class="grid">
+        <div class="form-group"><label for="edit-cliente-id-custom">ID / Código do Cliente</label><input type="text" id="edit-cliente-id-custom" placeholder="Ex: CLI-01"></div>
+        <div class="form-group"><label for="edit-cliente-nome">Nome</label><input type="text" id="edit-cliente-nome"></div>
+      </div>
+      <div class="grid">
+        <div class="form-group"><label for="edit-cliente-telefone">Telefone (WhatsApp)</label><input type="text" id="edit-cliente-telefone"></div>
+        <div class="form-group"><label for="edit-cliente-endereco">Endereço</label><input type="text" id="edit-cliente-endereco"></div>
+      </div>
+      <div class="form-group"><label for="edit-cliente-observacao">Observação</label><input type="text" id="edit-cliente-observacao"></div>
+      <div class="modal-acoes">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-editar-cliente')" style="flex:1;">Cancelar</button>
+        <button id="btn-salvar-edicao-cliente" class="btn btn-entrar" style="flex:1;">Guardar Alterações</button>
+      </div>
     </div>
   </div>
 
@@ -1544,7 +1576,6 @@ function fecharModal(id){ document.getElementById(id)?.classList.remove('show');
 document.getElementById('btn-toggle-dark')?.addEventListener('click', () => document.body.classList.toggle('dark'));
 </script>
 <!-- Biblioteca de leitura de código de barras/QR por câmara — funciona em Chrome, Safari (iOS) e Firefox, porque faz a descodificação em JavaScript puro, sem depender de nenhuma função nativa do navegador -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script type="module" src="./src/app.js"></script>
