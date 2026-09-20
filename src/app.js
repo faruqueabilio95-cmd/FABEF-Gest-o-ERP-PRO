@@ -1,6 +1,5 @@
-import JSZip from "jszip";
 import confetti from "canvas-confetti";
-if (typeof window !== "undefined") { window.JSZip = JSZip; window.confetti = confetti; }
+if (typeof window !== "undefined") { window.confetti = confetti; }
 import { initializeApp, deleteApp } from "firebase/app";
 import {
     getAuth,
@@ -1386,6 +1385,10 @@ function aplicarRestricoesDeAcessoPorPapel() {
     const bannerRamoInicio = document.getElementById("inicio-ramo");
     if (bannerRamoInicio) bannerRamoInicio.style.display = ehGerenteLogado ? "" : "none";
 
+    // Fornecedores: apenas o gerente pode registar fornecedores
+    const cardAdicionarForn = document.getElementById("card-adicionar-fornecedor");
+    if (cardAdicionarForn) cardAdicionarForn.style.display = ehGerenteLogado ? "block" : "none";
+
     // Atualiza os controles do POS de acordo com o perfil
     verificarAcessoPosGerente();
 
@@ -1755,25 +1758,35 @@ async function adicionarRamoPersonalizado() {
 
     const input = document.getElementById("novo-ramo-nome");
     const nome = input?.value.trim();
+    const pin = document.getElementById("novo-ramo-senha-inline")?.value.trim() || "";
     if (!nome) { alert("Introduza o nome do novo ramo."); return; }
-    if (RAMOS.some(r => r.toLowerCase() === nome.toLowerCase())) {
-        alert("Este ramo já existe na lista.");
-        return;
-    }
 
     try {
-        await updateDoc(empresaRef(), {
-            ramos_atividade: arrayUnion(nome),
-            ramo_ativo: nome,
-            atualizadoEm: serverTimestamp()
-        });
-
-        FABEF.empresa.ramos_atividade = [...(FABEF.empresa.ramos_atividade || []), nome];
+        const configRamos = obterConfigRamos();
+        if (!configRamos.some(r => r.nome.toLowerCase() === nome.toLowerCase())) {
+            configRamos.push({ nome: nome, tipo: nome, senha: pin });
+        }
+        if (!FABEF.empresa) FABEF.empresa = {};
+        FABEF.empresa.ramos_config = configRamos;
+        FABEF.empresa.ramos_atividade = Array.from(new Set([...(FABEF.empresa.ramos_atividade || []), nome]));
         FABEF.ramo = nome;
+
+        if (!window.FABEF?.isDemoMode) {
+            await updateDoc(empresaRef(), {
+                ramos_config: configRamos,
+                ramos_atividade: arrayUnion(nome),
+                ramo_ativo: nome,
+                atualizadoEm: serverTimestamp()
+            });
+        }
+
         if (input) input.value = "";
+        const pinInput = document.getElementById("novo-ramo-senha-inline");
+        if (pinInput) pinInput.value = "";
 
         renderTudo();
-        await gravarAuditoria("Adicionou um novo ramo de atividade personalizado: " + nome, "INFO");
+        await gravarAuditoria("Adicionou o ramo / filial: " + nome + (pin ? " (com PIN)" : ""), "INFO");
+        alert(`Ramo / filial "${nome}" adicionado e ativado com sucesso!`);
     } catch (error) {
         console.error(error);
         alert("Não foi possível adicionar o ramo.\n" + mensagemFirebase(error));
@@ -1976,6 +1989,7 @@ async function salvarProduto() {
     }
 
     try {
+        const idCustom = document.getElementById("novo-produto-id-custom")?.value.trim() || "";
         const payload = {
             nome: nome,
             categoria: categoria,
@@ -1991,15 +2005,17 @@ async function salvarProduto() {
             destaque: destaque,
             ramo: FABEF.ramo,
             ativo: true,
-            criadoPor: FABEF.user.uid,
+            criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin",
             dataCriacao: serverTimestamp()
         };
+        if (idCustom) payload.idPersonalizado = idCustom;
 
         const ref = await addDoc(subRef("produtos"), payload);
 
         // Atualização síncrona da memória em cache do navegador
         FABEF.produtos.push({
             id: ref.id,
+            idPersonalizado: payload.idPersonalizado || ref.id,
             nome: payload.nome,
             categoria: payload.categoria,
             codigo: payload.codigo,
@@ -2016,6 +2032,7 @@ async function salvarProduto() {
             ativo: payload.ativo
         });
 
+        limparProdutoForm();
         fecharModal("modal-produto");
         renderTudo();
 
@@ -2031,6 +2048,7 @@ async function salvarProduto() {
 
 function limparProdutoForm() {
     const campos = [
+        "novo-produto-id-custom",
         "novo-produto-nome",
         "novo-produto-categoria",
         "novo-produto-codigo",
@@ -2057,34 +2075,80 @@ document.getElementById("produto-pesquisa").addEventListener("input", renderProd
 
 
 window.abrirModalEditarProduto = function(id) {
-    const p=FABEF.produtos.find(x=>x.id===id); if(!p)return;
-    document.getElementById("edit-produto-id").value=p.id;
-    document.getElementById("edit-produto-nome").value=p.nome||"";
-    document.getElementById("edit-produto-categoria").value=p.categoria||"";
-    document.getElementById("edit-produto-codigo").value=p.codigo||"";
-    document.getElementById("edit-produto-custo").value=numero(p.custo);
-    document.getElementById("edit-produto-preco").value=numero(p.preco);
-    document.getElementById("edit-produto-stock").value=numero(p.stock);
-    document.getElementById("edit-produto-minimo").value=numero(p.stockMinimo||p.minimo||5);
+    const gerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    if (!gerente && !window.FABEF?.isDemoMode) {
+        alert("Operação negada: Apenas o Gerente tem autorização para editar produtos.");
+        return;
+    }
+
+    const p = FABEF.produtos.find(x => x.id === id); 
+    if (!p) return;
+
+    document.getElementById("edit-produto-id").value = p.id;
+    if (document.getElementById("edit-produto-id-custom")) {
+        document.getElementById("edit-produto-id-custom").value = p.idPersonalizado || p.codigo || p.id;
+    }
+    document.getElementById("edit-produto-nome").value = p.nome || "";
+    document.getElementById("edit-produto-categoria").value = p.categoria || "";
+    document.getElementById("edit-produto-codigo").value = p.codigo || "";
+    document.getElementById("edit-produto-custo").value = numero(p.custo);
+    document.getElementById("edit-produto-preco").value = numero(p.preco);
+    document.getElementById("edit-produto-stock").value = numero(p.stock);
+    document.getElementById("edit-produto-minimo").value = numero(p.stockMinimo || p.minimo || 5);
     if (document.getElementById("edit-produto-unidade")) document.getElementById("edit-produto-unidade").value = p.unidade || "unidade";
     if (document.getElementById("edit-produto-foto")) document.getElementById("edit-produto-foto").value = p.foto || "";
     if (document.getElementById("edit-produto-tamanho")) document.getElementById("edit-produto-tamanho").value = p.tamanho || "";
     if (document.getElementById("edit-produto-cor")) document.getElementById("edit-produto-cor").value = p.cor || "";
     if (document.getElementById("edit-produto-destaque")) document.getElementById("edit-produto-destaque").checked = !!p.destaque;
-    const gerente=(FABEF.userData?.perfil||FABEF.userData?.role)==="gerente";
-    const eliminar=document.getElementById("btn-eliminar-produto");
-    if(eliminar){eliminar.style.display=gerente?"block":"none";eliminar.disabled=!gerente;}
-    ["edit-produto-custo","edit-produto-stock"].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!gerente;});
+    
+    const eliminar = document.getElementById("btn-eliminar-produto");
+    if (eliminar) { eliminar.style.display = gerente ? "block" : "none"; eliminar.disabled = !gerente; }
+    ["edit-produto-custo", "edit-produto-stock"].forEach(i => { const el = document.getElementById(i); if (el) el.disabled = !gerente; });
     document.getElementById("modal-editar-produto")?.classList.add("show");
 };
 
-async function salvarEdicaoProduto(){
-    const id=document.getElementById("edit-produto-id").value; const p=FABEF.produtos.find(x=>x.id===id); if(!p)return;
-    const gerente=(FABEF.userData?.perfil||FABEF.userData?.role)==="gerente";
-    const payload={nome:document.getElementById("edit-produto-nome").value.trim(),categoria:document.getElementById("edit-produto-categoria").value.trim(),codigo:document.getElementById("edit-produto-codigo").value.trim(),preco:numero(document.getElementById("edit-produto-preco").value),stockMinimo:numero(document.getElementById("edit-produto-minimo").value),unidade:document.getElementById("edit-produto-unidade")?.value||"unidade",foto:document.getElementById("edit-produto-foto")?.value.trim()||"",tamanho:document.getElementById("edit-produto-tamanho")?.value.trim()||"",cor:document.getElementById("edit-produto-cor")?.value.trim()||"",destaque:document.getElementById("edit-produto-destaque")?.checked||false,atualizadoEm:serverTimestamp()};
-    if(!payload.nome){alert("Introduza o nome do produto.");return;}
-    if(gerente){payload.custo=numero(document.getElementById("edit-produto-custo").value);payload.stock=numero(document.getElementById("edit-produto-stock").value);}
-    try{await updateDoc(produtoRef(id),payload);Object.assign(p,payload);delete p.atualizadoEm;renderTudo();fecharModal("modal-editar-produto");await gravarAuditoria("Editou o produto: "+payload.nome,"INFO");}catch(error){console.error(error);alert("Erro ao editar o produto:\n"+mensagemFirebase(error));}
+async function salvarEdicaoProduto() {
+    const gerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    if (!gerente && !window.FABEF?.isDemoMode) {
+        alert("Operação negada: Funcionário não tem permissão para editar produtos. Esta função é exclusiva do Gerente.");
+        return;
+    }
+
+    const id = document.getElementById("edit-produto-id").value; 
+    const p = FABEF.produtos.find(x => x.id === id); 
+    if (!p) return;
+
+    const idCustom = document.getElementById("edit-produto-id-custom")?.value.trim() || "";
+    const payload = {
+        idPersonalizado: idCustom,
+        nome: document.getElementById("edit-produto-nome").value.trim(),
+        categoria: document.getElementById("edit-produto-categoria").value.trim(),
+        codigo: document.getElementById("edit-produto-codigo").value.trim(),
+        preco: numero(document.getElementById("edit-produto-preco").value),
+        stockMinimo: numero(document.getElementById("edit-produto-minimo").value),
+        unidade: document.getElementById("edit-produto-unidade")?.value || "unidade",
+        foto: document.getElementById("edit-produto-foto")?.value.trim() || "",
+        tamanho: document.getElementById("edit-produto-tamanho")?.value.trim() || "",
+        cor: document.getElementById("edit-produto-cor")?.value.trim() || "",
+        destaque: document.getElementById("edit-produto-destaque")?.checked || false,
+        atualizadoEm: serverTimestamp()
+    };
+    if (!payload.nome) { alert("Introduza o nome do produto."); return; }
+    payload.custo = numero(document.getElementById("edit-produto-custo").value);
+    payload.stock = numero(document.getElementById("edit-produto-stock").value);
+
+    try {
+        await updateDoc(produtoRef(id), payload);
+        Object.assign(p, payload);
+        delete p.atualizadoEm;
+        renderTudo();
+        fecharModal("modal-editar-produto");
+        await gravarAuditoria("Editou o produto (ID: " + (idCustom || id) + "): " + payload.nome, "INFO");
+        alert("Produto atualizado com sucesso.");
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao editar o produto:\n" + mensagemFirebase(error));
+    }
 }
 
 async function eliminarProduto(){
@@ -2104,6 +2168,7 @@ function renderProdutos() {
     const produtosFiltrados = FABEF.produtos.filter(p => {
         return p.ramo === FABEF.ramo && (!pesquisa ||
             String(p.nome || "").toLowerCase().includes(pesquisa) ||
+            String(p.idPersonalizado || "").toLowerCase().includes(pesquisa) ||
             String(p.codigo || "").toLowerCase().includes(pesquisa));
     });
 
@@ -2120,7 +2185,10 @@ function renderProdutos() {
 
         return `
         <tr>
-            <td><strong>${escapeHTML(p.nome)}</strong></td>
+            <td>
+                <strong>${escapeHTML(p.nome)}</strong>
+                ${p.idPersonalizado ? `<br><small style="color:#64748b;font-size:11px;">ID: ${escapeHTML(p.idPersonalizado)}</small>` : ""}
+            </td>
             <td>${escapeHTML(p.codigo || "—")}</td>
             <td>${ehGerente ? dinheiro(p.custo) : "—"}</td>
             <td>${dinheiro(p.preco)}</td>
@@ -2142,7 +2210,11 @@ function renderProdutos() {
                 }
             </td>
             <td>
-                <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarProduto('${escapeHTML(p.id)}')">âœï¸ Editar</button>
+                ${ehGerente ? `
+                    <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarProduto('${escapeHTML(p.id)}')">✏️ Editar</button>
+                ` : `
+                    <span style="color:#94a3b8;font-size:12px;font-weight:600;">🔒 Só Gerente</span>
+                `}
             </td>
         </tr>
         `;
@@ -3511,6 +3583,13 @@ document.getElementById("btn-adicionar-fornecedor").addEventListener("click", ad
 
 
 async function adicionarFornecedor() {
+    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    if (!ehGerente && !window.FABEF?.isDemoMode) {
+        alert("Operação negada: Funcionário não regista fornecedor, isso é do gerente.");
+        return;
+    }
+
+    const idCustom = document.getElementById("fornecedor-id")?.value.trim() || "";
     const nome = document.getElementById("fornecedor-nome").value.trim();
     const telefone = document.getElementById("fornecedor-telefone").value.trim();
     const observacao = document.getElementById("fornecedor-observacao").value.trim();
@@ -3528,16 +3607,18 @@ async function adicionarFornecedor() {
             observacao: observacao,
             divida: dividaInicial,
             ramo: FABEF.ramo,
-            criadoPor: FABEF.user.uid,
+            criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin",
             data: new Date().toISOString(),
             criadoEm: serverTimestamp()
         };
+        if (idCustom) payload.idPersonalizado = idCustom;
 
         const ref = await addDoc(subRef("fornecedores"), payload);
 
         // Alimenta de forma síncrona a cache interna local
         FABEF.fornecedores.push({
             id: ref.id,
+            idPersonalizado: payload.idPersonalizado || ref.id,
             nome: payload.nome,
             telefone: payload.telefone,
             observacao: payload.observacao,
@@ -3547,6 +3628,7 @@ async function adicionarFornecedor() {
         });
 
         // Limpa os elementos de texto do formulário
+        if (document.getElementById("fornecedor-id")) document.getElementById("fornecedor-id").value = "";
         document.getElementById("fornecedor-nome").value = "";
         document.getElementById("fornecedor-telefone").value = "";
         document.getElementById("fornecedor-observacao").value = "";
@@ -3554,7 +3636,7 @@ async function adicionarFornecedor() {
 
         renderFornecedores();
 
-        await gravarAuditoria("Adicionou o fornecedor ao catálogo: " + nome, "INFO");
+        await gravarAuditoria("Adicionou o fornecedor: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
         alert("Fornecedor guardado com sucesso.");
     } catch (error) {
         console.error(error);
@@ -3562,25 +3644,54 @@ async function adicionarFornecedor() {
     }
 }
 
+window.apagarFornecedor = async function(id, nome) {
+    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    if (!ehGerente && !window.FABEF?.isDemoMode) {
+        alert("Operação negada: Apenas o gerente pode apagar fornecedores.");
+        return;
+    }
+    const f = FABEF.fornecedores.find(x => x.id === id);
+    if (!f) return;
+    if (!confirm(`Deseja apagar definitivamente o fornecedor "${nome || f.nome}"?`)) return;
+
+    try {
+        await deleteDoc(subRef("fornecedores", id));
+        FABEF.fornecedores = FABEF.fornecedores.filter(x => x.id !== id);
+        renderFornecedores();
+        await gravarAuditoria("Eliminou o fornecedor: " + (nome || f.nome), "INFO");
+        alert("Fornecedor eliminado com sucesso.");
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao eliminar fornecedor:\n" + mensagemFirebase(error));
+    }
+};
 
 function renderFornecedores() {
     const tabelaCorpo = document.getElementById("tabela-fornecedores");
     if (!tabelaCorpo) return;
+
+    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
 
     tabelaCorpo.innerHTML = FABEF.fornecedores.map(f => {
         const divida = numero(f.divida);
         const compras = FABEF.compras.filter(c => (c.fornecedorNome || "").toLowerCase() === (f.nome || "").toLowerCase());
         return `
     <tr>
-        <td>${escapeHTML(f.nome)}</td>
+        <td>
+            <strong>${escapeHTML(f.nome)}</strong>
+            ${f.idPersonalizado ? `<br><small style="color:#64748b;font-size:11px;">ID: ${escapeHTML(f.idPersonalizado)}</small>` : ""}
+        </td>
         <td>${escapeHTML(f.telefone || "—")}</td>
         <td>${escapeHTML(f.observacao || "—")}</td>
         <td style="color:${divida > 0 ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(divida)}</td>
         <td>${compras.length}</td>
         <td>
-            <div style="display:flex;gap:5px;">
-                <button class="btn btn-light btn-small" type="button" onclick="verComprasFornecedor('${escapeHTML(f.nome)}')">ðŸšš Compras</button>
-                <button class="btn btn-light btn-small" type="button" onclick="amortizarDividaFornecedorPrompt('${escapeHTML(f.id)}','${escapeHTML(f.nome)}')" ${divida > 0 ? '' : 'disabled'}>ðŸ’µ Pagar</button>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                <button class="btn btn-light btn-small" type="button" onclick="verComprasFornecedor('${escapeHTML(f.nome)}')">📦 Compras</button>
+                <button class="btn btn-light btn-small" type="button" onclick="amortizarDividaFornecedorPrompt('${escapeHTML(f.id)}','${escapeHTML(f.nome)}')" ${divida > 0 ? '' : 'disabled'}>💳 Pagar</button>
+                ${ehGerente ? `
+                    <button class="btn btn-light btn-small" type="button" style="color:#ef4444;" onclick="apagarFornecedor('${escapeHTML(f.id)}','${escapeHTML(f.nome)}')">🗑️ Apagar</button>
+                ` : ''}
             </div>
         </td>
     </tr>
@@ -3639,6 +3750,7 @@ document.getElementById("btn-adicionar-cliente").addEventListener("click", adici
 
 
 async function adicionarCliente() {
+    const idCustom = document.getElementById("cliente-id")?.value.trim() || "";
     const nome = document.getElementById("cliente-nome").value.trim();
     const telefone = document.getElementById("cliente-telefone").value.trim();
     const endereco = document.getElementById("cliente-endereco")?.value.trim() || "";
@@ -3661,15 +3773,17 @@ async function adicionarCliente() {
             telefone: telefone,
             endereco: endereco,
             observacao: observacao,
-            criadoPor: FABEF.user.uid,
+            criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin",
             data: new Date().toISOString(),
             criadoEm: serverTimestamp()
         };
+        if (idCustom) payload.idPersonalizado = idCustom;
 
         const ref = await addDoc(subRef("clientes"), payload);
 
         FABEF.clientes.push({
             id: ref.id,
+            idPersonalizado: payload.idPersonalizado || ref.id,
             nome: payload.nome,
             telefone: payload.telefone,
             endereco: payload.endereco,
@@ -3678,6 +3792,7 @@ async function adicionarCliente() {
         });
 
         // Varre e reinicializa todos os campos de texto do cliente
+        if (document.getElementById("cliente-id")) document.getElementById("cliente-id").value = "";
         [
             "cliente-nome",
             "cliente-telefone",
@@ -3690,7 +3805,7 @@ async function adicionarCliente() {
 
         renderClientes();
 
-        await gravarAuditoria("Adicionou o cliente ao cadastro: " + nome, "INFO");
+        await gravarAuditoria("Adicionou o cliente ao cadastro: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
         alert("Cliente guardado com sucesso.");
     } catch (error) {
         console.error(error);
@@ -3698,6 +3813,57 @@ async function adicionarCliente() {
     }
 }
 
+window.abrirModalEditarCliente = function(id) {
+    const c = FABEF.clientes.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById("edit-cliente-id").value = c.id;
+    if (document.getElementById("edit-cliente-id-custom")) {
+        document.getElementById("edit-cliente-id-custom").value = c.idPersonalizado || c.id;
+    }
+    document.getElementById("edit-cliente-nome").value = c.nome || "";
+    document.getElementById("edit-cliente-telefone").value = c.telefone || "";
+    document.getElementById("edit-cliente-endereco").value = c.endereco || "";
+    document.getElementById("edit-cliente-observacao").value = c.observacao || "";
+    document.getElementById("modal-editar-cliente")?.classList.add("show");
+};
+
+async function salvarEdicaoCliente() {
+    const id = document.getElementById("edit-cliente-id").value;
+    const c = FABEF.clientes.find(x => x.id === id);
+    if (!c) return;
+
+    const nome = document.getElementById("edit-cliente-nome").value.trim();
+    const idCustom = document.getElementById("edit-cliente-id-custom")?.value.trim() || "";
+    const telefone = document.getElementById("edit-cliente-telefone").value.trim();
+    const endereco = document.getElementById("edit-cliente-endereco")?.value.trim() || "";
+    const observacao = document.getElementById("edit-cliente-observacao").value.trim();
+
+    if (!nome) { alert("Introduza o nome do cliente."); return; }
+
+    const payload = {
+        idPersonalizado: idCustom,
+        nome: nome,
+        telefone: telefone,
+        endereco: endereco,
+        observacao: observacao,
+        atualizadoEm: serverTimestamp()
+    };
+
+    try {
+        await updateDoc(subRef("clientes", id), payload);
+        Object.assign(c, payload);
+        delete c.atualizadoEm;
+        renderClientes();
+        fecharModal("modal-editar-cliente");
+        await gravarAuditoria("Editou dados do cliente: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
+        alert("Dados do cliente atualizados com sucesso.");
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao atualizar cliente:\n" + mensagemFirebase(error));
+    }
+}
+
+document.getElementById("btn-salvar-edicao-cliente")?.addEventListener("click", salvarEdicaoCliente);
 
 function renderClientes() {
     const tabelaCorpo = document.getElementById("tabela-clientes");
@@ -3708,11 +3874,19 @@ function renderClientes() {
         const saldo = numero(dividaCliente?.saldo);
         return `
     <tr>
-        <td>${escapeHTML(c.nome)}</td>
+        <td>
+            <strong>${escapeHTML(c.nome)}</strong>
+            ${c.idPersonalizado ? `<br><small style="color:#64748b;font-size:11px;">ID: ${escapeHTML(c.idPersonalizado)}</small>` : ""}
+        </td>
         <td>${escapeHTML(c.telefone || "—")}</td>
         <td>${escapeHTML(c.endereco || "—")}</td>
         <td style="color:${saldo > 0 ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(saldo)}</td>
-        <td><button class="btn btn-light btn-small" type="button" onclick="verDetalheCliente('${escapeHTML(c.id)}')">ðŸ‘ï¸ Detalhes</button></td>
+        <td>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                <button class="btn btn-light btn-small" type="button" onclick="verDetalheCliente('${escapeHTML(c.id)}')">👁️ Detalhes</button>
+                <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarCliente('${escapeHTML(c.id)}')">✏️ Editar</button>
+            </div>
+        </td>
     </tr>
     `;
     }).join("") || `
@@ -3797,7 +3971,7 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
             saldo: valor,
             limite: 0,
             data: new Date().toISOString(),
-            criadoPor: FABEF.user.uid,
+            criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin",
             criadoEm: serverTimestamp()
         };
 
@@ -3818,10 +3992,6 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
 
 
 async function registarDivida() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
-        alert("A conta de gerente não regista novas dívidas — isso é feito pelo funcionário no momento da venda ou do atendimento. O gerente pode consultar e acompanhar aqui.");
-        return;
-    }
     const cliente = document.getElementById("divida-cliente").value.trim();
     const telefone = document.getElementById("divida-telefone").value.trim();
     const valor = numero(document.getElementById("divida-valor").value);
@@ -3840,7 +4010,7 @@ async function registarDivida() {
         if (!existente && limite > 0) {
             const payload = {
                 cliente, telefone, saldo: valor, limite,
-                data: new Date().toISOString(), criadoPor: FABEF.user.uid, criadoEm: serverTimestamp()
+                data: new Date().toISOString(), criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin", criadoEm: serverTimestamp()
             };
             const ref = await addDoc(subRef("dividas"), payload);
             FABEF.dividas.push({ id: ref.id, cliente, telefone, saldo: valor, limite, data: payload.data });
@@ -4806,11 +4976,13 @@ function renderConfiguracoes() {
     const telInput = document.getElementById("config-telefone");
     const endInput = document.getElementById("config-endereco");
     const cidInput = document.getElementById("config-cidade");
+    const idEmpresaInput = document.getElementById("config-id");
     const ivaRegimeInput = document.getElementById("config-iva-regime");
     const ivaTaxaInput = document.getElementById("config-iva-taxa");
     const rodapeInput = document.getElementById("config-rodape");
 
     const emp = FABEF.empresa || {};
+    if (idEmpresaInput) idEmpresaInput.value = emp.idPersonalizado || emp.codigo || FABEF.empresaId || "";
     if (nomeInput) nomeInput.value = emp.nome || "";
     if (nuitInput) nuitInput.value = emp.nuit || "";
     if (telInput) telInput.value = emp.telefone || "";
@@ -4833,6 +5005,7 @@ async function guardarConfiguracoes() {
         alert("Apenas o Gerente pode aceder e alterar as configurações.");
         return;
     }
+    const idPersonalizado = document.getElementById("config-id")?.value.trim() || "";
     const nome = document.getElementById("config-nome")?.value.trim() || "";
     const nuit = document.getElementById("config-nuit")?.value.trim() || "";
     const telefone = document.getElementById("config-telefone")?.value.trim() || "";
@@ -4848,6 +5021,7 @@ async function guardarConfiguracoes() {
     }
 
     if (!FABEF.empresa) FABEF.empresa = {};
+    FABEF.empresa.idPersonalizado = idPersonalizado;
     FABEF.empresa.nome = nome;
     FABEF.empresa.nuit = nuit;
     FABEF.empresa.telefone = telefone;
@@ -4865,6 +5039,7 @@ async function guardarConfiguracoes() {
 
     try {
         await updateDoc(empresaRef(), {
+            idPersonalizado: idPersonalizado,
             nome: nome,
             nuit: nuit,
             telefone: telefone,
@@ -4878,7 +5053,7 @@ async function guardarConfiguracoes() {
 
         renderTudo();
 
-        await gravarAuditoria("Actualizou as configurações estruturais da empresa e dados do recibo profissional.", "INFO");
+        await gravarAuditoria("Actualizou as configurações estruturais da empresa e ID do negócio.", "INFO");
         alert("Dados do negócio e parâmetros de recibo guardados com sucesso na nuvem.");
     } catch (error) {
         console.error(error);
@@ -6509,85 +6684,6 @@ window.alternarPerfilDemo = function(novoPerfil) {
     alert(`✅ Perfil alternado para: ${perfil.toUpperCase()}.\n\n${perfil === 'funcionario' ? 'Ramos, compras, relatórios e configurações estão ocultos. O funcionário vai diretamente para Vendas / POS.' : 'Acesso total de Gerente restaurado com gestão de ramos, inventário e relatórios.'}`);
 };
 
-/* =====================================================
-   EXPORTAÇão COMPLETA DO PROJETO EM FICHEIRO ZIP
-===================================================== */
-window.baixarProjetoZip = async function() {
-    const btn = document.getElementById("btn-baixar-projeto-zip");
-    const textoOriginal = btn ? btn.innerHTML : "";
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = "⏳ A compilar ficheiros do projeto...";
-    }
-
-    try {
-        const zip = new JSZip();
-        
-        // Obter index.html atual
-        const resHtml = await fetch("./index.html");
-        const htmlContent = await resHtml.text();
-        zip.file("index.html", htmlContent);
-
-        // Obter src/app.js atual
-        const resApp = await fetch("./src/app.js");
-        const appContent = await resApp.text();
-        zip.folder("src").file("app.js", appContent);
-
-        // Obter package.json
-        try {
-            const resPkg = await fetch("./package.json");
-            if (resPkg.ok) {
-                zip.file("package.json", await resPkg.text());
-            }
-        } catch (_) {}
-
-        // README explicativo com instruções de instalação e substituição
-        zip.file("LEIA-ME-INSTALACAO.txt", 
-`=============================================================
-  FABEF GESTão ERP PRO - PACOTE COMPLETO DE CÓDIGO FONTE
-=============================================================
-
-Este arquivo ZIP contém a versão atualizada do FABEF Gestão ERP PRO com todas as melhorias solicitadas:
-1. Controle rigoroso de perfis (Funcionário restrito a Vendas/Caixa sem acesso a outros ramos).
-2. Bloqueio automático de segurança com PIN ao minimizar a tela ou sair do foco do navegador.
-3. Logout forçado com e-mail e senha ao encerrar a sessão.
-4. Navegação ágil: o menu de 3 pontos fecha instantaneamente e abre apenas a aba selecionada.
-5. Venda fracionada de carne (kg, gramas e litros) com conversão automática de preço por peso.
-6. Recibo profissional personalizável pelo Gerente (NUIT, Endereço, Cidade, Regime de IVA e Rodapé).
-7. Impressão térmica de 80mm e envio direto via WhatsApp.
-
-COMO SUBSTITUIR NO SEU PROJETO OU GITHUB:
-------------------------------------------
-1. Extraia este arquivo ZIP no seu computador.
-2. Copie o arquivo 'index.html' para a raiz do seu repositório/hospedagem.
-3. Copie o arquivo 'src/app.js' para a pasta 'src/' substituindo o anterior.
-4. Faça commit e push no GitHub Pages ou hospede no seu servidor web.
-
-Desenvolvido com excelência para empresas de Moçambique!
-`);
-
-        const blob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `FABEF_ERP_PRO_Completo_${new Date().toISOString().slice(0, 10)}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        toast("📦 Ficheiro ZIP gerado e descarregado com sucesso!");
-    } catch (err) {
-        console.error("Erro ao gerar ZIP:", err);
-        alert("Não foi possível gerar o ZIP automaticamente:\n" + err.message);
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = textoOriginal;
-        }
-    }
-};
-
 // Binds
 document.getElementById("btn-demo-mode")?.addEventListener("click", entrarModoDemo);
 document.getElementById("btn-abrir-sugestoes")?.addEventListener("click", () => {
@@ -6608,9 +6704,6 @@ document.getElementById("btn-recibo-whatsapp")?.addEventListener("click", bindWh
 document.getElementById("btn-recibo-fechar")?.addEventListener("click", () => {
     fecharModal("modal-recibo-sucesso");
 });
-
-// Suporte para descarregar o projeto em ZIP a partir do botão da interface
-document.getElementById("btn-baixar-projeto-zip")?.addEventListener("click", window.baixarProjetoZip);
 
 // Suporte para abrir o modal de alteração de senha a partir da barra lateral
 document.getElementById("btn-sidebar-alterar-senha")?.addEventListener("click", () => {
