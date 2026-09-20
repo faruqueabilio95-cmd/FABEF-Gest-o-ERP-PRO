@@ -708,8 +708,10 @@ let FABEF_arranqueEmCurso = false;
 const elAuth = id => document.getElementById(id);
 
 async function executarLogin() {
-    const email = elAuth("login-email")?.value?.trim() || "";
-    const senha = elAuth("login-senha")?.value || "";
+    const emailInput = elAuth("login-email");
+    const senhaInput = elAuth("login-senha");
+    const email = (emailInput?.value || "").trim().toLowerCase();
+    const senha = senhaInput?.value || "";
     const status = elAuth("login-status");
 
     if (!email || !senha) {
@@ -719,17 +721,27 @@ async function executarLogin() {
 
     const btn = elAuth("btn-login");
     if (btn) btn.disabled = true;
-    if (status) status.textContent = "⏳ A autenticar...";
+    if (status) {
+        status.textContent = "⏳ A validar credenciais...";
+        status.style.color = "#2563eb";
+    }
 
     try {
+        // Autentica no Firebase
         const credencial = await signInWithEmailAndPassword(auth, email, senha);
-        if (status) status.textContent = "🟢 Login realizado. A carregar o sistema...";
+        if (status) {
+            status.textContent = "🟢 Acesso autorizado! A abrir o painel...";
+            status.style.color = "#10b981";
+        }
         if (credencial?.user) {
             await iniciarSessaoFABEF(credencial.user);
         }
     } catch (error) {
         console.error("Erro de login:", error);
-        if (status) status.textContent = "🔴 " + mensagemFirebase(error);
+        if (status) {
+            status.style.color = "#dc2626";
+            status.textContent = "🔴 " + mensagemFirebase(error);
+        }
     } finally {
         if (btn) btn.disabled = false;
     }
@@ -1305,6 +1317,12 @@ function abrirAplicacao() {
     renderTudo();
     verificarSubscricao();
     atualizarIndicadorLigacao();
+    // Garante que SEMPRE começa no menu inicial (painel de controlo limpo)
+    setTimeout(() => {
+        if (typeof mostrarSecao === "function") {
+            mostrarSecao("inicio");
+        }
+    }, 100);
 
     // Pergunta UMA ÚNICA VEZ neste dispositivo se deseja configurar PIN
     const chavePerguntado = "fabef_pin_perguntado_" + FABEF.user.uid;
@@ -1371,38 +1389,34 @@ function aplicarRestricoesDeAcessoPorPapel() {
     // Atualiza os controles do POS de acordo com o perfil
     verificarAcessoPosGerente();
 
-    // O funcionário ao entrar deve ir DIRETO para a sua atividade (Vender / POS)
-    if (!ehGerenteLogado) {
-        const secaoAtual = document.querySelector(".secao.active")?.id;
-        if (!secaoAtual || secaoAtual === "sec-inicio" || secoesReservadasAoGerente.some(sec => "sec-" + sec === secaoAtual)) {
-            mostrarSecao("pos");
-        }
-    }
+    // Sempre que entrar, abre na secção de início
+    mostrarSecao("inicio");
 }
 
 function verificarAcessoPosGerente() {
-    let perfil = "gerente";
+    let perfilAtual = "gerente";
     if (window.FABEF?.isDemoMode) {
-        perfil = window.FABEF.demoPerfil || "gerente";
+        perfilAtual = window.FABEF.demoPerfil || "gerente";
     } else if (FABEF.userData) {
-        perfil = FABEF.userData.perfil || FABEF.userData.role || "gerente";
+        perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
     }
-    const ehGerenteLogado = perfil === "gerente";
+
+    const ehGerente = perfilAtual === "gerente";
     const avisoPos = document.getElementById("aviso-pos-gerente-bloqueado");
     const btnFinalizar = document.getElementById("btn-finalizar-venda");
 
     if (avisoPos) {
-        avisoPos.style.display = ehGerenteLogado ? "block" : "none";
+        avisoPos.style.display = ehGerente ? "block" : "none";
     }
     if (btnFinalizar) {
-        if (ehGerenteLogado) {
+        if (ehGerente) {
             btnFinalizar.disabled = true;
-            btnFinalizar.title = "O perfil de Gerente é exclusivo para gestão e supervisão. As vendas devem ser feitas por Funcionários.";
-            btnFinalizar.style.opacity = "0.6";
+            btnFinalizar.title = "🛡️ O Gerente tem a função exclusiva de supervisão, cadastro/edição de artigos e relatórios. As vendas operacionais no caixa são da responsabilidade do Funcionário.";
+            btnFinalizar.style.opacity = "0.45";
             btnFinalizar.style.cursor = "not-allowed";
         } else {
             btnFinalizar.disabled = false;
-            btnFinalizar.title = "";
+            btnFinalizar.title = "Finalizar venda";
             btnFinalizar.style.opacity = "1";
             btnFinalizar.style.cursor = "pointer";
         }
@@ -1796,7 +1810,10 @@ async function recarregarDadosDoRamoAtual() {
 }
 
 async function mudarRamo(ramo) {
-    if (!RAMOS.includes(ramo)) return;
+    if (!RAMOS.includes(ramo)) {
+        const personalizados = FABEF.empresa?.ramos_atividade || [];
+        RAMOS = Array.from(new Set([...RAMOS_PADRAO, ...personalizados, ramo]));
+    }
 
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
         alert("Só o gerente pode mudar o ramo de atividade.");
@@ -1806,6 +1823,22 @@ async function mudarRamo(ramo) {
     }
 
     if (ramo === FABEF.ramo) return;
+
+    // Verificar se o ramo alvo está protegido por PIN / Senha
+    const configRamos = obterConfigRamos();
+    const ramoAlvo = configRamos.find(r => r.nome === ramo);
+    if (ramoAlvo && ramoAlvo.senha && ramoAlvo.senha.trim()) {
+        const pinDigitado = prompt(`🔒 Segurança de Ramo / Filial:\n\nO ramo "${ramo}" está protegido por PIN.\nPor favor, introduza o PIN ou Senha de acesso configurada pelo Gerente:`);
+        if (pinDigitado === null) {
+            renderRamos();
+            return;
+        }
+        if (pinDigitado.trim() !== ramoAlvo.senha.trim()) {
+            alert("❌ Senha / PIN incorreto! Acesso não autorizado ao ramo " + ramo);
+            renderRamos();
+            return;
+        }
+    }
 
     const confirmar = confirm(
         `Vai mudar do ramo "${FABEF.ramo}" para "${ramo}".\n\n` +
@@ -1828,6 +1861,7 @@ async function mudarRamo(ramo) {
         FABEF.ramo = ramo;
         await recarregarDadosDoRamoAtual(); // Fecha listeners do ramo anterior e subscreve todos os dados do novo ramo
         renderTudo();
+        renderPastaRamos();
 
         // Escreve de forma persistente a alteração nos registos de auditoria
         await gravarAuditoria("Alterou o ramo activo para " + ramo, "INFO");
@@ -1836,6 +1870,7 @@ async function mudarRamo(ramo) {
         alert("Não foi possível alterar o ramo.\n" + mensagemFirebase(error));
     }
 }
+window.mudarRamo = mudarRamo;
 
 
 /* =====================================================
@@ -2556,10 +2591,10 @@ function renderPOS() {
     if (containerDestaques) {
         const destaques = pesquisa ? [] : FABEF.produtos.filter(p => p.ativo !== false && p.ramo === FABEF.ramo && p.destaque);
         containerDestaques.innerHTML = destaques.length ? `
-            <p style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;">â­ SUGESTÕES RÁPIDAS</p>
+            <p style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;">⭐ SUGESTÕES RÁPIDAS</p>
             <div id="pos-sugestoes-rapidas-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));gap:8px;margin-bottom:14px;">
                 ${destaques.map(p => `
-                <button class="produto-pos" data-pos-produto="${escapeHTML(p.id)}" type="button" ${caixaFechado ? "disabled" : ""} style="border-color:#f59e0b;">
+                <button class="produto-pos" data-pos-produto="${escapeHTML(p.id)}" type="button" style="border-color:#f59e0b;">
                     <strong>${escapeHTML(p.nome)}</strong>
                     <small>${dinheiro(p.preco)}</small>
                 </button>`).join("")}
@@ -2571,8 +2606,7 @@ function renderPOS() {
         class="produto-pos"
         data-pos-produto="${escapeHTML(p.id)}"
         type="button"
-        ${caixaFechado ? "disabled" : ""}
-        title="${caixaFechado ? "Abra o caixa / turno para vender" : "Adicionar ao carrinho"}"
+        title="Adicionar ao carrinho"
     >
         ${p.foto ? `<img src="${escapeHTML(p.foto)}" alt="" style="width:100%;height:70px;object-fit:cover;border-radius:6px;margin-bottom:4px;" onerror="this.style.display='none';">` : ""}
         <strong>${escapeHTML(p.nome)}</strong>
@@ -2607,15 +2641,25 @@ function renderPOS() {
 ===================================================== */
 
 async function adicionarCarrinho(id) {
-    // A conta de gerente é só de controlo — não regista vendas (a menos que esteja no modo teste)
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
-        alert("A conta de gerente não pode registar vendas. Entre com uma conta de funcionário.");
+    let perfilAtual = "gerente";
+    if (window.FABEF?.isDemoMode) {
+        perfilAtual = window.FABEF.demoPerfil || "gerente";
+    } else if (FABEF.userData) {
+        perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
+    }
+
+    // O Gerente tem a função exclusiva de gestão e supervisão (adicionar/editar artigos, stocks, relatórios e auditoria)
+    if (perfilAtual === "gerente") {
+        alert("🛡️ Modo Exclusivo de Supervisão:\n\nO Gerente tem a função de gestão estratégica, supervisão, stock e preços (adicionar e editar artigos).\n\nAs vendas operacionais no caixa do POS devem ser realizadas pelo perfil de Funcionário.");
         return;
     }
 
-    // Barreira imediata de interface: o estado do caixa já é mantido em tempo real.
+    // Barreira imediata de interface: caixa deve estar aberto para vender
     if (!FABEF.turnoId) {
-        alert("Operação bloqueada: abra o caixa / turno antes de realizar vendas.");
+        const abrir = confirm("⚠️ O Caixa / Turno de hoje ainda não foi aberto.\n\nPara registar vendas operacionais, o caixa precisa de estar aberto.\nDeseja ir à secção Caixa / Turnos para abrir agora?");
+        if (abrir) {
+            mostrarSecao("caixa");
+        }
         atualizarTelaCaixa();
         return;
     }
@@ -2982,8 +3026,9 @@ async function finalizarVenda() {
     } else if (FABEF.userData) {
         perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
     }
+
     if (perfilAtual === "gerente") {
-        alert("Operação Bloqueada: A aba e perfil do Gerente não pode realizar vendas operacionais. Todas as vendas de balcão no POS devem ser realizadas pelo perfil de Funcionário.");
+        alert("🛡️ Operação Bloqueada ao Gerente:\n\nO perfil de Gerente é para gestão, supervisão, auditoria e edição/cadastro de artigos.\n\nPara registar vendas operacionais no caixa, aceda com o perfil de Funcionário.");
         return;
     }
 
@@ -3253,10 +3298,14 @@ window.imprimirReciboVenda = function(vendaId) {
     const subtotalVenda = numero(v.subtotal || totalVenda);
     const descontoVenda = numero(v.desconto || 0);
 
-    const w = window.open("", "_blank");
-    if (!w) { alert("O navegador bloqueou a janela de impressão."); return; }
+    let w = null;
+    try {
+        w = window.open("", "_blank");
+    } catch (e) {
+        w = null;
+    }
 
-    w.document.write(`
+    const reciboHtml = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -3366,8 +3415,30 @@ window.imprimirReciboVenda = function(vendaId) {
         </script>
     </body>
     </html>
-    `);
-    w.document.close();
+    `;
+    if (w) {
+        w.document.write(reciboHtml);
+        w.document.close();
+    } else {
+        let printIframe = document.getElementById("print-recibo-fallback-iframe");
+        if (!printIframe) {
+            printIframe = document.createElement("iframe");
+            printIframe.id = "print-recibo-fallback-iframe";
+            printIframe.style.display = "none";
+            document.body.appendChild(printIframe);
+        }
+        printIframe.contentWindow.document.open();
+        printIframe.contentWindow.document.write(reciboHtml);
+        printIframe.contentWindow.document.close();
+        setTimeout(() => {
+            try {
+                printIframe.contentWindow.focus();
+                printIframe.contentWindow.print();
+            } catch (err) {
+                alert("Nota: Se a impressão automática for restrita nesta janela, abra o aplicativo numa nova aba.");
+            }
+        }, 300);
+    }
 };
 
 window.enviarReciboWhatsApp = function(vendaId) {
@@ -4512,8 +4583,7 @@ window.exportarRelatorioPDF = function() {
     if (!FABEF_RELATORIO_ATUAL) { alert("Aguarde o relatório carregar."); return; }
     const r = FABEF_RELATORIO_ATUAL;
     const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
-    const janela = window.open("", "_blank");
-    janela.document.write(`<html><head><title>Relatório - ${escapeHTML(nomeEmpresa)}</title>
+    const relatorioHtml = `<html><head><title>Relatório - ${escapeHTML(nomeEmpresa)}</title>
     <style>body{font-family:Arial;padding:24px;color:#0f172a;} h2{margin-bottom:4px;} table{width:100%;border-collapse:collapse;margin-top:14px;} td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left;}</style>
     </head><body>
     <h2>${escapeHTML(nomeEmpresa)}</h2>
@@ -4528,8 +4598,37 @@ window.exportarRelatorioPDF = function() {
     </table>
     <p style="margin-top:20px;color:#64748b;font-size:12px;">Gerado pelo FABEF Gestão ERP PRO</p>
     <script>window.print();<\/script>
-    </body></html>`);
-    janela.document.close();
+    </body></html>`;
+
+    let janela = null;
+    try {
+        janela = window.open("", "_blank");
+    } catch (e) {
+        janela = null;
+    }
+    if (janela) {
+        janela.document.write(relatorioHtml);
+        janela.document.close();
+    } else {
+        let printIframe = document.getElementById("print-fallback-frame");
+        if (!printIframe) {
+            printIframe = document.createElement("iframe");
+            printIframe.id = "print-fallback-frame";
+            printIframe.style.display = "none";
+            document.body.appendChild(printIframe);
+        }
+        printIframe.contentWindow.document.open();
+        printIframe.contentWindow.document.write(relatorioHtml);
+        printIframe.contentWindow.document.close();
+        setTimeout(() => {
+            try {
+                printIframe.contentWindow.focus();
+                printIframe.contentWindow.print();
+            } catch (err) {
+                alert("Aviso: Janela pop-up bloqueada. Utilize o botão 'Word' para descarregar o relatório.");
+            }
+        }, 500);
+    }
 };
 
 window.exportarRelatorioWord = function() {
@@ -5399,7 +5498,7 @@ function renderPastaRamos() {
                     </div>
                 </div>
 
-                <div style="display:flex;gap:8px;">
+                <div style="display:flex;gap:8px;flex-direction:column;">
                     ${ehAtivo ? `
                         <button class="btn btn-success btn-small" type="button" style="width:100%;font-weight:700;" disabled>
                             ✔ Ramo Selecionado Agora
@@ -5409,6 +5508,16 @@ function renderPastaRamos() {
                             📂 Alternar para este Ramo
                         </button>
                     `}
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn btn-light btn-small" type="button" style="flex:1;font-size:11px;font-weight:600;" onclick="alterarPinRamo('${escapeHTML(r.nome)}')">
+                            🔑 ${temSenha ? 'Alterar PIN' : 'Definir PIN'}
+                        </button>
+                        ${!ehAtivo ? `
+                        <button class="btn btn-light btn-small" type="button" style="color:#ef4444;font-size:11px;font-weight:600;" onclick="removerRamoPasta('${escapeHTML(r.nome)}')" title="Remover este ramo da pasta">
+                            🗑️ Remover
+                        </button>
+                        ` : ''}
+                    </div>
                 </div>
             </div>
         `;
@@ -5425,16 +5534,116 @@ window.alternarRamoPasta = async function(nomeRamo) {
     }
 
     if (ramoAlvo.senha && ramoAlvo.senha.trim()) {
-        const pinDigitado = prompt(`🔒 Segurança de Ramo:\n\nO ramo "${nomeRamo}" está protegido por senha.\nPor favor, introduza a senha de acesso definida pelo Gerente:`);
+        const pinDigitado = prompt(`🔒 Segurança de Filial / Ramo:\n\nO ramo "${nomeRamo}" está protegido por PIN.\nPor favor, introduza o PIN ou Senha de acesso configurada pelo Gerente:`);
         if (pinDigitado === null) return;
         if (pinDigitado.trim() !== ramoAlvo.senha.trim()) {
-            alert("❌ Senha incorreta! Acesso não autorizado para o ramo " + nomeRamo);
+            alert("❌ Senha ou PIN incorreto! Acesso não autorizado para o ramo " + nomeRamo);
             return;
         }
     }
 
     await mudarRamo(nomeRamo);
     renderPastaRamos();
+};
+
+window.alterarPinRamo = async function(nomeRamo) {
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+        alert("Apenas o Gerente tem autorização para configurar o PIN dos ramos.");
+        return;
+    }
+
+    const ramos = obterConfigRamos();
+    const index = ramos.findIndex(r => r.nome === nomeRamo);
+    if (index === -1) {
+        alert("Ramo não encontrado na pasta.");
+        return;
+    }
+    const ramo = ramos[index];
+
+    if (ramo.senha && ramo.senha.trim()) {
+        const pinAtual = prompt(`🔒 Segurança de Ramo:\n\nO ramo "${nomeRamo}" possui um PIN atual.\nIntroduza o PIN atual para autorizar a alteração:`);
+        if (pinAtual === null) return;
+        if (pinAtual.trim() !== ramo.senha.trim()) {
+            alert("❌ PIN atual incorreto! Não foi possível autorizar.");
+            return;
+        }
+    }
+
+    const novoPin = prompt(`🔑 Definir PIN para o ramo "${nomeRamo}":\n\nIntroduza o novo PIN (ex: 1234) para proteger este ramo.\n(Deixe em branco e clique em OK se desejar remover o PIN e deixar com acesso livre):`);
+    if (novoPin === null) return;
+
+    try {
+        ramos[index].senha = novoPin.trim();
+        if (!window.FABEF?.isDemoMode) {
+            await updateDoc(empresaRef(), {
+                ramos_config: ramos,
+                atualizadoEm: serverTimestamp()
+            });
+        }
+        if (!FABEF.empresa) FABEF.empresa = {};
+        FABEF.empresa.ramos_config = ramos;
+
+        await gravarAuditoria(`Gerente configurou/alterou o PIN de proteção do ramo "${nomeRamo}".`, "INFO");
+        alert(`✅ Segurança do ramo "${nomeRamo}" atualizada com sucesso!`);
+        renderPastaRamos();
+    } catch (e) {
+        console.error(e);
+        alert("Erro ao guardar o PIN do ramo:\n" + mensagemFirebase(e));
+    }
+};
+
+window.removerRamoPasta = async function(nomeRamo) {
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+        alert("Apenas o Gerente pode remover ramos da pasta.");
+        return;
+    }
+
+    if (nomeRamo === FABEF.ramo) {
+        alert("⚠️ Não é possível remover o ramo que está atualmente em uso. Alterne primeiro para outro ramo antes de remover este.");
+        return;
+    }
+
+    const confirmou = confirm(`⚠️ Confirmação:\n\nDeseja remover o ramo "${nomeRamo}" da pasta de ramos da empresa?\n\nOs artigos deste ramo permanecerão seguros na base de dados caso adicione novamente o ramo mais tarde.`);
+    if (!confirmou) return;
+
+    const ramos = obterConfigRamos();
+    const ramoAlvo = ramos.find(r => r.nome === nomeRamo);
+    if (ramoAlvo && ramoAlvo.senha && ramoAlvo.senha.trim()) {
+        const pinDigitado = prompt(`🔒 Introduza o PIN do ramo "${nomeRamo}" para autorizar a remoção:`);
+        if (pinDigitado === null) return;
+        if (pinDigitado.trim() !== ramoAlvo.senha.trim()) {
+            alert("❌ PIN incorreto!");
+            return;
+        }
+    }
+
+    try {
+        const novaListaRamos = ramos.filter(r => r.nome !== nomeRamo);
+        const novaListaNomes = (FABEF.empresa?.ramos_atividade || []).filter(n => n !== nomeRamo);
+
+        if (!window.FABEF?.isDemoMode) {
+            await updateDoc(empresaRef(), {
+                ramos_config: novaListaRamos,
+                ramos_atividade: novaListaNomes,
+                atualizadoEm: serverTimestamp()
+            });
+        }
+
+        if (!FABEF.empresa) FABEF.empresa = {};
+        FABEF.empresa.ramos_config = novaListaRamos;
+        FABEF.empresa.ramos_atividade = novaListaNomes;
+
+        const personalizados = FABEF.empresa?.ramos_atividade || [];
+        RAMOS = Array.from(new Set([...RAMOS_PADRAO, ...personalizados]));
+
+        await gravarAuditoria(`Gerente removeu o ramo "${nomeRamo}" da pasta de ramos.`, "INFO");
+        renderRamos();
+        renderPastaRamos();
+        alert(`🗑️ Ramo "${nomeRamo}" removido da pasta com sucesso.`);
+    } catch (e) {
+        console.error(e);
+        alert("Erro ao remover ramo:\n" + mensagemFirebase(e));
+    }
 };
 
 document.getElementById("btn-abrir-modal-novo-ramo")?.addEventListener("click", () => {
@@ -6440,4 +6649,43 @@ const acionarInstalacaoPWA = async () => {
 
 document.getElementById("btn-instalar-app")?.addEventListener("click", acionarInstalacaoPWA);
 document.getElementById("btn-sidebar-instalar")?.addEventListener("click", acionarInstalacaoPWA);
+
+
+async function abrirCaixaAutomatico(saldoInicial = 0) {
+    if (FABEF.turnoId) return FABEF.turnoId;
+    const agora = new Date().toISOString();
+    const dadosTurno = {
+        empresaId: FABEF.empresaId,
+        ramo: FABEF.ramo,
+        operadorUid: FABEF.user?.uid || "sistema",
+        operadorNome: FABEF.userData?.nome || "Operador",
+        abertoEm: agora,
+        saldoInicial: Number(saldoInicial) || 0,
+        estado: "ABERTO",
+        totalVendasDinheiro: 0,
+        totalVendasMpesa: 0,
+        totalVendasEmola: 0,
+        totalVendasCartao: 0,
+        totalVendasCredito: 0,
+        totalEntradas: 0,
+        totalSaidas: 0,
+        criadoEm: serverTimestamp()
+    };
+    const refDoc = await addDoc(collection(db, "turnos_caixa"), dadosTurno);
+    FABEF.turnoId = refDoc.id;
+    FABEF.turno = { id: refDoc.id, ...dadosTurno };
+    await gravarAuditoria("Abertura automática de caixa/turno no POS (" + FABEF.ramo + ")", "INFO");
+    atualizarTelaCaixa();
+    return refDoc.id;
+}
+
+// Vinculação do botão de regularização da licença
+document.getElementById("btn-pagar-licenca")?.addEventListener("click", () => {
+    const bloqueio = document.getElementById("bloqueio-licenca");
+    if (bloqueio) {
+        bloqueio.classList.remove("show");
+        bloqueio.style.display = "none";
+    }
+    mostrarSecao("subscricao");
+});
 
