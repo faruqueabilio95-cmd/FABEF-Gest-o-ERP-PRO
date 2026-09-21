@@ -735,19 +735,30 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
     </section>
 
-    <!-- DESPESAS -->
+    <!-- DESPESAS E CUSTOS OPERACIONAIS -->
     <section class="secao" id="sec-despesas">
-      <h2>Despesas</h2>
+      <h2>Custos e Despesas Operacionais</h2>
       <div class="card">
         <div class="grid">
-          <div class="form-group"><label for="despesa-descricao">Descrição</label><input type="text" id="despesa-descricao"></div>
-          <div class="form-group"><label for="despesa-valor">Valor</label><input type="number" id="despesa-valor" min="0" step="0.01"></div>
+          <div class="form-group"><label for="despesa-descricao">Descrição do Custo / Despesa</label><input type="text" id="despesa-descricao" placeholder="Ex: Champô e coloração, Renda do salão, Eletricidade, Transporte..."></div>
+          <div class="form-group">
+            <label for="despesa-categoria">Categoria do Custo</label>
+            <select id="despesa-categoria" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;">
+              <option value="Produtos e Materiais">Produtos e Materiais (Tintas, Champô, Químicos, Insumos)</option>
+              <option value="Renda e Instalações">Renda / Aluguer do Espaço</option>
+              <option value="Água, Luz e Telecom">Água, Eletricidade e Internet</option>
+              <option value="Salários e Comissões">Salários e Comissões</option>
+              <option value="Manutenção e Limpeza">Manutenção e Material de Limpeza</option>
+              <option value="Outros Custos">Outros Custos Gerais</option>
+            </select>
+          </div>
+          <div class="form-group"><label for="despesa-valor">Valor (MT)</label><input type="number" id="despesa-valor" min="0" step="0.01" placeholder="0,00"></div>
         </div>
-        <button id="btn-registar-despesa" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar despesa</button>
+        <button id="btn-registar-despesa" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar Custo / Despesa</button>
       </div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Utilizador</th></tr></thead>
+          <thead><tr><th>Data</th><th>Descrição & Categoria</th><th>Valor</th><th>Registado por</th><th>Ramo</th></tr></thead>
           <tbody id="tabela-despesas"></tbody>
         </table></div>
       </div>
@@ -817,10 +828,16 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <!-- METAS -->
     <section class="secao" id="sec-metas">
-      <h2>Metas</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+        <h2>🎯 Metas Operacionais</h2>
+        <div style="background:#e0f2fe; color:#0369a1; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:700; border:1px solid #bae6fd;">
+          🏷️ Ramo: <span id="metas-ramo-ativo-nome"></span>
+        </div>
+      </div>
       <div class="grid" id="metas-progresso-loja" style="margin-bottom:16px;"></div>
       <div class="card">
-        <h3 style="margin-bottom:10px;">Metas gerais da loja (só o gerente edita)</h3>
+        <h3 style="margin-bottom:10px;">Metas do Ramo Ativo (só o gerente edita)</h3>
+        <p style="font-size:13px;color:#64748b;margin-bottom:12px;">As metas abaixo são exclusivas do ramo selecionado e não se misturam com os outros ramos.</p>
         <div class="grid">
           <div class="form-group"><label for="metas-input-diaria">Meta diária (MT)</label><input type="number" id="metas-input-diaria" min="0" step="0.01"></div>
           <div class="form-group"><label for="metas-input-semanal">Meta semanal (MT)</label><input type="number" id="metas-input-semanal" min="0" step="0.01"></div>
@@ -1089,10 +1106,17 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <section class="secao" id="sec-config">
 
       <h2>Configurações do Estabelecimento & Recibo</h2>
+      <div id="aviso-config-ramo-ativo" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 16px; margin-bottom:16px; font-size:14px; color:#1e40af; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <div>
+          🏷️ <strong>Ramo / Filial em Configuração:</strong> <span id="config-ramo-ativo-nome" style="font-weight:800; color:#1d4ed8;"></span>
+          <br><small style="color:#64748b;">Cada ramo tem o seu próprio nome de loja, telefone, endereço e rodapé de recibo.</small>
+        </div>
+        <button class="btn btn-light btn-small" type="button" onclick="mostrarSecao('ramos')" style="background:#fff; border:1px solid #93c5fd; color:#1e40af; font-weight:700;">Alternar Ramo</button>
+      </div>
       <div class="card">
-        <h3 style="margin-bottom:12px;color:#1e3a8a;">🏢 Dados Oficiais da Empresa (Emitidos no Recibo)</h3>
+        <h3 style="margin-bottom:12px;color:#1e3a8a;">🏢 Dados Oficiais do Ramo (Emitidos no Recibo)</h3>
         <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
-          O gerente define aqui os dados que aparecem em todos os recibos térmicos (80mm/A4) e no envio por WhatsApp ao cliente.
+          O gerente define aqui os dados que aparecem em todos os recibos térmicos (80mm/A4) e no envio por WhatsApp ao cliente para este ramo.
         </p>
         <div class="grid">
           <div class="form-group">
@@ -1677,13 +1701,6 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
       <button class="btn btn-primary" onclick="fecharModal('modal-sugestoes')" style="padding: 8px 20px;">Entendido</button>
     </div>
   </div>
-</div>
-
-<!-- ATALHO FLUTUANTE VISÍVEL EM TODAS AS TELAS -->
-<div id="barra-flutuante-atalhos" style="position:fixed; bottom:20px; right:20px; z-index:9990; display:flex; gap:8px; align-items:center; background:rgba(15,23,42,0.88); backdrop-filter:blur(10px); padding:8px 12px; border-radius:30px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.2);">
-  <button type="button" data-sec="config" style="background:#2563eb; color:#fff; font-weight:700; border:none; border-radius:20px; padding:8px 14px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 2px 6px rgba(37,99,235,0.4);">
-    ⚙️ Configurações
-  </button>
 </div>
 
 </body>
