@@ -797,7 +797,7 @@ if (btnEsqueciSenha && !btnEsqueciSenha.dataset.fabefBound) {
         }
         try {
             await sendPasswordResetEmail(auth, email);
-            if (status) status.textContent = "ðŸŸ¢ Enviámos um e-mail para " + email + " com as instruções para definir uma nova senha. Verifique também a pasta de spam.";
+            if (status) status.textContent = "🟢 Enviámos um e-mail para " + email + " com as instruções para definir uma nova senha. Verifique também a pasta de spam.";
         } catch (error) {
             console.error(error);
             if (status) status.textContent = "🔴 " + mensagemFirebase(error);
@@ -1236,8 +1236,8 @@ function pedirRenderTudo() {
    é assim que os dados chegam quando o dispositivo estava offline
    e volta a ligar-se à internet.
 ===================================================== */
-const COLECOES_POR_RAMO = new Set(["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
-const COLECOES_POR_DIA = new Set(["vendas","despesas","compras","dividas","encomendas","auditoria_logs","sugestoes"]);
+const COLECOES_POR_RAMO = new Set(["produtos","compras","vendas","despesas","encomendas","funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
+const COLECOES_POR_DIA = new Set(["vendas","despesas","compras","encomendas","auditoria_logs","sugestoes"]);
 function referenciaColecaoFiltrada(nome) {
     const ref = subRef(nome);
     return COLECOES_POR_RAMO.has(nome) && FABEF.ramo ? query(ref, where("ramo", "==", FABEF.ramo)) : ref;
@@ -1273,6 +1273,32 @@ function escutarColecao(nome, estado) {
         let primeiraVez = true;
         const unsub = onSnapshot(referenciaColecaoFiltrada(nome), (snap) => {
             const dados=snap.docs.map(d=>({id:d.id,...d.data()}));
+            if (estado === "clientes") {
+                try {
+                    const localRaw = localStorage.getItem("fabef_local_clientes_" + FABEF.empresaId);
+                    if (localRaw) {
+                        const localCli = JSON.parse(localRaw);
+                        localCli.forEach(c => {
+                            if (!dados.some(d => d.id === c.id || (d.nome && d.nome.toLowerCase() === (c.nome || "").toLowerCase()))) {
+                                dados.push(c);
+                            }
+                        });
+                    }
+                } catch(e){}
+            }
+            if (estado === "dividas") {
+                try {
+                    const localRaw = localStorage.getItem("fabef_local_dividas_" + FABEF.empresaId);
+                    if (localRaw) {
+                        const localDiv = JSON.parse(localRaw);
+                        localDiv.forEach(d => {
+                            if (!dados.some(x => x.id === d.id || (x.cliente && x.cliente.toLowerCase() === (d.cliente || "").toLowerCase()))) {
+                                dados.push(d);
+                            }
+                        });
+                    }
+                } catch(e){}
+            }
             if(COLECOES_POR_DIA.has(nome)){ FABEF._raw=FABEF._raw||{}; FABEF._raw[nome]=dados; } else FABEF[estado]=dados;
             aplicarFiltroDia();
             if(estado==="produtos") verificarReconciliacaoStock();
@@ -1289,7 +1315,7 @@ function atualizarIndicadorLigacao() {
     const indicador = document.getElementById("indicador-ligacao");
     if (!indicador) return;
     if (navigator.onLine) {
-        indicador.textContent = "ðŸŸ¢ Online";
+        indicador.textContent = "🟢 Online";
         indicador.style.color = "#10b981";
         indicador.title = "Ligado à internet — os dados sincronizam em tempo real.";
     } else {
@@ -1388,6 +1414,10 @@ function aplicarRestricoesDeAcessoPorPapel() {
     // Fornecedores: apenas o gerente pode registar fornecedores
     const cardAdicionarForn = document.getElementById("card-adicionar-fornecedor");
     if (cardAdicionarForn) cardAdicionarForn.style.display = ehGerenteLogado ? "block" : "none";
+
+    // Produtos: funcionário não pode adicionar produtos, só o gerente!
+    const btnNovoProd = document.getElementById("btn-novo-produto");
+    if (btnNovoProd) btnNovoProd.style.display = ehGerenteLogado ? "" : "none";
 
     // Atualiza os controles do POS de acordo com o perfil
     verificarAcessoPosGerente();
@@ -1549,7 +1579,7 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
         const credencial = EmailAuthProvider.credential(auth.currentUser.email, atual);
         await reauthenticateWithCredential(auth.currentUser, credencial);
         await updatePassword(auth.currentUser, nova);
-        status.textContent = "ðŸŸ¢ Senha alterada com sucesso!";
+        status.textContent = "🟢 Senha alterada com sucesso!";
         await gravarAuditoria("Alterou a própria senha de acesso.", "INFO");
         setTimeout(() => fecharModal("modal-alterar-senha"), 1500);
     } catch (error) {
@@ -1704,7 +1734,7 @@ function renderRamos() {
     if (sugestoesDoRamo.length === 0) {
         const totalSugestoes = (SUGESTOES[FABEF.ramo] || []).length;
         containerSugestoes.innerHTML = totalSugestoes > 0
-            ? `<p style="color:#10b981;font-size:13px;">âœ”ï¸ Já adicionou todas as sugestões prontas para este ramo.</p>`
+            ? `<p style="color:#10b981;font-size:13px;">✔️ Já adicionou todas as sugestões prontas para este ramo.</p>`
             : `<p style="color:#64748b;font-size:13px;">Ainda não há sugestões rápidas para este ramo. Pode criar os seus produtos manualmente na página "Produtos".</p>`;
     } else {
         containerSugestoes.innerHTML = `
@@ -1944,6 +1974,10 @@ async function criarProdutoSugestao(nome, silencioso) {
 ===================================================== */
 
 document.getElementById("btn-novo-produto").addEventListener("click", () => {
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+        alert("🔒 Acesso Reservado:\n\nFuncionários não podem adicionar produtos ao catálogo. Apenas o Gerente pode cadastrar novos produtos.");
+        return;
+    }
     limparProdutoForm();
     document.getElementById("modal-produto").classList.add("show");
 });
@@ -1957,6 +1991,12 @@ document.getElementById("btn-salvar-produto").addEventListener("click", salvarPr
 ===================================================== */
 
 async function salvarProduto() {
+    // 1. Apenas o Gerente pode cadastrar produtos
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+        alert("🔒 Acesso Reservado:\n\nFuncionários não podem adicionar produtos ao catálogo. Apenas o Gerente tem autorização para cadastrar novos produtos.");
+        return;
+    }
+
     const nome = document.getElementById("novo-produto-nome").value.trim();
     const categoria = document.getElementById("novo-produto-categoria").value.trim();
     const codigo = document.getElementById("novo-produto-codigo").value.trim();
@@ -1969,10 +2009,26 @@ async function salvarProduto() {
     const tamanho = document.getElementById("novo-produto-tamanho")?.value.trim() || "";
     const cor = document.getElementById("novo-produto-cor")?.value.trim() || "";
     const destaque = document.getElementById("novo-produto-destaque")?.checked || false;
+    const idCustom = document.getElementById("novo-produto-id-custom")?.value.trim() || "";
 
     // Validação de segurança básica para integridade de dados
     if (!nome) {
         alert("Introduza o nome do produto.");
+        return;
+    }
+
+    // 2. Não permitir produtos repetidos no mesmo ramo (por nome, código de barras ou ID)
+    const nomeNorm = nome.toLowerCase();
+    const jaExiste = FABEF.produtos.some(p => {
+        if (p.ramo !== FABEF.ramo) return false;
+        const mesmoNome = (p.nome || "").trim().toLowerCase() === nomeNorm;
+        const mesmoCodigo = codigo && p.codigo && p.codigo.trim() === codigo;
+        const mesmoId = idCustom && p.idPersonalizado && p.idPersonalizado.trim() === idCustom;
+        return mesmoNome || mesmoCodigo || mesmoId;
+    });
+
+    if (jaExiste) {
+        alert(`❌ Não é permitido registar produtos repetidos!\n\nJá existe um produto com este nome ("${nome}") ou código no ramo "${FABEF.ramo}".\nSe pretender adicionar mais unidades, utilize "Ajustar Stock" ou lance uma nova Compra.`);
         return;
     }
 
@@ -1989,7 +2045,6 @@ async function salvarProduto() {
     }
 
     try {
-        const idCustom = document.getElementById("novo-produto-id-custom")?.value.trim() || "";
         const payload = {
             nome: nome,
             categoria: categoria,
@@ -2187,6 +2242,7 @@ function renderProdutos() {
         <tr>
             <td>
                 <strong>${escapeHTML(p.nome)}</strong>
+                ${(p.tamanho || p.cor) ? `<br><small style="color:#0284c7;font-weight:600;">${[p.tamanho ? 'Tam: ' + escapeHTML(p.tamanho) : '', p.cor ? 'Cor: ' + escapeHTML(p.cor) : ''].filter(Boolean).join(' | ')}</small>` : ''}
                 ${p.idPersonalizado ? `<br><small style="color:#64748b;font-size:11px;">ID: ${escapeHTML(p.idPersonalizado)}</small>` : ""}
             </td>
             <td>${escapeHTML(p.codigo || "—")}</td>
@@ -2295,7 +2351,7 @@ function renderInventario() {
                         '<span class="badge badge-green">NORMAL</span>')
                 }
             </td>
-            <td><button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock('${escapeHTML(p.id)}')">âš™ï¸ Ajustar</button></td>
+            <td><button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock('${escapeHTML(p.id)}')">⚙️ Ajustar</button></td>
         </tr>
         `;
     }).join("") || `
@@ -2387,7 +2443,7 @@ async function confirmarAjusteStock() {
         renderTudo();
 
         await gravarAuditoria(
-            `Ajuste de stock (${tipoTexto}) em "${produto.nome}": ${stockAnterior} â†’ ${stockNovo} (motivo: ${motivo})`,
+            `Ajuste de stock (${tipoTexto}) em "${produto.nome}": ${stockAnterior} → ${stockNovo} (motivo: ${motivo})`,
             tipo === "perda" ? "AVISO" : "INFO"
         );
         alert("Ajuste de stock registado com sucesso.");
@@ -2410,7 +2466,7 @@ window.abrirRastreabilidadeDeLotes = function (idProduto, nomeProduto) {
 
     if (!modal || !corpo || !resumo) return;
 
-    document.getElementById("md-titulo-produto").textContent = "ðŸ“‹ Histórico de Lotes: " + nomeProduto;
+    document.getElementById("md-titulo-produto").textContent = "📋 Histórico de Lotes: " + nomeProduto;
     modal.classList.add("show");
 
     // Usa diretamente os dados já sincronizados em FABEF.compras (memória local),
@@ -2650,7 +2706,10 @@ function renderPOS() {
             p.ramo === FABEF.ramo &&
             (!pesquisa ||
                 String(p.nome || "").toLowerCase().includes(pesquisa) ||
-                String(p.codigo || "").toLowerCase().includes(pesquisa));
+                String(p.codigo || "").toLowerCase().includes(pesquisa) ||
+                String(p.tamanho || "").toLowerCase().includes(pesquisa) ||
+                String(p.cor || "").toLowerCase().includes(pesquisa) ||
+                String(p.categoria || "").toLowerCase().includes(pesquisa));
     });
 
     const containerPOS = document.getElementById("produtos-pos");
@@ -2668,24 +2727,33 @@ function renderPOS() {
                 ${destaques.map(p => `
                 <button class="produto-pos" data-pos-produto="${escapeHTML(p.id)}" type="button" style="border-color:#f59e0b;">
                     <strong>${escapeHTML(p.nome)}</strong>
+                    ${(p.tamanho || p.cor) ? `<small style="color:#0284c7;font-weight:600;">${[p.tamanho ? 'Tam: ' + escapeHTML(p.tamanho) : '', p.cor ? 'Cor: ' + escapeHTML(p.cor) : ''].filter(Boolean).join(' | ')}</small>` : ''}
                     <small>${dinheiro(p.preco)}</small>
                 </button>`).join("")}
             </div>` : "";
     }
 
-    containerPOS.innerHTML = lista.map(p => `
-    <button
-        class="produto-pos"
-        data-pos-produto="${escapeHTML(p.id)}"
-        type="button"
-        title="Adicionar ao carrinho"
-    >
-        ${p.foto ? `<img src="${escapeHTML(p.foto)}" alt="" style="width:100%;height:70px;object-fit:cover;border-radius:6px;margin-bottom:4px;" onerror="this.style.display='none';">` : ""}
-        <strong>${escapeHTML(p.nome)}</strong>
-        <small>${dinheiro(p.preco)}${p.unidade && p.unidade !== "unidade" ? " / " + escapeHTML(p.unidade) : ""}</small>
-        <small>Stock: ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</small>
-    </button>
-    `).join("") || `
+    containerPOS.innerHTML = lista.map(p => {
+        const atributos = [];
+        if (p.tamanho) atributos.push(`Tam: ${escapeHTML(p.tamanho)}`);
+        if (p.cor) atributos.push(`Cor: ${escapeHTML(p.cor)}`);
+        const atrBadge = atributos.length ? `<small style="color:#0284c7;font-weight:600;display:block;margin:2px 0;">${atributos.join(" | ")}</small>` : "";
+
+        return `
+        <button
+            class="produto-pos"
+            data-pos-produto="${escapeHTML(p.id)}"
+            type="button"
+            title="Adicionar ao carrinho"
+        >
+            ${p.foto ? `<img src="${escapeHTML(p.foto)}" alt="" style="width:100%;height:70px;object-fit:cover;border-radius:6px;margin-bottom:4px;" onerror="this.style.display='none';">` : ""}
+            <strong>${escapeHTML(p.nome)}</strong>
+            ${atrBadge}
+            <small>${dinheiro(p.preco)}${p.unidade && p.unidade !== "unidade" ? " / " + escapeHTML(p.unidade) : ""}</small>
+            <small>Stock: ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</small>
+        </button>
+        `;
+    }).join("") || `
     <div class="alert alert-info" style="width: 100%; text-align: center;">
         Nenhum produto disponível para faturamento neste ramo.
     </div>
@@ -2769,6 +2837,8 @@ async function adicionarCarrinho(id) {
             nome: produto.nome,
             preco: numero(produto.preco),
             unidade: produto.unidade || "unidade",
+            tamanho: produto.tamanho || "",
+            cor: produto.cor || "",
             quantidade: 1
         });
     }
@@ -2918,6 +2988,8 @@ document.getElementById("btn-confirmar-fracionada")?.addEventListener("click", (
             nome: produto.nome,
             preco: precoUnit,
             unidade: produto.unidade || "kg",
+            tamanho: produto.tamanho || "",
+            cor: produto.cor || "",
             quantidade: quantidadeDesejada
         });
     }
@@ -2954,10 +3026,15 @@ function renderCarrinho() {
             `${numero(item.quantidade).toFixed(3)} ${item.unidade}` :
             `${numero(item.quantidade)} ${item.unidade || "un"}`;
 
+        const atributos = [];
+        if (item.tamanho) atributos.push(`Tam: ${escapeHTML(item.tamanho)}`);
+        if (item.cor) atributos.push(`Cor: ${escapeHTML(item.cor)}`);
+        const atrTxt = atributos.length ? ` <span style="font-size:11px;color:#0284c7;font-weight:600;">(${atributos.join(", ")})</span>` : "";
+
         return `
         <div class="cart-item">
             <div class="cart-info">
-                <strong>${escapeHTML(item.nome)}</strong><br>
+                <strong>${escapeHTML(item.nome)}</strong>${atrTxt}<br>
                 <small>${qtdFormatada} × ${dinheiro(item.preco)}</small>
             </div>
             <div style="font-weight: 700; font-size: 13px; margin-right: 5px; color: #065f46;">
@@ -3084,7 +3161,7 @@ function atualizarRestantePagamentoMisto() {
     const restante = totalComDesconto - soma;
     span.textContent = dinheiro(Math.abs(restante));
     span.style.color = Math.abs(restante) < 0.5 ? "#10b981" : (restante > 0 ? "#ef4444" : "#f59e0b");
-    span.textContent += restante > 0.5 ? " em falta" : (restante < -0.5 ? " a mais" : " — tudo atribuído âœ“");
+    span.textContent += restante > 0.5 ? " em falta" : (restante < -0.5 ? " a mais" : " — tudo atribuído ✓");
 }
 ["pos-valor-dinheiro", "pos-valor-mpesa", "pos-valor-emola", "pos-valor-cartao", "pos-valor-credito", "pos-desconto"].forEach(id => {
     document.getElementById(id)?.addEventListener("input", atualizarRestantePagamentoMisto);
@@ -3196,7 +3273,9 @@ async function finalizarVenda() {
                 nome: produto.nome,
                 quantidade: numero(item.quantidade),
                 preco: numero(produto.preco),
-                unidade: produto.unidade || "unidade",
+                unidade: produto.unidade || item.unidade || "unidade",
+                tamanho: produto.tamanho || item.tamanho || "",
+                cor: produto.cor || item.cor || "",
                 subtotal: numero(item.quantidade) * numero(produto.preco)
             });
         }
@@ -3302,6 +3381,7 @@ function renderVendas() {
     const listaFiltrada = FABEF.vendas.filter(v => {
         const dataVenda = new Date(v.data || v.date || 0);
         if (inicio && dataVenda < inicio) return false;
+        if (v.ramo && v.ramo !== FABEF.ramo) return false;
         const textoCompleto = JSON.stringify(v).toLowerCase();
         return !pesquisa || textoCompleto.includes(pesquisa);
     }).sort((a,b) => new Date(b.data || b.date || 0) - new Date(a.data || a.date || 0));
@@ -3310,7 +3390,15 @@ function renderVendas() {
     if (!tabelaCorpo) return;
 
     tabelaCorpo.innerHTML = listaFiltrada.map(v => {
-        const itensMapeados = (v.itens || v.items || []).map(x => escapeHTML(x.nome || "Produto") + " × " + numero(x.quantidade || x.qty)).join(", ");
+        const itensMapeados = (v.itens || v.items || []).map(x => {
+            const qtd = numero(x.quantidade || x.qty);
+            const un = (x.unidade && x.unidade !== "unidade") ? ` ${x.unidade}` : "";
+            const atributos = [];
+            if (x.tamanho) atributos.push(`Tam: ${escapeHTML(x.tamanho)}`);
+            if (x.cor) atributos.push(`Cor: ${escapeHTML(x.cor)}`);
+            const atrTxt = atributos.length ? ` <span style="color:#0284c7;font-weight:600;font-size:11px;">(${atributos.join(", ")})</span>` : "";
+            return `<div style="margin-bottom:3px;">• <strong>${escapeHTML(x.nome || "Produto")}</strong>${atrTxt} × <span style="font-weight:600;">${qtd}${un}</span></div>`;
+        }).join("");
         const ehFalhada = v.status === "FALHADA_CANCELADA" || v.status === "FALHADA" || v.status === "CANCELADA";
         return `
         <tr style="${ehFalhada ? 'background: #fff1f2; opacity: 0.88;' : ''}">
@@ -3749,6 +3837,24 @@ window.amortizarDividaFornecedorPrompt = async function(id, nome) {
 document.getElementById("btn-adicionar-cliente").addEventListener("click", adicionarCliente);
 
 
+function guardarClientesLocalmente() {
+    try {
+        if (!FABEF.empresaId) return;
+        localStorage.setItem("fabef_local_clientes_" + FABEF.empresaId, JSON.stringify(FABEF.clientes || []));
+    } catch (e) {
+        console.warn("Erro ao salvar clientes localmente:", e);
+    }
+}
+
+function guardarDividasLocalmente() {
+    try {
+        if (!FABEF.empresaId) return;
+        localStorage.setItem("fabef_local_dividas_" + FABEF.empresaId, JSON.stringify(FABEF.dividas || []));
+    } catch (e) {
+        console.warn("Erro ao salvar dividas localmente:", e);
+    }
+}
+
 async function adicionarCliente() {
     const idCustom = document.getElementById("cliente-id")?.value.trim() || "";
     const nome = document.getElementById("cliente-nome").value.trim();
@@ -3767,50 +3873,58 @@ async function adicionarCliente() {
         return;
     }
 
+    const payload = {
+        nome: nome,
+        telefone: telefone,
+        endereco: endereco,
+        observacao: observacao,
+        ramo: FABEF.ramo || "Geral",
+        criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin",
+        data: new Date().toISOString(),
+        criadoEm: serverTimestamp()
+    };
+    if (idCustom) payload.idPersonalizado = idCustom;
+
+    let docId = "cli_" + Date.now();
+    let salvoNuvem = false;
+
     try {
-        const payload = {
-            nome: nome,
-            telefone: telefone,
-            endereco: endereco,
-            observacao: observacao,
-            criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin",
-            data: new Date().toISOString(),
-            criadoEm: serverTimestamp()
-        };
-        if (idCustom) payload.idPersonalizado = idCustom;
-
         const ref = await addDoc(subRef("clientes"), payload);
-
-        FABEF.clientes.push({
-            id: ref.id,
-            idPersonalizado: payload.idPersonalizado || ref.id,
-            nome: payload.nome,
-            telefone: payload.telefone,
-            endereco: payload.endereco,
-            observacao: payload.observacao,
-            data: payload.data
-        });
-
-        // Varre e reinicializa todos os campos de texto do cliente
-        if (document.getElementById("cliente-id")) document.getElementById("cliente-id").value = "";
-        [
-            "cliente-nome",
-            "cliente-telefone",
-            "cliente-endereco",
-            "cliente-observacao"
-        ].forEach(id => {
-            const input = document.getElementById(id);
-            if (input) input.value = "";
-        });
-
-        renderClientes();
-
-        await gravarAuditoria("Adicionou o cliente ao cadastro: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
-        alert("Cliente guardado com sucesso.");
+        docId = ref.id;
+        salvoNuvem = true;
     } catch (error) {
-        console.error(error);
-        alert("Erro ao guardar o cliente:\n" + mensagemFirebase(error));
+        console.warn("Firebase offline ou regras restritas, a guardar cliente na memória do dispositivo:", error);
     }
+
+    const novoCliente = {
+        id: docId,
+        idPersonalizado: payload.idPersonalizado || docId,
+        nome: payload.nome,
+        telefone: payload.telefone,
+        endereco: payload.endereco,
+        observacao: payload.observacao,
+        ramo: payload.ramo,
+        data: payload.data
+    };
+    FABEF.clientes.push(novoCliente);
+    guardarClientesLocalmente();
+
+    // Varre e reinicializa todos os campos de texto do cliente
+    if (document.getElementById("cliente-id")) document.getElementById("cliente-id").value = "";
+    [
+        "cliente-nome",
+        "cliente-telefone",
+        "cliente-endereco",
+        "cliente-observacao"
+    ].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = "";
+    });
+
+    renderClientes();
+
+    await gravarAuditoria("Adicionou o cliente ao cadastro: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
+    alert("✅ Cliente guardado com sucesso!");
 }
 
 window.abrirModalEditarCliente = function(id) {
@@ -3850,17 +3964,18 @@ async function salvarEdicaoCliente() {
     };
 
     try {
-        await updateDoc(subRef("clientes", id), payload);
-        Object.assign(c, payload);
-        delete c.atualizadoEm;
-        renderClientes();
-        fecharModal("modal-editar-cliente");
-        await gravarAuditoria("Editou dados do cliente: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
-        alert("Dados do cliente atualizados com sucesso.");
+        await updateDoc(doc(db, "empresas", FABEF.empresaId, "clientes", id), payload);
     } catch (error) {
-        console.error(error);
-        alert("Erro ao atualizar cliente:\n" + mensagemFirebase(error));
+        console.warn("Aviso Firebase ao atualizar cliente, salvando localmente:", error);
     }
+
+    Object.assign(c, payload);
+    delete c.atualizadoEm;
+    guardarClientesLocalmente();
+    renderClientes();
+    fecharModal("modal-editar-cliente");
+    await gravarAuditoria("Editou dados do cliente: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
+    alert("✅ Dados do cliente atualizados com sucesso.");
 }
 
 document.getElementById("btn-salvar-edicao-cliente")?.addEventListener("click", salvarEdicaoCliente);
@@ -3958,10 +4073,14 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
             throw new Error("O limite de crédito deste cliente foi ultrapassado.");
         }
 
-        await updateDoc(doc(db, "empresas", FABEF.empresaId, "dividas", existente.id), {
-            saldo: novoSaldo,
-            atualizadoEm: serverTimestamp()
-        });
+        try {
+            await updateDoc(doc(db, "empresas", FABEF.empresaId, "dividas", existente.id), {
+                saldo: novoSaldo,
+                atualizadoEm: serverTimestamp()
+            });
+        } catch (error) {
+            console.warn("Aviso ao sincronizar dívida com Firebase, gravando na memória local:", error);
+        }
 
         existente.saldo = novoSaldo;
     } else {
@@ -3970,23 +4089,32 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
             telefone: telefone || "",
             saldo: valor,
             limite: 0,
+            ramo: FABEF.ramo || "Geral",
             data: new Date().toISOString(),
             criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin",
             criadoEm: serverTimestamp()
         };
 
-        const ref = await addDoc(subRef("dividas"), payload);
+        let idGerado = "div_" + Date.now();
+        try {
+            const ref = await addDoc(subRef("dividas"), payload);
+            idGerado = ref.id;
+        } catch (error) {
+            console.warn("Aviso ao salvar nova dívida no Firebase, gravando localmente:", error);
+        }
 
         FABEF.dividas.push({
-            id: ref.id,
+            id: idGerado,
             cliente: payload.cliente,
             telefone: payload.telefone,
             saldo: payload.saldo,
             limite: payload.limite,
+            ramo: payload.ramo,
             data: payload.data
         });
     }
 
+    guardarDividasLocalmente();
     renderDividas();
 }
 
@@ -4010,10 +4138,18 @@ async function registarDivida() {
         if (!existente && limite > 0) {
             const payload = {
                 cliente, telefone, saldo: valor, limite,
+                ramo: FABEF.ramo || "Geral",
                 data: new Date().toISOString(), criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin", criadoEm: serverTimestamp()
             };
-            const ref = await addDoc(subRef("dividas"), payload);
-            FABEF.dividas.push({ id: ref.id, cliente, telefone, saldo: valor, limite, data: payload.data });
+            let idGerado = "div_" + Date.now();
+            try {
+                const ref = await addDoc(subRef("dividas"), payload);
+                idGerado = ref.id;
+            } catch (err) {
+                console.warn("Aviso ao gravar dívida no Firebase:", err);
+            }
+            FABEF.dividas.push({ id: idGerado, cliente, telefone, saldo: valor, limite, ramo: payload.ramo, data: payload.data });
+            guardarDividasLocalmente();
         } else {
             await registrarOuAtualizarDivida(cliente, telefone, valor);
         }
@@ -4026,11 +4162,11 @@ async function registarDivida() {
         renderDividas();
 
         await gravarAuditoria("Registou uma nova dívida / fiado no valor de " + dinheiro(valor) + " para o cliente: " + cliente, "INFO");
-        alert("Dívida registada e conta corrente atualizada com sucesso.");
+        alert("✅ Dívida registada e conta corrente atualizada com sucesso.");
 
     } catch (error) {
         console.error("Erro crítico ao processar conta corrente de fiado:", error);
-        alert("Não foi possível registar o fiado:\n" + mensagemFirebase(error));
+        alert("Não foi possível registar o fiado:\n" + error.message);
     }
 }
 /* =====================================================
@@ -4043,8 +4179,8 @@ function renderDividas() {
     tabelaCorpo.innerHTML = FABEF.dividas.map(d => {
         const possuiDivida = numero(d.saldo) > 0;
         const botaoCobrar = possuiDivida
-            ? `<button class="btn btn-success btn-small" onclick="enviarLembreteDivida('${escapeHTML(d.id)}')" type="button" style="background-color:#25d366;">ðŸ“± Cobrar</button>`
-            : `<button class="btn btn-secondary btn-small" type="button" disabled style="opacity:.4;">ðŸ“± Pago</button>`;
+            ? `<button class="btn btn-success btn-small" onclick="enviarLembreteDivida('${escapeHTML(d.id)}')" type="button" style="background-color:#25d366;">📱 Cobrar</button>`
+            : `<button class="btn btn-secondary btn-small" type="button" disabled style="opacity:.4;">📱 Pago</button>`;
         return `<tr><td><strong>${escapeHTML(d.cliente)}</strong></td><td>${escapeHTML(d.telefone || "—")}</td><td style="color:${possuiDivida ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(d.saldo)}</td><td>${dinheiro(d.limite)}</td><td><div style="display:flex;gap:5px;"><button class="btn btn-light btn-small" onclick="amortizarDividaPrompt('${escapeHTML(d.id)}','${escapeHTML(d.cliente)}')" type="button" ${possuiDivida ? '' : 'disabled'}>Amortizar</button>${botaoCobrar}</div></td></tr>`;
     }).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Nenhum registo de fiado ativo localizado.</td></tr>`;
 }
@@ -4056,7 +4192,7 @@ window.enviarLembreteDivida = function(id) {
     let telefoneFormatado = String(d.telefone).trim().replace(/\D/g, "");
     if (telefoneFormatado.length === 9) telefoneFormatado = "258" + telefoneFormatado;
     const nomeEmpresa = FABEF.empresa?.nome || "Nosso Estabelecimento";
-    const mensagem = encodeURIComponent(`Olá *${d.cliente}*,\n\nEsperamos que esteja bem. Passamos por aqui para lembrar gentilmente que possui um saldo em aberto no valor de *${dinheiro(d.saldo)}* referente às suas compras a fiado em *${nomeEmpresa}*.\n\nO seu limite de crédito atual é de ${dinheiro(d.limite)}.\n\nAgradecemos se puder passar pelo estabelecimento para regularizar o valor assim que possível. Obrigado pela compreensão! ðŸ™`);
+    const mensagem = encodeURIComponent(`Olá *${d.cliente}*,\n\nEsperamos que esteja bem. Passamos por aqui para lembrar gentilmente que possui um saldo em aberto no valor de *${dinheiro(d.saldo)}* referente às suas compras a fiado em *${nomeEmpresa}*.\n\nO seu limite de crédito atual é de ${dinheiro(d.limite)}.\n\nAgradecemos se puder passar pelo estabelecimento para regularizar o valor assim que possível. Obrigado pela compreensão! 🙏`);
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
 };
 
@@ -4081,19 +4217,24 @@ window.amortizarDividaPrompt = async function(id, cliente) {
     try {
         const novoSaldo = numero(devedor.saldo) - quantia;
 
-        await updateDoc(doc(db, "empresas", FABEF.empresaId, "dividas", id), {
-            saldo: novoSaldo,
-            atualizadoEm: serverTimestamp()
-        });
+        try {
+            await updateDoc(doc(db, "empresas", FABEF.empresaId, "dividas", id), {
+                saldo: novoSaldo,
+                atualizadoEm: serverTimestamp()
+            });
+        } catch (errDb) {
+            console.warn("Aviso ao amortizar no Firebase:", errDb);
+        }
 
         devedor.saldo = novoSaldo;
+        guardarDividasLocalmente();
         renderDividas();
         
         await gravarAuditoria("Amortizou o valor de " + dinheiro(quantia) + " na conta de: " + cliente, "INFO");
-        alert("Amortização registada com sucesso.");
+        alert("✅ Amortização de " + dinheiro(quantia) + " registada com sucesso.");
     } catch (error) {
         console.error(error);
-        alert("Erro ao abater a dívida:\n" + mensagemFirebase(error));
+        alert("Erro ao abater a dívida:\n" + error.message);
     }
 };
 
@@ -4202,9 +4343,9 @@ function renderEncomendas() {
 
         let botoesAcao = "";
         if (e.estado === "PENDENTE") {
-            botoesAcao = `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','EM_PREPARACAO')" type="button">ðŸ› ï¸ Em preparação</button>`;
+            botoesAcao = `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','EM_PREPARACAO')" type="button">🛠️ Em preparação</button>`;
         } else if (e.estado === "EM_PREPARACAO") {
-            botoesAcao = `<button class="btn btn-success btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','PRONTA')" type="button">âœ”ï¸ Marcar pronta</button>`;
+            botoesAcao = `<button class="btn btn-success btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','PRONTA')" type="button">✔️ Marcar pronta</button>`;
         } else if (e.estado === "PRONTA") {
             botoesAcao = `<button class="btn btn-danger btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','ENTREGUE')" type="button">📦 Entregar</button>`;
         } else {
@@ -4270,7 +4411,7 @@ window.enviarAvisoEncomenda = function(id) {
         corpoMensagem += `\n\nValor pendente para esta encomenda: *${dinheiro(valorRestante)}*.`;
     }
 
-    const mensagem = encodeURIComponent(`Olá *${e.cliente}*,\n\n${corpoMensagem}\n\nEstamos à sua espera! Muito obrigado. ðŸ›ï¸`);
+    const mensagem = encodeURIComponent(`Olá *${e.cliente}*,\n\n${corpoMensagem}\n\nEstamos à sua espera! Muito obrigado. 🛍️`);
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
 };
 
@@ -4567,53 +4708,60 @@ document.getElementById("btn-registar-despesa").addEventListener("click", regist
 
 
 async function registarDespesa() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) === "gerente" && !window.FABEF?.isDemoMode) {
-        alert("A conta de gerente não regista despesas diretamente — isso é feito pelo funcionário. O gerente pode consultar aqui.");
-        return;
-    }
     const descricao = document.getElementById("despesa-descricao").value.trim();
     const valor = numero(document.getElementById("despesa-valor").value);
+    const categoria = document.getElementById("despesa-categoria")?.value || "Operacional";
 
     if (!descricao || valor <= 0) {
         alert("Introduza uma descrição válida e um valor superior a zero.");
         return;
     }
 
+    const payload = {
+        descricao: descricao,
+        valor: valor,
+        categoria: categoria,
+        ramo: FABEF.ramo || "Geral",
+        utilizadorId: FABEF.user?.uid || "admin",
+        utilizadorNome: FABEF.userData?.nome || FABEF.user?.email || "Administrador",
+        data: new Date().toISOString(),
+        criadoEm: serverTimestamp()
+    };
+
+    let docId = "desp_" + Date.now();
     try {
-        const payload = {
-            descricao: descricao,
-            valor: valor,
-            ramo: FABEF.ramo,
-            utilizadorId: FABEF.user.uid,
-            utilizadorNome: FABEF.userData?.nome || FABEF.user.email,
-            data: new Date().toISOString(),
-            criadoEm: serverTimestamp()
-        };
-
         const ref = await addDoc(subRef("despesas"), payload);
-
-        // Alimenta de forma síncrona a cache local na memória do navegador
-        FABEF.despesas.push({
-            id: ref.id,
-            descricao: payload.descricao,
-            valor: payload.valor,
-            ramo: payload.ramo,
-            utilizadorNome: payload.utilizadorNome,
-            data: payload.data
-        });
-
-        // Limpa os campos do formulário para o próximo lançamento
-        document.getElementById("despesa-descricao").value = "";
-        document.getElementById("despesa-valor").value = "";
-
-        renderDespesas();
-
-        // Regista a saída financeira nos logs inalteráveis de auditoria
-        await gravarAuditoria("Registou despesa comercial: " + descricao + " no valor de " + dinheiro(valor), "INFO");
+        docId = ref.id;
     } catch (error) {
-        console.error(error);
-        alert("Erro ao registar a despesa na base de dados:\n" + mensagemFirebase(error));
+        console.warn("Aviso Firebase ao registar despesa, mantendo em memória e offline:", error);
     }
+
+    // Alimenta de forma síncrona a cache local na memória do navegador
+    FABEF.despesas.push({
+        id: docId,
+        descricao: payload.descricao,
+        valor: payload.valor,
+        categoria: payload.categoria,
+        ramo: payload.ramo,
+        utilizadorNome: payload.utilizadorNome,
+        data: payload.data
+    });
+
+    try {
+        if (FABEF.empresaId) {
+            localStorage.setItem("fabef_local_despesas_" + FABEF.empresaId, JSON.stringify(FABEF.despesas));
+        }
+    } catch(e) {}
+
+    // Limpa os campos do formulário para o próximo lançamento
+    document.getElementById("despesa-descricao").value = "";
+    document.getElementById("despesa-valor").value = "";
+
+    renderDespesas();
+
+    // Regista a saída financeira nos logs inalteráveis de auditoria
+    await gravarAuditoria(`Registou despesa/custo comercial (${payload.ramo}): ` + descricao + " no valor de " + dinheiro(valor), "INFO");
+    alert("✅ Despesa/Custo registado com sucesso para " + (FABEF.ramo || "o negócio") + ".");
 }
 
 
@@ -4621,22 +4769,29 @@ function renderDespesas() {
     const tabelaCorpo = document.getElementById("tabela-despesas");
     if (!tabelaCorpo) return;
 
+    // Filtra pelo ramo de atividade ativo
+    const listaDoRamo = (FABEF.despesas || []).filter(d => !d.ramo || d.ramo === FABEF.ramo);
+
     // Ordena as despesas de forma decrescente pela data de lançamento
-    const listaOrdenada = FABEF.despesas
+    const listaOrdenada = listaDoRamo
         .slice()
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
 
     tabelaCorpo.innerHTML = listaOrdenada.map(d => `
     <tr>
         <td>${dataTexto(d.data)}</td>
-        <td>${escapeHTML(d.descricao)}</td>
-        <td style="color: #dc2626; font-weight: 600;">${dinheiro(d.valor)}</td>
+        <td>
+            <strong>${escapeHTML(d.descricao)}</strong>
+            ${d.categoria ? `<br><small style="color:#0284c7;font-size:11px;">${escapeHTML(d.categoria)}</small>` : ""}
+        </td>
+        <td style="color: #dc2626; font-weight: 700;">${dinheiro(d.valor)}</td>
         <td>${escapeHTML(d.utilizadorNome || "—")}</td>
+        <td><span class="badge badge-blue">${escapeHTML(d.ramo || FABEF.ramo || "—")}</span></td>
     </tr>
     `).join("") || `
     <tr>
-        <td colspan="4" style="text-align: center; color: #64748b;">
-            Nenhuma despesa registada para este negócio.
+        <td colspan="5" style="text-align: center; color: #64748b;">
+            Nenhuma despesa ou custo registado para o ramo: ${escapeHTML(FABEF.ramo || "Geral")}.
         </td>
     </tr>
     `;
@@ -4711,7 +4866,7 @@ function renderRelatorios() {
     const planoRelatorios = obterPlanoAtual();
     const avisoAvancado = document.getElementById("aviso-relatorios-avancados");
     if (planoRelatorios === "GRATIS") {
-        if (avisoAvancado) avisoAvancado.innerHTML = `<div class="alert alert-warning">ðŸ”’ A Curva ABC e a Análise Inteligente são funcionalidades do Plano Pago. <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')">â­ Atualizar por 250 MT</button></div>`;
+        if (avisoAvancado) avisoAvancado.innerHTML = `<div class="alert alert-warning">🔒 A Curva ABC e a Análise Inteligente são funcionalidades do Plano Pago. <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')">⭐ Atualizar por 250 MT</button></div>`;
         document.getElementById("tabela-abc").innerHTML = `<tr><td colspan="5" style="text-align:center;color:#64748b;">Disponível no Plano Pago.</td></tr>`;
         document.getElementById("analise-inteligente").innerHTML = "";
     } else {
@@ -4732,7 +4887,7 @@ function textoResumoRelatorio() {
     if (!FABEF_RELATORIO_ATUAL) return "";
     const r = FABEF_RELATORIO_ATUAL;
     const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
-    let texto = `ðŸ“Š Relatório — ${nomeEmpresa} (${escapeHTML(FABEF.ramo)})\n`;
+    let texto = `📊 Relatório — ${nomeEmpresa} (${escapeHTML(FABEF.ramo)})\n`;
     texto += `Período: ${r.periodo}\n\n`;
     texto += `Faturamento: ${dinheiro(r.faturamento)}\n`;
     texto += `Despesas: ${dinheiro(r.totalDespesas)}\n`;
@@ -5295,10 +5450,10 @@ function renderAvisoPlano() {
 
     container.innerHTML = `
         <div class="alert alert-warning">
-            <strong>ðŸ†“ Plano Grátis</strong> — Vendas hoje: ${vendasHoje}/${LIMITES_PLANO_GRATIS.vendasDiarias} Â·
-            Encomendas hoje: ${encomendasHoje}/${LIMITES_PLANO_GRATIS.encomendasDiarias} Â·
+            <strong>🆓 Plano Grátis</strong> — Vendas hoje: ${vendasHoje}/${LIMITES_PLANO_GRATIS.vendasDiarias} ·
+            Encomendas hoje: ${encomendasHoje}/${LIMITES_PLANO_GRATIS.encomendasDiarias} ·
             Funcionários: ${LIMITES_PLANO_GRATIS.funcionarios} máx.
-            <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')" style="margin-left:8px;">â­ Passar a Premium (250 MT)</button>
+            <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')" style="margin-left:8px;">⭐ Passar a Premium (250 MT)</button>
         </div>
     `;
 }
@@ -5347,7 +5502,7 @@ function verificarSubscricao(){
         const dias = Math.max(0, Math.ceil((fim - Date.now()) / 86400000));
         if (aviso) {
             aviso.className = "alert alert-warning";
-            aviso.textContent = `ðŸ’¡ Período de teste gratuito: Restam aproximadamente ${dias} dia(s).`;
+            aviso.textContent = `💡 Período de teste gratuito: Restam aproximadamente ${dias} dia(s).`;
         }
         if (estadoSpan) {
             estadoSpan.className = "alert alert-warning";
@@ -5360,7 +5515,7 @@ function verificarSubscricao(){
     } else {
         if (aviso) {
             aviso.className = "alert alert-warning";
-            aviso.textContent = "ðŸ†“ Está no Plano Grátis (limites diários de vendas/encomendas e 1 funcionário). Pague 250 MT para desbloquear tudo.";
+            aviso.textContent = "🆓 Está no Plano Grátis (limites diários de vendas/encomendas e 1 funcionário). Pague 250 MT para desbloquear tudo.";
         }
         if (estadoSpan) {
             estadoSpan.className = "alert alert-warning";
@@ -6055,10 +6210,10 @@ document.getElementById("btn-confirmar-encomenda-falhada")?.addEventListener("cl
 document.getElementById("btn-toggle-dark")?.addEventListener("click",()=>{
     const corpoApp=document.body; corpoApp.classList.toggle("dark-mode");
     const escuro=corpoApp.classList.contains("dark-mode");
-    document.getElementById("btn-toggle-dark").textContent=escuro?"â˜€ï¸ Modo Claro":"ðŸŒ™ Modo Escuro";
+    document.getElementById("btn-toggle-dark").textContent=escuro?"☀️ Modo Claro":"🌙 Modo Escuro";
     try{localStorage.setItem("FABEF_dark_mode",escuro?"1":"0");}catch(e){}
 });
-try{if(localStorage.getItem("FABEF_dark_mode")==="1"){document.body.classList.add("dark-mode");const b=document.getElementById("btn-toggle-dark");if(b)b.textContent="â˜€ï¸ Modo Claro";}}catch(e){}
+try{if(localStorage.getItem("FABEF_dark_mode")==="1"){document.body.classList.add("dark-mode");const b=document.getElementById("btn-toggle-dark");if(b)b.textContent="☀️ Modo Claro";}}catch(e){}
 
 /* =====================================================
    MÓDULO LÓGICO: RECONCILIAÇão DE STOCK (CONFLITOS OFFLINE)
@@ -6079,7 +6234,7 @@ function verificarReconciliacaoStock() {
             // Só grava o alerta de auditoria uma vez por produto/ocorrência,
             // para não encher o histórico com o mesmo aviso repetido.
             gravarAuditoria(
-                `âš ï¸ Reconciliação necessária: o produto "${p.nome}" ficou com stock negativo (${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + p.unidade : ""}). Isto normalmente acontece quando dois dispositivos venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar.`,
+                `⚠️ Reconciliação necessária: o produto "${p.nome}" ficou com stock negativo (${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + p.unidade : ""}). Isto normalmente acontece quando dois dispositivos venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar.`,
                 "ALERTA"
             );
         }
@@ -6111,11 +6266,11 @@ function renderAvisoReconciliacao() {
 
     container.innerHTML = `
         <div class="alert alert-warn">
-            <strong>âš ï¸ Reconciliação de stock necessária (${negativos.length})</strong>
+            <strong>⚠️ Reconciliação de stock necessária (${negativos.length})</strong>
             <p style="margin:6px 0;font-size:13px;">
                 Estes produtos ficaram com stock negativo — normalmente porque dois dispositivos
                 venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar. Confirme a
-                quantidade real na loja e corrija em Inventário â†’ "âš™ï¸ Ajustar".
+                quantidade real na loja e corrija em Inventário → "⚙️ Ajustar".
             </p>
             <ul style="margin:6px 0 0 18px;font-size:13px;">
                 ${negativos.map(p => `<li><strong>${escapeHTML(p.nome)}</strong>: stock atual ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</li>`).join("")}
@@ -6368,8 +6523,8 @@ function renderSugestoes() {
             <td>${escapeHTML(s.texto)}</td>
             <td><span class="badge ${s.estado === 'ADICIONADA' ? 'badge-green' : (s.estado === 'REJEITADA' ? 'badge-red' : 'badge-yellow')}">${escapeHTML(s.estado || "NOVA")}</span></td>
             <td>${souGerente && s.estado === "NOVA" ? `
-                <button class="btn btn-success btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','ADICIONADA')">âœ”ï¸ Adicionar ao catálogo</button>
-                <button class="btn btn-light btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','REJEITADA')">âœ–ï¸ Rejeitar</button>
+                <button class="btn btn-success btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','ADICIONADA')">✔️ Adicionar ao catálogo</button>
+                <button class="btn btn-light btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','REJEITADA')">✖️ Rejeitar</button>
             ` : "—"}</td>
         </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Ainda não há sugestões enviadas.</td></tr>`;
 }
