@@ -933,12 +933,15 @@ async function limparEstadoFABEF() {
     FABEF.dividas = [];
     FABEF.encomendas = [];
     FABEF.funcionarios = [];
+    FABEF.gastosFuncionarios = [];
     FABEF.pagamentos = [];
     FABEF.auditoria = [];
     FABEF.sugestoes = [];
     FABEF.carrinho = [];
     FABEF.turnoId = null;
     FABEF.turno = null;
+    FABEF.vendasTurno = [];
+    FABEF.despesasTurno = [];
     FABEF.dataAtiva = new Date().toLocaleDateString("en-CA");
     FABEF._raw = {};
     FABEF.carregado = false;
@@ -1424,6 +1427,7 @@ async function carregarDados() {
         escutarColecao("dividas", "dividas"),
         escutarColecao("encomendas", "encomendas"),
         escutarColecao("funcionarios", "funcionarios"),
+        escutarColecao("gastos_funcionarios", "gastosFuncionarios"),
         escutarColecao("pagamentos", "pagamentos"),
         escutarColecao("auditoria_logs", "auditoria"),
         escutarColecao("sugestoes", "sugestoes")
@@ -1452,8 +1456,8 @@ function pedirRenderTudo() {
    é assim que os dados chegam quando o dispositivo estava offline
    e volta a ligar-se à internet.
 ===================================================== */
-const COLECOES_POR_RAMO = new Set(["produtos","compras","vendas","despesas","encomendas","funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
-const COLECOES_POR_DIA = new Set(["vendas","despesas","compras","encomendas","auditoria_logs","sugestoes"]);
+const COLECOES_POR_RAMO = new Set(["produtos","compras","vendas","despesas","encomendas","funcionarios","gastos_funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
+const COLECOES_POR_DIA = new Set(["despesas","compras","encomendas","auditoria_logs","sugestoes"]);
 function referenciaColecaoFiltrada(nome) {
     const ref = subRef(nome);
     return COLECOES_POR_RAMO.has(nome) && FABEF.ramo ? query(ref, where("ramo", "==", FABEF.ramo)) : ref;
@@ -1471,14 +1475,19 @@ function aplicarFiltroDia(){
     for(const nome of COLECOES_POR_DIA){
         const estado=nome==="auditoria_logs"?"auditoria":nome;
         const raw=FABEF._raw?.[nome]||[];
-        // Vendas/despesas/encomendas do turno actual ficam isoladas do período anterior.
-        // Se não houver turno aberto, a consulta passa a ser por dia, permitindo ao gerente
-        // escolher a data histórica no selector.
-        if (FABEF.turnoId && ["vendas","despesas","encomendas"].includes(nome)) {
+        if (FABEF.turnoId && ["despesas","encomendas"].includes(nome)) {
             FABEF[estado]=raw.filter(x => x.turnoId === FABEF.turnoId && dataDoRegisto(x)===FABEF.dataAtiva);
         } else {
             FABEF[estado]=raw.filter(x=>dataDoRegisto(x)===FABEF.dataAtiva);
         }
+    }
+    // As vendas ficam SEMPRE completas em FABEF.vendas para permitir ao gerente consultar
+    // relatórios hoje, semanais, mensais, anuais ou por turno sem perder vendas anteriores!
+    FABEF.vendas = FABEF._raw?.vendas || FABEF.vendas || [];
+    if (FABEF.turnoId) {
+        FABEF.vendasTurno = FABEF.vendas.filter(x => x.turnoId === FABEF.turnoId);
+    } else {
+        FABEF.vendasTurno = FABEF.vendas.filter(x => dataDoRegisto(x) === FABEF.dataAtiva);
     }
 }
 function definirDiaAtivo(data){ if(!/^\d{4}-\d{2}-\d{2}$/.test(data||"")) return; FABEF.dataAtiva=data; aplicarFiltroDia(); renderTudo(); }
@@ -1633,6 +1642,28 @@ function aplicarRestricoesDeAcessoPorPapel() {
     const btnNovoProd = document.getElementById("btn-novo-produto");
     if (btnNovoProd) btnNovoProd.style.display = ehGerenteLogado ? "" : "none";
 
+    // Clientes e Dívidas: o funcionário e o gerente DEVEM conseguir adicionar clientes e registar dívidas (fiado)
+    const btnAddCli = document.getElementById("btn-adicionar-cliente");
+    if (btnAddCli) {
+        btnAddCli.disabled = false;
+        btnAddCli.style.display = "";
+        btnAddCli.style.pointerEvents = "auto";
+        btnAddCli.style.opacity = "1";
+    }
+    const btnRegDiv = document.getElementById("btn-registar-divida");
+    if (btnRegDiv) {
+        btnRegDiv.disabled = false;
+        btnRegDiv.style.display = "";
+        btnRegDiv.style.pointerEvents = "auto";
+        btnRegDiv.style.opacity = "1";
+    }
+
+    // Garante que o menu lateral para Clientes e Fiado/Dívidas permanece acessível
+    const btnMenuClientes = document.querySelector('.sidebar button[data-sec="clientes"]');
+    if (btnMenuClientes) btnMenuClientes.style.display = "";
+    const btnMenuDividas = document.querySelector('.sidebar button[data-sec="dividas"]');
+    if (btnMenuDividas) btnMenuDividas.style.display = "";
+
     // Atualiza os controles do POS de acordo com o perfil
     verificarAcessoPosGerente();
 
@@ -1654,19 +1685,14 @@ function verificarAcessoPosGerente() {
 
     if (avisoPos) {
         avisoPos.style.display = ehGerente ? "block" : "none";
+        avisoPos.className = "alert alert-info";
+        avisoPos.innerHTML = `🛡️ <strong>Modo Caixa / Operação Ativa:</strong> A sessão atual está autenticada como <strong>${ehGerente ? 'Gerente / Supervisor' : 'Funcionário Operacional'}</strong>. O funcionário pode registar vendas, calcular por kg ou preço manual, adicionar clientes e fiado.`;
     }
     if (btnFinalizar) {
-        if (ehGerente) {
-            btnFinalizar.disabled = true;
-            btnFinalizar.title = "🛡️ O Gerente tem a função exclusiva de supervisão, cadastro/edição de artigos e relatórios. As vendas operacionais no caixa são da responsabilidade do Funcionário.";
-            btnFinalizar.style.opacity = "0.45";
-            btnFinalizar.style.cursor = "not-allowed";
-        } else {
-            btnFinalizar.disabled = false;
-            btnFinalizar.title = "Finalizar venda";
-            btnFinalizar.style.opacity = "1";
-            btnFinalizar.style.cursor = "pointer";
-        }
+        btnFinalizar.disabled = false;
+        btnFinalizar.title = "Finalizar venda";
+        btnFinalizar.style.opacity = "1";
+        btnFinalizar.style.cursor = "pointer";
     }
 }
 window.verificarAcessoPosGerente = verificarAcessoPosGerente;
@@ -2968,19 +2994,32 @@ function renderPOS() {
         if (p.cor) atributos.push(`Cor: ${escapeHTML(p.cor)}`);
         const atrBadge = atributos.length ? `<small style="color:#0284c7;font-weight:600;display:block;margin:2px 0;">${atributos.join(" | ")}</small>` : "";
 
+        const unidadeNormalizada = (p.unidade || "").toLowerCase();
+        const ehPesavel = unidadeNormalizada === "kg" || unidadeNormalizada === "g" || unidadeNormalizada === "litro";
+
+        const botoesOpcaoVenda = ehPesavel ? `
+            <div style="display:flex;gap:4px;width:100%;margin-top:6px;z-index:2;" onclick="event.stopPropagation();">
+                <button type="button" class="btn btn-small btn-primary" onclick="abrirModalVendaFracionadaById('${escapeHTML(p.id)}', 'peso')" style="flex:1;padding:4px 2px;font-size:11px;font-weight:700;" title="Vender indicando o peso exato em KG ou Gramas">⚖️ Vender KG</button>
+                <button type="button" class="btn btn-small btn-light" onclick="abrirModalVendaFracionadaById('${escapeHTML(p.id)}', 'valor')" style="flex:1;padding:4px 2px;font-size:11px;font-weight:700;color:#1e3a8a;border:1px solid #93c5fd;" title="Vender indicando o valor em Meticais (calcula os KG automaticamente)">💵 Digitar MT</button>
+            </div>
+        ` : "";
+
         return `
-        <button
+        <div
             class="produto-pos"
             data-pos-produto="${escapeHTML(p.id)}"
-            type="button"
-            title="Adicionar ao carrinho"
+            title="${ehPesavel ? 'Clique para escolher vender em KG ou escrever o preço' : 'Adicionar ao carrinho'}"
+            style="cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;"
         >
-            ${p.foto ? `<img src="${escapeHTML(p.foto)}" alt="" style="width:100%;height:70px;object-fit:cover;border-radius:6px;margin-bottom:4px;" onerror="this.style.display='none';">` : ""}
-            <strong>${escapeHTML(p.nome)}</strong>
-            ${atrBadge}
-            <small>${dinheiro(p.preco)}${p.unidade && p.unidade !== "unidade" ? " / " + escapeHTML(p.unidade) : ""}</small>
-            <small>Stock: ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</small>
-        </button>
+            <div>
+                ${p.foto ? `<img src="${escapeHTML(p.foto)}" alt="" style="width:100%;height:70px;object-fit:cover;border-radius:6px;margin-bottom:4px;" onerror="this.style.display='none';">` : ""}
+                <strong>${escapeHTML(p.nome)}</strong>
+                ${atrBadge}
+                <small style="display:block;">${dinheiro(p.preco)}${p.unidade && p.unidade !== "unidade" ? " / " + escapeHTML(p.unidade) : ""}</small>
+                <small style="display:block;color:#64748b;">Stock: ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</small>
+            </div>
+            ${botoesOpcaoVenda}
+        </div>
         `;
     }).join("") || `
     <div class="alert alert-info" style="width: 100%; text-align: center;">
@@ -2988,8 +3027,8 @@ function renderPOS() {
     </div>
     `;
 
-    // Vincula dinamicamente a ação de clique nos cartões injetados para adição rápida
-    document.querySelectorAll("[data-pos-produto]").forEach(btn => {
+    // Vincula dinamicamente a ação de clique no corpo do cartão
+    document.querySelectorAll(".produto-pos[data-pos-produto]").forEach(btn => {
         btn.addEventListener("click", () => adicionarCarrinho(btn.dataset.posProduto));
     });
 
@@ -3009,18 +3048,18 @@ function renderPOS() {
    MÓDULO LÓGICO: ADIÇão E CONTROLO DE STOCK DO CARRINHO
 ===================================================== */
 
+window.abrirModalVendaFracionadaById = function(produtoId, modoInicial) {
+    const produto = (FABEF.produtos || []).find(p => p.id === produtoId);
+    if (!produto) return;
+    abrirModalVendaFracionada(produto, modoInicial || "peso");
+};
+
 async function adicionarCarrinho(id) {
     let perfilAtual = "gerente";
     if (window.FABEF?.isDemoMode) {
         perfilAtual = window.FABEF.demoPerfil || "gerente";
     } else if (FABEF.userData) {
         perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
-    }
-
-    // O Gerente tem a função exclusiva de gestão e supervisão (adicionar/editar artigos, stocks, relatórios e auditoria)
-    if (perfilAtual === "gerente") {
-        alert("🛡️ Modo Exclusivo de Supervisão:\n\nO Gerente tem a função de gestão estratégica, supervisão, stock e preços (adicionar e editar artigos).\n\nAs vendas operacionais no caixa do POS devem ser realizadas pelo perfil de Funcionário.");
-        return;
     }
 
     // Barreira imediata de interface: caixa deve estar aberto para vender
@@ -3045,8 +3084,9 @@ async function adicionarCarrinho(id) {
     const unidadeFracionada = produto.unidade === "kg" || produto.unidade === "litro" || produto.unidade === "g";
 
     // Produtos vendidos por peso/volume (ex: carne no talho, granel, líquidos) abrem a calculadora fracionada
+    // onde o funcionário escolhe se vende em kg ou se escreve o preço em Meticais
     if (unidadeFracionada) {
-        abrirModalVendaFracionada(produto);
+        abrirModalVendaFracionada(produto, "peso");
         return;
     }
 
@@ -3080,7 +3120,7 @@ async function adicionarCarrinho(id) {
 ===================================================== */
 window.FABEF_frac_modo = "peso";
 
-function abrirModalVendaFracionada(produto) {
+function abrirModalVendaFracionada(produto, modoInicial) {
     const modal = document.getElementById("modal-venda-fracionada");
     if (!modal) return;
 
@@ -3096,10 +3136,16 @@ function abrirModalVendaFracionada(produto) {
     if (inputValor) inputValor.value = "";
     if (selectUnidade) selectUnidade.value = produto.unidade === "g" ? "g" : "kg";
 
-    ativarModoCalculoFracionada("peso", produto);
+    ativarModoCalculoFracionada(modoInicial || "peso", produto);
 
     modal.classList.add("show");
-    setTimeout(() => inputPeso?.focus(), 150);
+    setTimeout(() => {
+        if (modoInicial === "valor") {
+            inputValor?.focus();
+        } else {
+            inputPeso?.focus();
+        }
+    }, 150);
 }
 
 function ativarModoCalculoFracionada(modo, produto) {
@@ -3606,14 +3652,54 @@ function renderVendas() {
     if (periodo === "hoje") inicio = dataHoje();
     if (periodo === "7") inicio = diasAtras(7);
     if (periodo === "30") inicio = diasAtras(30);
+    if (periodo === "ano") inicio = new Date(new Date().getFullYear(), 0, 1);
 
-    const listaFiltrada = FABEF.vendas.filter(v => {
-        const dataVenda = new Date(v.data || v.date || 0);
-        if (inicio && dataVenda < inicio) return false;
+    // Obtém todas as vendas da empresa no ramo ativo (da lista em memória ou do raw histórico)
+    const fonteVendas = (FABEF.vendas && FABEF.vendas.length > 0) ? FABEF.vendas : (FABEF._raw?.vendas || []);
+
+    const listaFiltrada = fonteVendas.filter(v => {
+        if (periodo === "turno") {
+            if (!v.turnoId || v.turnoId !== FABEF.turnoId) return false;
+        } else if (inicio) {
+            const dataVenda = new Date(v.data || v.date || 0);
+            if (dataVenda < inicio) return false;
+        }
         if (v.ramo && v.ramo !== FABEF.ramo) return false;
         const textoCompleto = JSON.stringify(v).toLowerCase();
         return !pesquisa || textoCompleto.includes(pesquisa);
     }).sort((a,b) => new Date(b.data || b.date || 0) - new Date(a.data || a.date || 0));
+
+    // Cálculos de KPI para o período selecionado
+    let faturamentoPeriodo = 0;
+    let kgPeriodo = 0;
+    let qtdValidas = 0;
+
+    listaFiltrada.forEach(v => {
+        const ehCancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+        if (!ehCancelada) {
+            faturamentoPeriodo += numero(v.total);
+            qtdValidas++;
+            const itens = v.itens || v.items || [];
+            itens.forEach(it => {
+                const un = (it.unidade || "").toLowerCase();
+                const q = numero(it.quantidade);
+                if (un === "kg") kgPeriodo += q;
+                else if (un === "g") kgPeriodo += (q / 1000);
+            });
+        }
+    });
+
+    const ticketMedio = qtdValidas > 0 ? (faturamentoPeriodo / qtdValidas) : 0;
+
+    const elKpiFat = document.getElementById("vendas-kpi-faturamento");
+    const elKpiKg = document.getElementById("vendas-kpi-kg");
+    const elKpiQtd = document.getElementById("vendas-kpi-qtd");
+    const elKpiTicket = document.getElementById("vendas-kpi-ticket");
+
+    if (elKpiFat) elKpiFat.textContent = dinheiro(faturamentoPeriodo);
+    if (elKpiKg) elKpiKg.textContent = kgPeriodo > 0 ? `${kgPeriodo.toFixed(3)} kg` : "0.000 kg";
+    if (elKpiQtd) elKpiQtd.textContent = String(qtdValidas);
+    if (elKpiTicket) elKpiTicket.textContent = dinheiro(ticketMedio);
 
     const tabelaCorpo = document.getElementById("tabela-vendas");
     if (!tabelaCorpo) return;
@@ -3629,13 +3715,18 @@ function renderVendas() {
             return `<div style="margin-bottom:3px;">• <strong>${escapeHTML(x.nome || "Produto")}</strong>${atrTxt} × <span style="font-weight:600;">${qtd}${un}</span></div>`;
         }).join("");
         const ehFalhada = v.status === "FALHADA_CANCELADA" || v.status === "FALHADA" || v.status === "CANCELADA";
+        const ehCorrigida = v.status === "CORRIGIDA_PRECO";
         return `
-        <tr style="${ehFalhada ? 'background: #fff1f2; opacity: 0.88;' : ''}">
+        <tr style="${ehFalhada ? 'background: #fff1f2; opacity: 0.88;' : (ehCorrigida ? 'background: #eff6ff;' : '')}">
             <td>
                 ${dataTexto(v.data || v.date)}
                 ${ehFalhada ? `
                     <div style="margin-top:4px;"><span class="badge badge-red" style="font-size:11px;">⚠️ Falhada / Cancelada</span></div>
-                    <div style="font-size:11px;color:#b91c1c;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || v.motivoFalha || 'Venda não concluída')}</div>
+                    <div style="font-size:11px;color:#b91c1c;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || v.motivoFalha || 'Venda anulada')}</div>
+                ` : ""}
+                ${ehCorrigida ? `
+                    <div style="margin-top:4px;"><span class="badge" style="background:#0284c7;color:#fff;font-size:11px;">✏️ Preço Corrigido (Antes: ${dinheiro(v.precoOriginal)})</span></div>
+                    <div style="font-size:11px;color:#1d4ed8;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || 'Ajuste de preço')}</div>
                 ` : ""}
             </td>
             <td>${escapeHTML(v.operadorNome || v.user || "—")}</td>
@@ -3649,7 +3740,7 @@ function renderVendas() {
                     <button class="btn btn-light btn-small" onclick="imprimirReciboVenda('${escapeHTML(v.id)}')" type="button">🖨️ Recibo</button>
                     <button class="btn btn-success btn-small" onclick="enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;">📱 WhatsApp</button>
                     ${!ehFalhada ? `
-                        <button class="btn btn-small" onclick="abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;" title="Registar falha ou alteração com justificativa obrigatória ao Gerente">⚠️ Falhou / Corrigir</button>
+                        <button class="btn btn-small" onclick="abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;" title="Registar falha ou corrigir preço com justificativa obrigatória ao Gerente">⚠️ Falhou / Corrigir</button>
                     ` : ""}
                 </div>
             </td>
@@ -5652,6 +5743,7 @@ function renderFuncionarios(){
             <td>${escapeHTML(FABEF.empresa?.telefone || "—")}</td>
             <td><span class="badge" style="background:#0284c7;color:#fff;">Todos os Ramos</span></td>
             <td><span class="badge badge-green" style="background-color:#0f172a;color:#fff;">GERENTE</span></td>
+            <td><span style="color:#64748b;font-size:12px;">—</span></td>
             <td><span class="badge badge-green">ATIVO</span></td>
             <td>—</td>
         </tr>`;
@@ -5663,8 +5755,12 @@ function renderFuncionarios(){
 
     const funcionarios = listaFuncionariosDoRamo.map(f => {
         const ativo = (f.estado || "ATIVO") === "ATIVO";
+        const gastosDoFunc = (FABEF.gastosFuncionarios || []).filter(g => g.funcionarioId === f.id);
+        const totalGastos = gastosDoFunc.reduce((s, g) => s + numero(g.valor), 0);
+
         const acoes = souGerente ? `
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario('${escapeHTML(f.id)}')" style="background:#f59e0b;color:#fff;font-weight:700;" title="Adicionar gasto ou vale na conta deste funcionário">➕ Gasto</button>
                 <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario('${escapeHTML(f.id)}')">✏️ Editar</button>
                 <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario('${escapeHTML(f.id)}')">${ativo ? '🚫 Desativar' : '✅ Reativar'}</button>
             </div>` : "—";
@@ -5676,6 +5772,10 @@ function renderFuncionarios(){
             <td>${escapeHTML(f.telefone || "—")}</td>
             <td><span class="badge badge-blue">${escapeHTML(f.ramo || FABEF.ramo || "—")}</span></td>
             <td><span class="badge badge-yellow">OPERADOR</span></td>
+            <td>
+                <strong style="${totalGastos > 0 ? 'color:#b45309;' : 'color:#64748b;'}">${dinheiro(totalGastos)}</strong>
+                ${gastosDoFunc.length > 0 ? `<small style="display:block;color:#64748b;font-size:11px;">(${gastosDoFunc.length} registo${gastosDoFunc.length > 1 ? 's' : ''})</small>` : ''}
+            </td>
             <td><span class="badge ${ativo ? 'badge-green' : 'badge-red'}">${escapeHTML(f.estado || "ATIVO")}</span></td>
             <td>${acoes}</td>
         </tr>`;
@@ -6451,7 +6551,7 @@ document.getElementById("btn-calc-mais-func")?.addEventListener("click", () => {
    (VENDA FALHADA & ENCOMENDA FALHADA)
 ===================================================== */
 window.abrirModalVendaFalhada = function(vendaId) {
-    const v = (FABEF.vendas || []).find(x => x.id === vendaId);
+    const v = (FABEF.vendas || []).find(x => x.id === vendaId) || (FABEF._raw?.vendas || []).find(x => x.id === vendaId);
     if (!v) { alert("Venda não localizada."); return; }
 
     const elId = document.getElementById("falha-venda-id");
@@ -6459,35 +6559,110 @@ window.abrirModalVendaFalhada = function(vendaId) {
     const elTotal = document.getElementById("falha-venda-total");
     const elItens = document.getElementById("falha-venda-itens");
     const elJust = document.getElementById("falha-venda-justificativa");
+    const elAcao = document.getElementById("falha-venda-tipo-acao");
+    const elNovoPreco = document.getElementById("falha-venda-novo-preco");
+    const blocoPreco = document.getElementById("bloco-falha-editar-preco");
+    const blocoStock = document.getElementById("bloco-falha-repor-stock");
 
     if (elId) elId.value = v.id;
     if (elRef) elRef.textContent = "#" + v.id.slice(0, 8);
     if (elTotal) elTotal.textContent = dinheiro(v.total);
+    if (elNovoPreco) elNovoPreco.value = numero(v.total);
 
     const itensStr = (v.itens || v.items || []).map(it => `${escapeHTML(it.nome || "Item")} (${it.quantidade} ${it.unidade || 'un'})`).join(", ");
     if (elItens) elItens.textContent = itensStr || "—";
     if (elJust) elJust.value = "";
 
+    function alternarAcaoFalha() {
+        const acao = elAcao?.value || "EDITAR_PRECO";
+        if (acao === "EDITAR_PRECO") {
+            if (blocoPreco) blocoPreco.style.display = "block";
+            if (blocoStock) blocoStock.style.display = "none";
+        } else {
+            if (blocoPreco) blocoPreco.style.display = "none";
+            if (blocoStock) blocoStock.style.display = "flex";
+        }
+    }
+
+    if (elAcao) {
+        elAcao.value = "EDITAR_PRECO";
+        elAcao.onchange = alternarAcaoFalha;
+        alternarAcaoFalha();
+    }
+
     document.getElementById("modal-venda-falhada")?.classList.add("show");
+    setTimeout(() => {
+        if (elNovoPreco) elNovoPreco.focus();
+    }, 150);
 };
 
 document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click", async () => {
     const vendaId = document.getElementById("falha-venda-id")?.value;
-    const motivoTipo = document.getElementById("falha-venda-motivo-tipo")?.value || "Venda Cancelada";
+    const tipoAcao = document.getElementById("falha-venda-tipo-acao")?.value || "EDITAR_PRECO";
+    const motivoTipo = document.getElementById("falha-venda-motivo-tipo")?.value || "Correção de Venda";
     const justificativa = (document.getElementById("falha-venda-justificativa")?.value || "").trim();
     const reporStock = Boolean(document.getElementById("falha-venda-repor-stock")?.checked);
 
     if (!justificativa) {
-        alert("⚠️ Campo Obrigatório:\nPor favor, escreva a justificativa para o Gerente explicando o motivo pelo qual esta venda falhou ou necessita de ser anulada.");
+        alert("⚠️ Justificativa Obrigatória:\nPor favor, escreva a justificativa detalhada para o Gerente explicando o motivo da alteração ou anulação desta venda.");
         document.getElementById("falha-venda-justificativa")?.focus();
         return;
     }
 
-    const v = (FABEF.vendas || []).find(x => x.id === vendaId);
+    const v = (FABEF.vendas || []).find(x => x.id === vendaId) || (FABEF._raw?.vendas || []).find(x => x.id === vendaId);
     if (!v) { alert("Venda não encontrada."); return; }
 
     try {
         const usuarioNome = FABEF.userData?.nome || auth.currentUser?.email || "Funcionário";
+
+        if (tipoAcao === "EDITAR_PRECO") {
+            const novoPreco = numero(document.getElementById("falha-venda-novo-preco")?.value);
+            if (isNaN(novoPreco) || novoPreco < 0) {
+                alert("Introduza um valor válido para o novo preço da venda.");
+                document.getElementById("falha-venda-novo-preco")?.focus();
+                return;
+            }
+
+            const precoAntigo = numero(v.total);
+            const diferenca = novoPreco - precoAntigo;
+
+            const payloadAtualizacao = {
+                total: novoPreco,
+                precoOriginal: precoAntigo,
+                status: "CORRIGIDA_PRECO",
+                motivoFalha: motivoTipo,
+                justificativaGerente: justificativa,
+                corrigidoPor: usuarioNome,
+                corrigidoEm: new Date().toISOString()
+            };
+
+            // Se pertencer ao turno de caixa aberto, ajusta os totais do turno
+            if (FABEF.turnoId && v.turnoId === FABEF.turnoId && FABEF.turno) {
+                FABEF.turno.totalVendas = Math.max(0, numero(FABEF.turno.totalVendas) + diferenca);
+                if (v.pagamento === "Numerário") {
+                    FABEF.turno.totalVendasDinheiro = Math.max(0, numero(FABEF.turno.totalVendasDinheiro) + diferenca);
+                }
+                await updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+                    totalVendas: FABEF.turno.totalVendas,
+                    totalVendasDinheiro: FABEF.turno.totalVendasDinheiro || 0
+                }).catch(e => console.warn("Aviso ao atualizar turno:", e));
+                atualizarTelaCaixa();
+            }
+
+            await updateDoc(doc(db, "empresas", FABEF.empresaId, "vendas", vendaId), payloadAtualizacao);
+            Object.assign(v, payloadAtualizacao);
+
+            await gravarAuditoria(`✏️ PREÇO DE VENDA CORRIGIDO (#${v.id.slice(0, 8)}) por ${usuarioNome}: de ${dinheiro(precoAntigo)} para ${dinheiro(novoPreco)}. Justificativa ao Gerente: "${justificativa}"`, "ALERTA");
+
+            fecharModal("modal-venda-falhada");
+            renderVendas();
+            renderDashboard();
+
+            alert(`✅ Preço da venda corrigido para ${dinheiro(novoPreco)} com sucesso!\nA justificativa foi enviada e arquivada nos registos de auditoria do Gerente.`);
+            return;
+        }
+
+        // Caso seja cancelamento total:
         const payloadAtualizacao = {
             status: "FALHADA_CANCELADA",
             motivoFalha: motivoTipo,
@@ -6498,7 +6673,7 @@ document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click"
 
         if (reporStock && (v.itens || v.items)) {
             for (const item of (v.itens || v.items)) {
-                const prod = (FABEF.produtos || []).find(p => p.id === item.id);
+                const prod = (FABEF.produtos || []).find(p => p.id === item.id || p.id === item.produtoId);
                 if (prod) {
                     const novoStock = numero(prod.stock) + numero(item.quantidade);
                     prod.stock = novoStock;
@@ -6513,17 +6688,17 @@ document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click"
         await updateDoc(doc(db, "empresas", FABEF.empresaId, "vendas", vendaId), payloadAtualizacao);
         Object.assign(v, payloadAtualizacao);
 
-        await gravarAuditoria(`⚠️ VENDA FALHADA (#${v.id.slice(0, 8)} - ${dinheiro(v.total)}) registada por ${usuarioNome}. Motivo ao Gerente: "${justificativa}"`, "ALERTA");
+        await gravarAuditoria(`⚠️ VENDA ANULADA / FALHADA (#${v.id.slice(0, 8)} - ${dinheiro(v.total)}) registada por ${usuarioNome}. Motivo ao Gerente: "${justificativa}"`, "ALERTA");
 
         fecharModal("modal-venda-falhada");
         renderVendas();
         renderProdutos();
         renderDashboard();
 
-        alert("A venda foi registada como Falhada/Cancelada com sucesso.\nA justificativa foi arquivada para o Gerente nos registos de auditoria e o stock foi restabelecido.");
+        alert("A venda foi anulada com sucesso.\nA justificativa foi arquivada para o Gerente nos registos de auditoria e o stock foi restabelecido.");
     } catch (error) {
-        console.error("Erro ao registar venda falhada:", error);
-        alert("Erro ao processar a anulação da venda:\n" + mensagemFirebase(error));
+        console.error("Erro ao registar correção/falha de venda:", error);
+        alert("Erro ao processar a operação:\n" + mensagemFirebase(error));
     }
 });
 
@@ -6825,36 +7000,313 @@ window.salvarMetaFuncionario = async function(funcionarioId, valor) {
 
 
 /* =====================================================
-   MÓDULO LÓGICO: DESEMPENHO DOS FUNCIONÁRIOS
+   MÓDULO LÓGICO: DESEMPENHO DOS FUNCIONÁRIOS (AVALIAÇÃO DO GERENTE)
+   O gerente é quem define metas e avalia o desempenho dos funcionários.
+   O desempenho é exclusivamente para os funcionários da empresa.
 ===================================================== */
 function renderDesempenho() {
     const corpo = document.getElementById("tabela-desempenho");
     if (!corpo) return;
 
-    const equipa = [
-        { id: FABEF.user?.uid, nome: (FABEF.userData?.nome || "Gerente") + " (gerente)" },
-        ...(FABEF.funcionarios || []).map(f => ({ id: f.id, nome: f.nome }))
-    ];
+    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const listaFuncionarios = (FABEF.funcionarios || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
 
-    corpo.innerHTML = equipa.map(pessoa => {
-        const vendasPessoa = FABEF.vendas.filter(v => v.operadorId === pessoa.id);
-        const valorVendido = vendasPessoa.reduce((s, v) => s + numero(v.total), 0);
-        const descontos = vendasPessoa.reduce((s, v) => s + numero(v.desconto), 0);
-        const encomendasPessoa = FABEF.encomendas.filter(e => e.criadoPor === pessoa.id).length;
-        const dividasPessoa = FABEF.dividas.filter(d => d.criadoPor === pessoa.id).length;
-        const sugestoesPessoa = (FABEF.sugestoes || []).filter(s => s.criadoPor === pessoa.id).length;
+    const todasVendas = (FABEF.vendas && FABEF.vendas.length > 0) ? FABEF.vendas : (FABEF._raw?.vendas || []);
+
+    corpo.innerHTML = listaFuncionarios.map(func => {
+        // Vendas realizadas por este funcionário
+        const vendasFunc = todasVendas.filter(v => {
+            const ehOperador = v.operadorId === func.id || v.operadorNome === func.nome;
+            const ehCancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+            return ehOperador && !ehCancelada;
+        });
+
+        const valorVendido = vendasFunc.reduce((s, v) => s + numero(v.total), 0);
+        const descontos = vendasFunc.reduce((s, v) => s + numero(v.desconto), 0);
+
+        // Calcula total de kg vendidos por este funcionário
+        let kgVendidos = 0;
+        vendasFunc.forEach(v => {
+            const itens = v.itens || v.items || [];
+            itens.forEach(it => {
+                const un = (it.unidade || "").toLowerCase();
+                const q = numero(it.quantidade);
+                if (un === "kg") kgVendidos += q;
+                else if (un === "g") kgVendidos += (q / 1000);
+            });
+        });
+
+        // Gastos na conta do funcionário
+        const gastosFunc = (FABEF.gastosFuncionarios || []).filter(g => g.funcionarioId === func.id);
+        const totalGastos = gastosFunc.reduce((s, g) => s + numero(g.valor), 0);
+
+        const encomendasFunc = (FABEF.encomendas || []).filter(e => e.criadoPor === func.id || e.atribuidoA === func.id).length;
+        const dividasFunc = (FABEF.dividas || []).filter(d => d.criadoPor === func.id).length;
+
+        const avaliacaoAtual = func.avaliacaoGerente || "Bom / Satisfatório";
+
+        const seletorAvaliacao = souGerente ? `
+            <select style="font-size:12px;padding:4px 8px;border-radius:6px;border:1.5px solid #cbd5e1;font-weight:700;background:#fff;" onchange="salvarAvaliacaoFuncionario('${escapeHTML(func.id)}', this.value)">
+                <option value="🌟 Excelente" ${avaliacaoAtual.includes('Excelente') ? 'selected' : ''}>🌟 Excelente</option>
+                <option value="👍 Muito Bom" ${avaliacaoAtual.includes('Muito Bom') ? 'selected' : ''}>👍 Muito Bom</option>
+                <option value="🆗 Bom / Satisfatório" ${avaliacaoAtual.includes('Satisfatório') || avaliacaoAtual === 'Bom' ? 'selected' : ''}>🆗 Bom / Satisfatório</option>
+                <option value="⚠️ Precisa Melhorar" ${avaliacaoAtual.includes('Melhorar') ? 'selected' : ''}>⚠️ Precisa Melhorar</option>
+                <option value="🚨 Fraco / Alerta" ${avaliacaoAtual.includes('Fraco') ? 'selected' : ''}>🚨 Fraco / Alerta</option>
+            </select>
+        ` : `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;">${escapeHTML(avaliacaoAtual)}</span>`;
 
         return `<tr>
-            <td><strong>${escapeHTML(pessoa.nome)}</strong></td>
-            <td>${vendasPessoa.length}</td>
-            <td>${dinheiro(valorVendido)}</td>
-            <td>${dinheiro(descontos)}</td>
-            <td>${encomendasPessoa}</td>
-            <td>${dividasPessoa}</td>
-            <td>${sugestoesPessoa}</td>
+            <td>
+                <strong>${escapeHTML(func.nome)}</strong>
+                <small style="display:block;color:#64748b;">${escapeHTML(func.email || func.telefone || '')}</small>
+            </td>
+            <td><strong>${vendasFunc.length}</strong></td>
+            <td><strong style="color:#0284c7;">${kgVendidos > 0 ? `${kgVendidos.toFixed(3)} kg` : '0 kg'}</strong></td>
+            <td><strong style="color:#059669;">${dinheiro(valorVendido)}</strong></td>
+            <td>
+                <span style="color:#b45309;font-weight:800;">${dinheiro(totalGastos)}</span>
+                ${gastosFunc.length > 0 ? `<button type="button" class="btn btn-small btn-light" onclick="mostrarSecao('funcionarios')" style="padding:1px 6px;font-size:11px;margin-left:4px;" title="Ver detalhes de gastos">👁️</button>` : ''}
+            </td>
+            <td>${descontos > 0 ? dinheiro(descontos) : 'MT 0,00'}</td>
+            <td>${encomendasFunc}</td>
+            <td>${dividasFunc}</td>
+            <td>${seletorAvaliacao}</td>
         </tr>`;
-    }).join("");
+    }).join("") || `<tr><td colspan="9" style="text-align:center;color:#64748b;padding:16px;">Sem funcionários cadastrados para avaliação no ramo atual.</td></tr>`;
 }
+
+window.salvarAvaliacaoFuncionario = async function(funcionarioId, avaliacao) {
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+        alert("Apenas o Gerente tem permissão para avaliar os funcionários.");
+        return;
+    }
+    try {
+        await updateDoc(doc(db, "empresas", FABEF.empresaId, "funcionarios", funcionarioId), {
+            avaliacaoGerente: avaliacao,
+            avaliadoEm: serverTimestamp()
+        });
+        const func = (FABEF.funcionarios || []).find(x => x.id === funcionarioId);
+        if (func) func.avaliacaoGerente = avaliacao;
+        await gravarAuditoria(`Gerente avaliou o desempenho do funcionário "${func?.nome || funcionarioId}" como: ${avaliacao}.`, "INFO");
+    } catch(err) {
+        console.error("Erro ao salvar avaliação do funcionário:", err);
+        alert("Erro ao guardar avaliação:\n" + mensagemFirebase(err));
+    }
+};
+
+/* =====================================================
+   MÓDULO LÓGICO: GASTOS NA CONTA DO FUNCIONÁRIO (VALES, ADIANTAMENTOS)
+===================================================== */
+window.abrirModalGastoFuncionario = function(funcionarioId) {
+    const modal = document.getElementById("modal-gasto-funcionario");
+    if (!modal) return;
+
+    const select = document.getElementById("gasto-func-select");
+    if (select) {
+        const lista = (FABEF.funcionarios || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
+        select.innerHTML = lista.map(f => `<option value="${escapeHTML(f.id)}">${escapeHTML(f.nome)} (${escapeHTML(f.telefone || f.email || 'Funcionário')})</option>`).join("") || `<option value="">Nenhum funcionário cadastrado</option>`;
+        if (funcionarioId) select.value = funcionarioId;
+    }
+
+    const inputData = document.getElementById("gasto-func-data");
+    if (inputData) inputData.value = dataHojeStr();
+
+    const inputValor = document.getElementById("gasto-func-valor");
+    if (inputValor) inputValor.value = "";
+
+    const inputDesc = document.getElementById("gasto-func-descricao");
+    if (inputDesc) inputDesc.value = "";
+
+    modal.classList.add("show");
+    setTimeout(() => inputValor?.focus(), 150);
+};
+
+document.getElementById("btn-abrir-modal-gasto-func")?.addEventListener("click", () => {
+    abrirModalGastoFuncionario();
+});
+
+document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click", async () => {
+    const selectFunc = document.getElementById("gasto-func-select");
+    const funcionarioId = selectFunc?.value;
+    const funcionarioNome = selectFunc?.options[selectFunc.selectedIndex]?.text?.split(" (")[0] || "Funcionário";
+    const tipoGasto = document.getElementById("gasto-func-tipo")?.value || "Adiantamento de Salário (Vale)";
+    const valor = numero(document.getElementById("gasto-func-valor")?.value);
+    const dataGasto = document.getElementById("gasto-func-data")?.value || dataHojeStr();
+    const descricao = (document.getElementById("gasto-func-descricao")?.value || "").trim();
+    const lancarDespesa = Boolean(document.getElementById("gasto-func-lancar-despesa")?.checked);
+
+    if (!funcionarioId) {
+        alert("Selecione o funcionário para registar o gasto na conta.");
+        return;
+    }
+    if (isNaN(valor) || valor <= 0) {
+        alert("Indique um valor válido para o gasto.");
+        document.getElementById("gasto-func-valor")?.focus();
+        return;
+    }
+    if (!descricao) {
+        alert("Por favor, descreva o motivo do gasto na conta do funcionário.");
+        document.getElementById("gasto-func-descricao")?.focus();
+        return;
+    }
+
+    try {
+        const quemRegistou = FABEF.userData?.nome || auth.currentUser?.email || "Gerente";
+        const payloadGasto = {
+            funcionarioId,
+            funcionarioNome,
+            tipo: tipoGasto,
+            valor,
+            data: dataGasto,
+            descricao,
+            lancarDespesa,
+            ramo: FABEF.ramo,
+            registadoPor: quemRegistou,
+            criadoEm: serverTimestamp()
+        };
+
+        const ref = await addDoc(subRef("gastos_funcionarios"), payloadGasto);
+        if (!FABEF.gastosFuncionarios) FABEF.gastosFuncionarios = [];
+        FABEF.gastosFuncionarios.push({ id: ref.id, ...payloadGasto, criadoEm: undefined });
+
+        // Lança também como despesa operacional se solicitado
+        if (lancarDespesa) {
+            await addDoc(subRef("despesas"), {
+                descricao: `Gasto Func.: ${funcionarioNome} (${tipoGasto} - ${descricao})`,
+                valor,
+                categoria: "Pessoal / Salários",
+                data: dataGasto,
+                turnoId: FABEF.turnoId || null,
+                ramo: FABEF.ramo,
+                criadoPor: quemRegistou,
+                criadoEm: serverTimestamp()
+            }).catch(e => console.warn("Aviso ao registar despesa reflexa:", e));
+        }
+
+        await gravarAuditoria(`💳 GASTO NA CONTA: Registado ${dinheiro(valor)} para o funcionário ${funcionarioNome} (${tipoGasto} - "${descricao}") por ${quemRegistou}.`, "INFO");
+
+        fecharModal("modal-gasto-funcionario");
+        renderGastosFuncionarios();
+        renderFuncionarios();
+        renderDesempenho();
+
+        alert(`✅ Gasto de ${dinheiro(valor)} registado com sucesso na conta de ${funcionarioNome}!`);
+    } catch(err) {
+        console.error("Erro ao guardar gasto do funcionário:", err);
+        alert("Erro ao guardar gasto:\n" + mensagemFirebase(err));
+    }
+});
+
+function renderGastosFuncionarios() {
+    const corpo = document.getElementById("tabela-gastos-funcionarios");
+    if (!corpo) return;
+
+    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const lista = (FABEF.gastosFuncionarios || [])
+        .filter(g => !g.ramo || g.ramo === FABEF.ramo)
+        .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+
+    corpo.innerHTML = lista.map(g => `
+        <tr>
+            <td>${dataTexto(g.data)}</td>
+            <td><strong>${escapeHTML(g.funcionarioNome || "Funcionário")}</strong></td>
+            <td><span class="badge badge-yellow">${escapeHTML(g.tipo || "Gasto")}</span></td>
+            <td><strong style="color:#b45309;">${dinheiro(g.valor)}</strong></td>
+            <td>${escapeHTML(g.descricao || "—")}${g.lancarDespesa ? ' <small style="color:#059669;font-weight:600;">(lançado em despesas)</small>' : ''}</td>
+            <td>${escapeHTML(g.registadoPor || "—")}</td>
+            <td>${souGerente ? `
+                <button class="btn btn-danger btn-small" type="button" onclick="eliminarGastoFuncionario('${escapeHTML(g.id)}')" title="Eliminar registo de gasto">🗑️</button>
+            ` : "—"}</td>
+        </tr>
+    `).join("") || `<tr><td colspan="7" style="text-align:center;color:#64748b;padding:14px;">Ainda não há gastos ou vales registados na conta dos funcionários.</td></tr>`;
+}
+
+window.eliminarGastoFuncionario = async function(gastoId) {
+    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+        alert("Apenas o gerente pode eliminar registos de gastos.");
+        return;
+    }
+    if (!confirm("Tem a certeza que deseja eliminar este registo de gasto na conta do funcionário?")) return;
+
+    try {
+        await deleteDoc(doc(db, "empresas", FABEF.empresaId, "gastos_funcionarios", gastoId));
+        FABEF.gastosFuncionarios = (FABEF.gastosFuncionarios || []).filter(g => g.id !== gastoId);
+        await gravarAuditoria(`Gerente eliminou registo de gasto de funcionário (#${gastoId.slice(0, 6)}).`, "ALERTA");
+        renderGastosFuncionarios();
+        renderFuncionarios();
+        renderDesempenho();
+        alert("Registo de gasto removido.");
+    } catch(err) {
+        console.error("Erro ao eliminar gasto:", err);
+        alert("Erro ao eliminar gasto:\n" + mensagemFirebase(err));
+    }
+};
+
+/* =====================================================
+   MÓDULO LÓGICO: REGISTO RÁPIDO DE CLIENTE & DÍVIDAS NO POS
+===================================================== */
+document.getElementById("btn-pos-novo-cliente")?.addEventListener("click", () => {
+    const modal = document.getElementById("modal-pos-rapido-cliente");
+    if (!modal) return;
+    const inputNome = document.getElementById("pos-rapido-cliente-nome");
+    const inputTel = document.getElementById("pos-rapido-cliente-telefone");
+    const inputLim = document.getElementById("pos-rapido-cliente-limite");
+    if (inputNome) inputNome.value = "";
+    if (inputTel) inputTel.value = "";
+    if (inputLim) inputLim.value = "";
+    modal.classList.add("show");
+    setTimeout(() => inputNome?.focus(), 150);
+});
+
+document.getElementById("btn-salvar-pos-rapido-cliente")?.addEventListener("click", async () => {
+    const nome = (document.getElementById("pos-rapido-cliente-nome")?.value || "").trim();
+    const telefone = (document.getElementById("pos-rapido-cliente-telefone")?.value || "").trim();
+    const limiteCredito = numero(document.getElementById("pos-rapido-cliente-limite")?.value) || 0;
+
+    if (!nome) {
+        alert("Introduza o nome do cliente.");
+        document.getElementById("pos-rapido-cliente-nome")?.focus();
+        return;
+    }
+
+    try {
+        const payload = {
+            nome,
+            telefone,
+            limiteCredito,
+            ramo: FABEF.ramo,
+            criadoPor: FABEF.userData?.nome || auth.currentUser?.email || "Operador",
+            criadoEm: serverTimestamp()
+        };
+
+        const ref = await addDoc(subRef("clientes"), payload);
+        const novoCli = { id: ref.id, ...payload, criadoEm: undefined };
+        if (!FABEF.clientes) FABEF.clientes = [];
+        FABEF.clientes.push(novoCli);
+
+        // Preenche automaticamente o campo no POS
+        const campoPos = document.getElementById("pos-cliente-nome");
+        if (campoPos) campoPos.value = nome;
+
+        // Atualiza a datalist
+        const listaClientesPos = document.getElementById("lista-clientes-pos");
+        if (listaClientesPos) {
+            listaClientesPos.innerHTML = FABEF.clientes.map(c => `<option value="${escapeHTML(c.nome)}">`).join("");
+        }
+
+        fecharModal("modal-pos-rapido-cliente");
+        renderClientes();
+        await gravarAuditoria(`Cadastrou novo cliente "${nome}" via balcão do POS.`, "INFO");
+        alert(`✅ Cliente "${nome}" registado com sucesso!`);
+    } catch(err) {
+        console.error("Erro ao criar cliente:", err);
+        alert("Erro ao criar cliente:\n" + mensagemFirebase(err));
+    }
+});
+
+document.getElementById("btn-pos-ver-dividas")?.addEventListener("click", () => {
+    mostrarSecao("dividas");
+});
 
 
 /* =====================================================
@@ -6967,6 +7419,7 @@ function renderTudo() {
 
     // Proteções de segurança contra erros de inicialização de funções secundárias
     if (typeof renderFuncionarios === "function") renderFuncionarios();
+    if (typeof renderGastosFuncionarios === "function") renderGastosFuncionarios();
     if (typeof renderAuditoria === "function") renderAuditoria();
     if (typeof renderMetas === "function") renderMetas();
     if (typeof renderDesempenho === "function") renderDesempenho();
