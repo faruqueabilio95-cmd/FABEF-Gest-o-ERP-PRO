@@ -345,7 +345,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
   <nav class="sidebar" id="sidebar">
     <button data-sec="inicio" class="active">🏠 Início</button>
 
-    <details style="margin-top:6px;">
+    <details open style="margin-top:6px;">
       <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Comercial</summary>
       <button data-sec="pos">🛒 Vender</button>
       <button data-sec="vendas">💵 Vendas</button>
@@ -479,7 +479,13 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             <span>Total</span><span id="cart-total">MT 0,00</span>
           </div>
           <div class="form-group">
-            <label for="pos-cliente-nome">Cliente (opcional — para histórico)</label>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label for="pos-cliente-nome" style="margin:0;">Cliente (opcional — para histórico e fiado)</label>
+              <div style="display:flex;gap:4px;">
+                <button type="button" id="btn-pos-novo-cliente" class="btn btn-small btn-light" style="padding:2px 8px;font-size:11px;color:#1e3a8a;font-weight:700;" title="Registar novo cliente sem sair do POS">➕ Novo Cliente</button>
+                <button type="button" id="btn-pos-ver-dividas" class="btn btn-small btn-light" style="padding:2px 8px;font-size:11px;color:#b45309;font-weight:700;" title="Consultar ou registar dívidas/fiado">🧾 Fiado / Dívidas</button>
+              </div>
+            </div>
             <input type="text" id="pos-cliente-nome" list="lista-clientes-pos" placeholder="Nome do cliente">
             <datalist id="lista-clientes-pos"></datalist>
           </div>
@@ -523,19 +529,48 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <!-- VENDAS -->
     <section class="secao" id="sec-vendas">
-      <h2>Histórico de Vendas</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <h2>Histórico de Vendas</h2>
+        <div style="font-size:13px;color:#64748b;font-weight:600;">
+          Acesso completo a todas as vendas da empresa e relatórios por período
+        </div>
+      </div>
+
+      <!-- Resumo KPI das Vendas no Período Selecionado -->
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="kpi">
+          <div class="rotulo">Total Faturado</div>
+          <div class="valor" id="vendas-kpi-faturamento">MT 0,00</div>
+        </div>
+        <div class="kpi">
+          <div class="rotulo">Total KG / Unidades</div>
+          <div class="valor" id="vendas-kpi-kg" style="font-size:18px;color:#0284c7;">0.000 kg</div>
+        </div>
+        <div class="kpi">
+          <div class="rotulo">Qtd. de Operações</div>
+          <div class="valor" id="vendas-kpi-qtd" style="font-size:18px;">0 vendas</div>
+        </div>
+        <div class="kpi">
+          <div class="rotulo">Ticket Médio</div>
+          <div class="valor" id="vendas-kpi-ticket" style="font-size:18px;color:#10b981;">MT 0,00</div>
+        </div>
+      </div>
+
       <div class="card">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-          <input type="text" id="vendas-pesquisa" placeholder="🔍 Pesquisar venda..." style="flex:1;min-width:180px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-          <select id="vendas-periodo" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-            <option value="todos">Todo o período</option>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+          <input type="text" id="vendas-pesquisa" placeholder="🔍 Pesquisar por cliente, produto, recibo (#) ou operador..." style="flex:1;min-width:200px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+          <select id="vendas-periodo" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;">
+            <option value="todos">Todo o período (Todas as Vendas Registadas)</option>
+            <option value="turno">Turno Atual do Caixa</option>
             <option value="hoje">Hoje</option>
-            <option value="7">Últimos 7 dias</option>
-            <option value="30">Últimos 30 dias</option>
+            <option value="7">Últimos 7 dias (Semanal)</option>
+            <option value="30">Últimos 30 dias (Mensal)</option>
+            <option value="ano">Este Ano (Anual)</option>
           </select>
+          <button type="button" class="btn btn-light" onclick="renderVendas()" style="padding:10px 14px;">🔄 Atualizar</button>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Operador</th><th>Itens</th><th>Total</th><th>Pagamento</th><th>NUIT</th><th>Ramo</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Data</th><th>Operador</th><th>Itens & Quantidade</th><th>Total</th><th>Pagamento</th><th>NUIT</th><th>Ramo</th><th>Ações</th></tr></thead>
           <tbody id="tabela-vendas"></tbody>
         </table></div>
       </div>
@@ -885,10 +920,29 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <!-- DESEMPENHO -->
     <section class="secao" id="sec-desempenho">
-      <h2>Desempenho da equipa</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
+        <h2>Avaliação e Desempenho dos Funcionários</h2>
+        <div style="font-size:12px;background:#fef3c7;color:#92400e;padding:6px 12px;border-radius:20px;font-weight:700;border:1px solid #fde68a;">
+          👑 Exclusivo: O Gerente é quem define metas e avalia o desempenho dos funcionários
+        </div>
+      </div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:16px;">
+        Acompanhamento detalhado das vendas, kg vendidos, faturamento, despesas/gastos registados na conta do funcionário e avaliação de performance.
+      </p>
+
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Pessoa</th><th>Vendas</th><th>Valor vendido</th><th>Descontos</th><th>Encomendas</th><th>Dívidas registadas</th><th>Sugestões</th></tr></thead>
+          <thead><tr>
+            <th>Funcionário</th>
+            <th>Vendas (Qtd)</th>
+            <th>Kg Vendidos</th>
+            <th>Valor Vendido</th>
+            <th>Gastos na Conta</th>
+            <th>Descontos</th>
+            <th>Encomendas</th>
+            <th>Dívidas Registadas</th>
+            <th>Avaliação do Gerente</th>
+          </tr></thead>
           <tbody id="tabela-desempenho"></tbody>
         </table></div>
       </div>
@@ -927,8 +981,35 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Ramo / Filial</th><th>Função</th><th>Estado</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Ramo / Filial</th><th>Função</th><th>Gastos na Conta</th><th>Estado</th><th>Ações</th></tr></thead>
           <tbody id="tabela-funcionarios"></tbody>
+        </table></div>
+      </div>
+
+      <!-- GASTOS NA CONTA DO FUNCIONÁRIO (VALES, ADIANTAMENTOS, REFEIÇÕES) -->
+      <div class="card" id="card-gastos-funcionarios" style="border-top:3px solid #f59e0b;margin-top:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div>
+            <h3 style="margin:0;color:#b45309;font-size:16px;">💳 Gastos e Vales na Conta do Funcionário</h3>
+            <p style="margin:3px 0 0;font-size:13px;color:#64748b;">
+              Registe adiantamentos salariais (vales), refeições, transportes, quebras ou produtos consumidos pelo funcionário.
+            </p>
+          </div>
+          <button id="btn-abrir-modal-gasto-func" class="btn btn-warning" type="button" style="background:#f59e0b;color:#fff;font-weight:700;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;">
+            ➕ Registar Gasto na Conta
+          </button>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Data</th>
+            <th>Funcionário</th>
+            <th>Tipo de Gasto</th>
+            <th>Valor</th>
+            <th>Descrição / Motivo</th>
+            <th>Registado Por</th>
+            <th>Ações</th>
+          </tr></thead>
+          <tbody id="tabela-gastos-funcionarios"></tbody>
         </table></div>
       </div>
     </section>
@@ -1532,33 +1613,51 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
   </div>
 
-  <!-- MODAL DE CORREÇÃO / REGISTO DE VENDA FALHADA (COM JUSTIFICATIVA OBRIGATÓRIA AO GERENTE) -->
+  <!-- MODAL DE CORREÇÃO / REGISTO DE VENDA FALHADA (EDITAR PREÇO OU ANULAR COM JUSTIFICATIVA AO GERENTE) -->
   <div class="modal-overlay" id="modal-venda-falhada">
     <div class="modal-box" style="max-width: 480px;">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
         <span style="font-size:24px;">⚠️</span>
-        <h3 style="color:#b91c1c; margin:0;">Registo de Venda Falhada / Anulação</h3>
+        <h3 style="color:#b91c1c; margin:0;">Corrigir Venda / Justificativa ao Gerente</h3>
       </div>
       <p style="font-size:13px; color:#64748b; margin-bottom:14px;">
-        O funcionário só pode editar o registo em casos de venda que falhou. <strong>É obrigatório</strong> justificar detalhadamente ao Gerente o motivo desta alteração.
+        Quando a funcionária falha a venda ou o valor digitado está incorreto, pode <strong>editar o preço</strong> ou <strong>anular a venda</strong>, sendo obrigatório justificar detalhadamente ao Gerente.
       </p>
 
       <input type="hidden" id="falha-venda-id">
 
       <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px; margin-bottom:14px; font-size:13px;">
         <div><strong>Venda:</strong> <span id="falha-venda-ref">—</span></div>
-        <div><strong>Total:</strong> <strong id="falha-venda-total" style="color:#b91c1c;">MT 0,00</strong></div>
+        <div><strong>Total Atual:</strong> <strong id="falha-venda-total" style="color:#b91c1c;">MT 0,00</strong></div>
         <div style="margin-top:4px;"><strong>Itens:</strong> <span id="falha-venda-itens">—</span></div>
       </div>
 
       <div class="form-group">
-        <label for="falha-venda-motivo-tipo">Tipo de Falha Ocorrida *</label>
+        <label for="falha-venda-tipo-acao">O que deseja fazer nesta venda? *</label>
+        <select id="falha-venda-tipo-acao">
+          <option value="EDITAR_PRECO">✏️ Editar / Corrigir o Preço da Venda (ao mesmo tempo justificar)</option>
+          <option value="CANCELAR_TOTAL">❌ Anular / Cancelar Venda na Totalidade (Devolver ao Stock)</option>
+        </select>
+      </div>
+
+      <!-- Bloco para Editar o Preço -->
+      <div id="bloco-falha-editar-preco" class="form-group" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;">
+        <label for="falha-venda-novo-preco" style="color:#1e3a8a;font-weight:800;display:block;margin-bottom:4px;">
+          Novo Preço / Valor Correto da Venda (MT) *
+        </label>
+        <input type="number" id="falha-venda-novo-preco" min="0" step="0.01" style="font-size:16px;font-weight:800;width:100%;padding:10px;border:1.5px solid #2563eb;border-radius:8px;" placeholder="0,00">
+        <small style="color:#475569;display:block;margin-top:4px;">Escreva o valor corrigido exato que o cliente pagou ou deve pagar.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="falha-venda-motivo-tipo">Motivo da Correção / Falha *</label>
         <select id="falha-venda-motivo-tipo">
-          <option value="Cliente desistiu antes ou após o registo">Cliente desistiu / Não tinha valor suficiente</option>
-          <option value="Falha na transação M-Pesa / E-Mola / POS">Falha ou recusa no pagamento digital (M-Pesa/E-Mola)</option>
-          <option value="Erro de digitação de quantidade no caixa">Erro de digitação ou quantidade digitada errada</option>
-          <option value="Produto devolvido com defeito ou validade">Devolução imediata de produto danificado / avariado</option>
-          <option value="Troca por outro artigo">Troca direta por outro artigo</option>
+          <option value="Preço digitado incorretamente pelo funcionário">Preço digitado incorretamente pelo funcionário</option>
+          <option value="Quantidade ou peso calculado com divergência">Quantidade ou peso (kg) calculado com divergência</option>
+          <option value="Desconto acordado com cliente ou autorização do gerente">Desconto acordado com cliente ou autorização</option>
+          <option value="Cliente desistiu / Falha no pagamento">Cliente desistiu / Falha no pagamento</option>
+          <option value="Produto trocado ou devolvido">Produto trocado ou devolvido</option>
+          <option value="Outro motivo">Outro motivo operacional</option>
         </select>
       </div>
 
@@ -1566,19 +1665,108 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <label for="falha-venda-justificativa" style="color:#b91c1c; font-weight:800;">
           Justificativa Obrigatória para o Gerente *
         </label>
-        <textarea id="falha-venda-justificativa" rows="3" placeholder="Explique aqui com exatidão ao Gerente o que correu mal nesta venda..." style="width:100%; padding:10px; border:1.5px solid #ef4444; border-radius:8px; font-size:13px; font-family:inherit; resize:vertical;"></textarea>
+        <textarea id="falha-venda-justificativa" rows="3" placeholder="Explique aqui com exatidão ao Gerente o que correu mal e porque alterou o preço..." style="width:100%; padding:10px; border:1.5px solid #ef4444; border-radius:8px; font-size:13px; font-family:inherit; resize:vertical;"></textarea>
         <small style="color:#64748b; display:block; margin-top:3px;">Esta justificativa ficará registada permanentemente na auditoria do Gerente.</small>
       </div>
 
-      <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+      <div id="bloco-falha-repor-stock" class="form-group" style="display:none; align-items:center; gap:8px;">
         <input type="checkbox" id="falha-venda-repor-stock" checked style="width:auto;">
         <label for="falha-venda-repor-stock" style="margin:0; font-size:13px;">Devolver e repor as quantidades dos produtos no stock do armazém</label>
       </div>
 
       <div class="modal-acoes">
         <button class="btn btn-light" type="button" onclick="fecharModal('modal-venda-falhada')" style="flex:1;">Cancelar</button>
-        <button id="btn-confirmar-venda-falhada" class="btn btn-danger" type="button" style="flex:1.2; font-weight:800; background:#dc2626; color:#fff; border:none; padding:10px; border-radius:8px; cursor:pointer;">
-          ⚠️ Confirmar & Justificar
+        <button id="btn-confirmar-venda-falhada" class="btn btn-primary" type="button" style="flex:1.4; font-weight:800; background:#2563eb; color:#fff; border:none; padding:10px; border-radius:8px; cursor:pointer;">
+          💾 Confirmar & Justificar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE REGISTO DE GASTOS NA CONTA DO FUNCIONÁRIO -->
+  <div class="modal-overlay" id="modal-gasto-funcionario">
+    <div class="modal-box" style="max-width: 480px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:24px;">💳</span>
+        <h3 style="color:#b45309;margin:0;">Adicionar Gasto na Conta do Funcionário</h3>
+      </div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
+        Registe adiantamentos salariais, compras na loja, refeições ou gastos que devem ser lançados na conta do funcionário.
+      </p>
+
+      <div class="form-group">
+        <label for="gasto-func-select">Funcionário *</label>
+        <select id="gasto-func-select" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;"></select>
+      </div>
+
+      <div class="grid">
+        <div class="form-group">
+          <label for="gasto-func-tipo">Tipo de Gasto *</label>
+          <select id="gasto-func-tipo" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+            <option value="Adiantamento de Salário (Vale)">Adiantamento de Salário (Vale)</option>
+            <option value="Alimentação / Refeição">Alimentação / Refeição</option>
+            <option value="Transporte">Transporte</option>
+            <option value="Consumo de Artigos da Loja">Consumo de Artigos da Loja</option>
+            <option value="Quebra / Dano / Falta">Quebra / Dano / Falta de Caixa</option>
+            <option value="Outro Gasto">Outro Gasto / Desconto</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="gasto-func-valor">Valor (MT) *</label>
+          <input type="number" id="gasto-func-valor" min="1" step="0.01" placeholder="Ex: 500,00" style="font-weight:800;font-size:16px;">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="gasto-func-data">Data do Gasto</label>
+        <input type="date" id="gasto-func-data">
+      </div>
+
+      <div class="form-group">
+        <label for="gasto-func-descricao">Descrição / Motivo *</label>
+        <input type="text" id="gasto-func-descricao" placeholder="Ex: Vale pedido para despesa médica, almoço, etc.">
+      </div>
+
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="gasto-func-lancar-despesa" checked style="width:auto;">
+        <label for="gasto-func-lancar-despesa" style="margin:0;font-size:13px;">Lançar também como despesa operacional da empresa</label>
+      </div>
+
+      <div class="modal-acoes">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-gasto-funcionario')" style="flex:1;">Cancelar</button>
+        <button id="btn-salvar-gasto-funcionario" class="btn btn-entrar" type="button" style="flex:1.4;background:#f59e0b;color:#fff;font-weight:700;">
+          💾 Guardar Gasto na Conta
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL RÁPIDO PARA ADICIONAR CLIENTE NO POS -->
+  <div class="modal-overlay" id="modal-pos-rapido-cliente">
+    <div class="modal-box" style="max-width: 440px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:24px;">👥</span>
+        <h3 style="color:#1e3a8a;margin:0;">Registo Rápido de Cliente</h3>
+      </div>
+      <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
+        Adicione rapidamente o cliente sem sair da caixa registadora.
+      </p>
+      <div class="form-group">
+        <label for="pos-rapido-cliente-nome">Nome do Cliente *</label>
+        <input type="text" id="pos-rapido-cliente-nome" placeholder="Ex: Carlos Silva">
+      </div>
+      <div class="form-group">
+        <label for="pos-rapido-cliente-telefone">Telefone (WhatsApp / Chamadas)</label>
+        <input type="text" id="pos-rapido-cliente-telefone" placeholder="Ex: +258 84 123 4567">
+      </div>
+      <div class="form-group">
+        <label for="pos-rapido-cliente-limite">Limite de Crédito para Fiado (MT)</label>
+        <input type="number" id="pos-rapido-cliente-limite" placeholder="0 para ilimitado" min="0" value="0">
+      </div>
+      <div class="modal-acoes">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-pos-rapido-cliente')" style="flex:1;">Cancelar</button>
+        <button id="btn-salvar-pos-rapido-cliente" class="btn btn-primary" type="button" style="flex:1.2;font-weight:700;">
+          ➕ Adicionar & Selecionar
         </button>
       </div>
     </div>
