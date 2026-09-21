@@ -733,6 +733,7 @@ async function executarLogin() {
             status.style.color = "#10b981";
         }
         if (credencial?.user) {
+            sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
             await iniciarSessaoFABEF(credencial.user);
         }
     } catch (error) {
@@ -997,27 +998,69 @@ async function calcularHashPin(pin) {
 }
 
 async function configurarNovoPin(uid) {
-    let pin = prompt("Defina um PIN de 4 dígitos para desbloquear a aplicação rapidamente da próxima vez (mesmo sem internet):");
-    if (pin === null) return; // o utilizador optou por não definir agora
-    pin = pin.trim();
-    if (!/^\d{4,6}$/.test(pin)) { alert("O PIN deve ter entre 4 e 6 números."); return; }
-    const confirmacao = prompt("Confirme o PIN novamente:");
-    if (pin !== (confirmacao || "").trim()) { alert("Os PINs não coincidem. Tente novamente mais tarde em Configurações."); return; }
-
-    const hash = await calcularHashPin(pin);
-    localStorage.setItem(chavePinLocal(uid), hash);
-    alert("PIN definido com sucesso. Da próxima vez que abrir a aplicação, vai usar este PIN em vez do e-mail e senha.");
+    mostrarModalConfigurarPin(auth.currentUser || { uid }, false);
 }
 
-function mostrarEcraPin() {
-    elAuth("app")?.classList.add("hidden");
+function mostrarModalConfigurarPin(user, obrigatorio = false) {
+    const modal = document.getElementById("modal-configurar-pin");
+    if (!modal) return;
+    const inpNovo = document.getElementById("input-novo-pin");
+    const inpConf = document.getElementById("input-confirmar-pin");
+    const status = document.getElementById("status-config-pin");
+    const btnCancelar = document.getElementById("btn-cancelar-pin");
+    const titulo = document.getElementById("titulo-config-pin");
+    const desc = document.getElementById("desc-config-pin");
+
+    if (inpNovo) inpNovo.value = "";
+    if (inpConf) inpConf.value = "";
+    if (status) status.textContent = "";
+
+    if (obrigatorio) {
+        if (titulo) titulo.textContent = "🛡️ Ativar PIN de Segurança (Obrigatório)";
+        if (desc) desc.textContent = "Para garantir a máxima proteção do seu telemóvel e evitar acessos indevidos, crie um código PIN numérico de 4 a 6 dígitos.";
+        if (btnCancelar) {
+            btnCancelar.textContent = "Sair da Conta";
+            btnCancelar.onclick = async () => {
+                modal.classList.remove("active");
+                sessionStorage.removeItem("fabef_sessao_desbloqueada");
+                sessionStorage.setItem("fabef_saiu_manual", "true");
+                await signOut(auth);
+            };
+        }
+    } else {
+        if (titulo) titulo.textContent = "🔑 Definir / Alterar PIN";
+        if (desc) desc.textContent = "Introduza o novo código PIN de 4 a 6 dígitos para este dispositivo.";
+        if (btnCancelar) {
+            btnCancelar.textContent = "Cancelar";
+            btnCancelar.onclick = () => modal.classList.remove("active");
+        }
+    }
+
+    modal.classList.add("active");
+    setTimeout(() => inpNovo?.focus(), 200);
+}
+
+function mostrarEcraPin(user) {
+    if (elAuth("app")) elAuth("app").classList.add("hidden");
     if (elAuth("tela-login")) elAuth("tela-login").style.display = "none";
     const telaPin = document.getElementById("tela-pin");
     if (telaPin) telaPin.style.display = "flex";
+
+    const identificador = user?.email || FABEF.userData?.nome || FABEF.user?.email || "Administrador";
+    const sub = document.getElementById("pin-subtitulo");
+    if (sub) {
+        sub.innerHTML = `Sessão protegida: <strong style="color:#1e40af;">${escapeHTML(identificador)}</strong><br><span style="font-size:12px;color:#64748b;">Introduza o PIN de 4 dígitos para desbloquear</span>`;
+    }
+
     const inputPin = document.getElementById("pin-input");
-    if (inputPin) { inputPin.value = ""; inputPin.focus(); }
+    if (inputPin) {
+        inputPin.value = "";
+        setTimeout(() => inputPin.focus(), 150);
+    }
     const statusPin = document.getElementById("pin-status");
-    if (statusPin) statusPin.textContent = "";
+    if (statusPin) {
+        statusPin.textContent = "";
+    }
 }
 
 function esconderEcraPin() {
@@ -1025,39 +1068,120 @@ function esconderEcraPin() {
     if (telaPin) telaPin.style.display = "none";
 }
 
-document.getElementById("btn-pin-entrar")?.addEventListener("click", async () => {
-    const pinDigitado = (document.getElementById("pin-input")?.value || "").trim();
+async function validarEEntrarPin() {
+    const input = document.getElementById("pin-input");
+    const pinDigitado = (input?.value || "").trim();
     const statusPin = document.getElementById("pin-status");
-    if (!pinDigitado) { if (statusPin) statusPin.textContent = "Introduza o PIN."; return; }
-
-    if (window.FABEF?.isDemoMode) {
-        // No modo teste, aceita 1234 ou qualquer PIN de 4 dígitos
-        if (pinDigitado.length >= 4) {
-            esconderEcraPin();
-            document.getElementById("app")?.classList.remove("hidden");
-            toast("🔓 Aplicação desbloqueada com sucesso.");
-        } else {
-            if (statusPin) statusPin.textContent = "🔴 O PIN deve ter pelo menos 4 dígitos (ex: 1234).";
+    if (!pinDigitado) {
+        if (statusPin) {
+            statusPin.textContent = "⚠️ Introduza o seu código PIN.";
+            statusPin.style.color = "#b45309";
         }
         return;
     }
 
-    const user = auth.currentUser;
-    if (!user) { mostrarEcraPin(); return; }
+    if (window.FABEF?.isDemoMode) {
+        if (pinDigitado.length >= 4) {
+            sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
+            esconderEcraPin();
+            document.getElementById("app")?.classList.remove("hidden");
+            toast("🔓 Aplicação desbloqueada com sucesso.");
+        } else {
+            if (statusPin) {
+                statusPin.textContent = "🔴 O PIN deve ter pelo menos 4 dígitos (ex: 1234).";
+                statusPin.style.color = "#dc2626";
+            }
+        }
+        return;
+    }
 
-    const hashGuardado = localStorage.getItem(chavePinLocal(user.uid));
+    const user = auth.currentUser || FABEF.user;
+    if (!user) {
+        mostrarEcraPin();
+        return;
+    }
+
+    let hashGuardado = localStorage.getItem(chavePinLocal(user.uid));
+    if (!hashGuardado && FABEF.userData?.pinHash) {
+        hashGuardado = FABEF.userData.pinHash;
+        localStorage.setItem(chavePinLocal(user.uid), hashGuardado);
+    }
+
+    if (!hashGuardado) {
+        mostrarModalConfigurarPin(user, true);
+        return;
+    }
 
     const hashDigitado = await calcularHashPin(pinDigitado);
     if (hashDigitado === hashGuardado) {
-        esconderEcraPin();
-        document.getElementById("app")?.classList.remove("hidden");
-        await iniciarSessaoFABEF(user);
+        if (statusPin) {
+            statusPin.textContent = "🟢 PIN correto! A abrir o sistema...";
+            statusPin.style.color = "#16a34a";
+        }
+        sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
+        setTimeout(async () => {
+            esconderEcraPin();
+            document.getElementById("app")?.classList.remove("hidden");
+            await iniciarSessaoFABEF(user);
+        }, 150);
     } else {
-        if (statusPin) statusPin.textContent = "🔴 PIN incorreto. Tente novamente.";
+        if (input) input.value = "";
+        if (statusPin) {
+            statusPin.textContent = "🔴 PIN incorreto. Tente novamente ou use a palavra-passe.";
+            statusPin.style.color = "#dc2626";
+        }
+        setTimeout(() => input?.focus(), 100);
+    }
+}
+
+// Ouvintes de clique e teclado do PIN
+document.getElementById("btn-pin-entrar")?.addEventListener("click", validarEEntrarPin);
+
+document.getElementById("pin-input")?.addEventListener("input", e => {
+    e.target.value = e.target.value.replace(/\D/g, "");
+    if (e.target.value.length === 4) {
+        validarEEntrarPin();
+    }
+});
+
+document.getElementById("pin-input")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+        validarEEntrarPin();
+    }
+});
+
+// Teclas do teclado numérico táctil (touchscreen / celular)
+document.querySelectorAll(".pin-num-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const input = document.getElementById("pin-input");
+        if (!input) return;
+        const key = btn.getAttribute("data-key");
+        if (key === "clear") {
+            input.value = "";
+        } else if (key === "back") {
+            input.value = input.value.slice(0, -1);
+        } else if (/^\d$/.test(key)) {
+            if (input.value.length < 6) {
+                input.value += key;
+                if (input.value.length === 4) {
+                    validarEEntrarPin();
+                }
+            }
+        }
+    });
+});
+
+document.getElementById("btn-pin-esqueceu")?.addEventListener("click", async () => {
+    if (confirm("Deseja sair para entrar com o seu e-mail e palavra-passe da conta?")) {
+        sessionStorage.removeItem("fabef_sessao_desbloqueada");
+        sessionStorage.setItem("fabef_saiu_manual", "true");
+        esconderEcraPin();
+        await signOut(auth);
     }
 });
 
 document.getElementById("btn-pin-sair")?.addEventListener("click", async () => {
+    sessionStorage.removeItem("fabef_sessao_desbloqueada");
     sessionStorage.setItem("fabef_saiu_manual", "true");
     esconderEcraPin();
     if (window.FABEF?.isDemoMode) {
@@ -1071,24 +1195,102 @@ document.getElementById("btn-pin-sair")?.addEventListener("click", async () => {
     await signOut(auth);
 });
 
-// Bloqueio por PIN ao minimizar a aplicação (no telemóvel ou ao alternar de janela)
+// Gravação de PIN no Modal
+document.getElementById("btn-salvar-pin")?.addEventListener("click", async () => {
+    const inpNovo = document.getElementById("input-novo-pin");
+    const inpConf = document.getElementById("input-confirmar-pin");
+    const status = document.getElementById("status-config-pin");
+    const modal = document.getElementById("modal-configurar-pin");
+
+    const p1 = (inpNovo?.value || "").trim();
+    const p2 = (inpConf?.value || "").trim();
+
+    if (!/^\d{4,6}$/.test(p1)) {
+        if (status) {
+            status.textContent = "⚠️ O PIN deve ter entre 4 e 6 números.";
+            status.style.color = "#dc2626";
+        }
+        return;
+    }
+    if (p1 !== p2) {
+        if (status) {
+            status.textContent = "⚠️ Os PINs introduzidos não são iguais.";
+            status.style.color = "#dc2626";
+        }
+        return;
+    }
+
+    const user = auth.currentUser || FABEF.user;
+    if (!user && !window.FABEF?.isDemoMode) {
+        alert("Sessão não detetada. Inicie sessão novamente.");
+        return;
+    }
+
+    try {
+        const hash = await calcularHashPin(p1);
+        if (user?.uid) {
+            localStorage.setItem(chavePinLocal(user.uid), hash);
+            try {
+                await updateDoc(doc(db, "utilizadores", user.uid), { pinHash: hash });
+            } catch(e){}
+        }
+
+        sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
+        if (modal) modal.classList.remove("active");
+        esconderEcraPin();
+        document.getElementById("app")?.classList.remove("hidden");
+
+        const configPinEstado = document.getElementById("config-pin-estado");
+        if (configPinEstado) {
+            configPinEstado.textContent = "🟢 PIN ATIVO E PROTEGIDO";
+            configPinEstado.style.color = "#16a34a";
+        }
+
+        if (user) {
+            await iniciarSessaoFABEF(user);
+        }
+
+        alert("✅ PIN de segurança definido com sucesso!\nO seu aplicativo agora está 100% protegido. Sempre que for aberto no celular ou minimizado, o PIN será exigido.");
+    } catch(err) {
+        console.error("Erro ao guardar PIN:", err);
+        if (status) {
+            status.textContent = "Erro ao guardar PIN: " + err.message;
+            status.style.color = "#dc2626";
+        }
+    }
+});
+
+// Bloqueio por PIN ao minimizar a aplicação ou suspender o telemóvel
 let appFoiMinimizada = false;
 document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
         if (FABEF.carregado && (FABEF.user || window.FABEF?.isDemoMode)) {
             appFoiMinimizada = true;
+            sessionStorage.removeItem("fabef_sessao_desbloqueada");
         }
     } else {
-        if (appFoiMinimizada && FABEF.carregado && (FABEF.user || window.FABEF?.isDemoMode)) {
+        if (appFoiMinimizada && (FABEF.user || window.FABEF?.isDemoMode)) {
             appFoiMinimizada = false;
-            mostrarEcraPin();
+            mostrarEcraPin(auth.currentUser || FABEF.user);
             const statusPin = document.getElementById("pin-status");
             if (statusPin) {
                 statusPin.textContent = "🔒 Aplicação suspensa. Introduza o PIN para desbloquear.";
-                statusPin.style.color = "#1e3a8a";
+                statusPin.style.color = "#2563eb";
             }
         }
     }
+});
+
+// Botão de bloqueio instantâneo no topo do sistema
+document.getElementById("btn-bloquear-ecra")?.addEventListener("click", () => {
+    sessionStorage.removeItem("fabef_sessao_desbloqueada");
+    mostrarEcraPin(auth.currentUser || FABEF.user);
+});
+
+// Testar bloqueio a partir das configurações
+document.getElementById("btn-testar-bloqueio")?.addEventListener("click", () => {
+    sessionStorage.removeItem("fabef_sessao_desbloqueada");
+    mostrarEcraPin(auth.currentUser || FABEF.user);
 });
 
 
@@ -1112,9 +1314,23 @@ onAuthStateChanged(auth, async user => {
     // Esperamos a conclusão de criarConta() para evitar uma corrida de inicialização.
     if (FABEF_registoEmCurso) return;
 
-    // LOGIN NORMAL: e-mail + senha abre diretamente a aplicação.
-    // O PIN só é usado quando a aplicação foi suspensa/minimizada ou o ecrã foi bloqueado.
-    await iniciarSessaoFABEF(user);
+    // VERIFICAÇÃO DE SEGURANÇA OBRIGATÓRIA NO TELEMÓVEL:
+    // Se a sessão já foi validada nesta aba/sessão (acabou de fazer login com senha ou digitou o PIN), abre
+    const sessaoDesbloqueada = sessionStorage.getItem("fabef_sessao_desbloqueada") === "true";
+    if (sessaoDesbloqueada) {
+        await iniciarSessaoFABEF(user);
+        return;
+    }
+
+    // Caso contrário (aplicação reaberta no telemóvel, PWA iniciada ou reiniciada):
+    // EXIGE O PIN OU CONFIGURAÇÃO IMEDIATA DO PIN
+    const hashGuardado = localStorage.getItem(chavePinLocal(user.uid));
+    if (hashGuardado) {
+        mostrarEcraPin(user);
+    } else {
+        // Ainda não configurou o PIN: exige configuração para proteger o telemóvel
+        mostrarModalConfigurarPin(user, true);
+    }
 });
 
 async function carregarPerfil(user) {
@@ -1349,11 +1565,9 @@ function abrirAplicacao() {
         }
     }, 100);
 
-    // Pergunta UMA ÚNICA VEZ neste dispositivo se deseja configurar PIN
-    const chavePerguntado = "fabef_pin_perguntado_" + FABEF.user.uid;
-    if (FABEF.user?.uid && !localStorage.getItem(chavePinLocal(FABEF.user.uid)) && !localStorage.getItem(chavePerguntado)) {
-        localStorage.setItem(chavePerguntado, "true");
-        setTimeout(() => configurarNovoPin(FABEF.user.uid), 600);
+    // Se ainda não configurou PIN neste telemóvel/dispositivo, abre o modal de configuração
+    if (FABEF.user?.uid && !localStorage.getItem(chavePinLocal(FABEF.user.uid))) {
+        setTimeout(() => mostrarModalConfigurarPin(FABEF.user, false), 800);
     }
 }
 
@@ -1902,9 +2116,24 @@ async function mudarRamo(ramo) {
         }
 
         FABEF.ramo = ramo;
+        ramoSendoConfigurado = ramo;
+        const configRamo = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(ramo) : null;
+        if (configRamo && FABEF.empresa) {
+            FABEF.empresa.nome = configRamo.nome;
+            FABEF.empresa.telefone = configRamo.telefone;
+            FABEF.empresa.endereco = configRamo.endereco;
+            FABEF.empresa.cidade = configRamo.cidade;
+            FABEF.empresa.nuit = configRamo.nuit;
+            FABEF.empresa.ivaRegime = configRamo.ivaRegime;
+            FABEF.empresa.ivaTaxa = configRamo.ivaTaxa;
+            FABEF.empresa.rodapeRecibo = configRamo.rodapeRecibo;
+            FABEF.empresa.idPersonalizado = configRamo.idPersonalizado;
+        }
+
         await recarregarDadosDoRamoAtual(); // Fecha listeners do ramo anterior e subscreve todos os dados do novo ramo
         renderTudo();
         renderPastaRamos();
+        renderConfiguracoes();
 
         // Escreve de forma persistente a alteração nos registos de auditoria
         await gravarAuditoria("Alterou o ramo activo para " + ramo, "INFO");
@@ -3432,13 +3661,14 @@ window.imprimirReciboVenda = function(vendaId) {
     const v = FABEF.vendas.find(x => x.id === vendaId);
     if (!v) { alert("Venda não localizada."); return; }
 
-    const emp = FABEF.empresa || {};
-    const nomeEmpresa = emp.nome || "FABEF GESTão ERP PRO";
+    const ramoDaVenda = v.ramo || FABEF.ramo;
+    const emp = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(ramoDaVenda) : (FABEF.empresa || {});
+    const nomeEmpresa = emp.nome || ramoDaVenda || "FABEF GESTÃO ERP PRO";
     const nuitEmpresa = emp.nuit || "Isento / Não registado";
     const telEmpresa = emp.telefone || "+258 84 123 4567";
     const endEmpresa = emp.endereco || "Moçambique";
     const cidadeEmpresa = emp.cidade || "Maputo";
-    const regimeIva = emp.ivaRegime === "normal" ? `IVA ${emp.ivaTaxa || 16}% Incluído` : "Regime de Isenção (Art. 9 CIVA)";
+    const regimeIva = emp.ivaRegime === "GERAL_16" ? `IVA ${emp.ivaTaxa || 16}% Incluído` : (emp.ivaRegime === "SIMPLIFICADO_5" ? `IVA 5% Simplificado` : "Regime de Isenção (Art. 9 CIVA)");
     const rodapeMsg = emp.rodapeRecibo || "Obrigado pela sua preferência! Volte sempre.";
 
     const itensHtml = (v.itens || []).map(i => {
@@ -3605,8 +3835,9 @@ window.enviarReciboWhatsApp = function(vendaId) {
     const v = FABEF.vendas.find(x => x.id === vendaId);
     if (!v) { alert("Venda não localizada."); return; }
 
-    const emp = FABEF.empresa || {};
-    const nomeEmpresa = emp.nome || "FABEF GESTão ERP PRO";
+    const ramoDaVenda = v.ramo || FABEF.ramo;
+    const emp = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(ramoDaVenda) : (FABEF.empresa || {});
+    const nomeEmpresa = emp.nome || ramoDaVenda || "FABEF GESTÃO ERP PRO";
     const nuitEmpresa = emp.nuit || "Isento";
     const telEmpresa = emp.telefone || "+258 84 123 4567";
 
@@ -4158,15 +4389,24 @@ async function registarDivida() {
         document.getElementById("divida-cliente").value = "";
         document.getElementById("divida-telefone").value = "";
         document.getElementById("divida-valor").value = "";
+        const elLimite = document.getElementById("divida-limite");
+        if (elLimite) elLimite.value = "";
 
         renderDividas();
 
-        await gravarAuditoria("Registou uma nova dívida / fiado no valor de " + dinheiro(valor) + " para o cliente: " + cliente, "INFO");
+        try {
+            await gravarAuditoria("Registou uma nova dívida / fiado no valor de " + dinheiro(valor) + " para o cliente: " + cliente, "INFO");
+        } catch (e) {}
+
         alert("✅ Dívida registada e conta corrente atualizada com sucesso.");
 
     } catch (error) {
-        console.error("Erro crítico ao processar conta corrente de fiado:", error);
-        alert("Não foi possível registar o fiado:\n" + error.message);
+        console.error("Erro ao processar conta corrente de fiado:", error);
+        if (error.message && error.message.includes("limite de crédito")) {
+            alert("⚠️ " + error.message);
+        } else {
+            alert("Não foi possível registar o fiado:\n" + (error.message || error));
+        }
     }
 }
 /* =====================================================
@@ -5122,97 +5362,221 @@ function renderABC(vendas) {
     `;
 }
 /* =====================================================
-   MÓDULO LÓGICO: CONFIGURAÇÕES CORPORATIVAS DO NEGÓCIO
+   MÓDULO LÓGICO: CONFIGURAÇÕES INDEPENDENTES POR RAMO & NEGÓCIO
 ===================================================== */
 
+let ramoSendoConfigurado = null;
+
+function obterConfiguracaoRamo(ramoNome) {
+    const r = ramoNome || FABEF.ramo || "Comércio Geral";
+    const ramosConfigs = FABEF.empresa?.ramos_configuracoes || {};
+    const configEspecifica = ramosConfigs[r];
+    if (configEspecifica) {
+        return {
+            idPersonalizado: configEspecifica.idPersonalizado || "",
+            nome: configEspecifica.nome || r,
+            nuit: configEspecifica.nuit !== undefined ? configEspecifica.nuit : (FABEF.empresa?.nuit || ""),
+            telefone: configEspecifica.telefone !== undefined ? configEspecifica.telefone : (FABEF.empresa?.telefone || ""),
+            endereco: configEspecifica.endereco !== undefined ? configEspecifica.endereco : (FABEF.empresa?.endereco || ""),
+            cidade: configEspecifica.cidade !== undefined ? configEspecifica.cidade : (FABEF.empresa?.cidade || ""),
+            ivaRegime: configEspecifica.ivaRegime || "ISENTO",
+            ivaTaxa: configEspecifica.ivaTaxa !== undefined ? configEspecifica.ivaTaxa : 0,
+            rodapeRecibo: configEspecifica.rodapeRecibo || "Obrigado pela sua preferência! Volte sempre.",
+            ramo: r
+        };
+    }
+
+    // Se este ramo for exatamente o ramo onde a empresa foi configurada originalmente:
+    const nomePadrao = (r === (FABEF.empresa?.ramo_ativo || FABEF.empresa?.ramo_principal) && FABEF.empresa?.nome)
+        ? FABEF.empresa.nome
+        : r;
+
+    return {
+        idPersonalizado: FABEF.empresa?.idPersonalizado || "",
+        nome: nomePadrao,
+        nuit: FABEF.empresa?.nuit || "",
+        telefone: FABEF.empresa?.telefone || "",
+        endereco: FABEF.empresa?.endereco || "",
+        cidade: FABEF.empresa?.cidade || "",
+        ivaRegime: FABEF.empresa?.ivaRegime || "ISENTO",
+        ivaTaxa: FABEF.empresa?.ivaTaxa !== undefined ? FABEF.empresa?.ivaTaxa : 0,
+        rodapeRecibo: FABEF.empresa?.rodapeRecibo || "Obrigado pela sua preferência! Volte sempre.",
+        ramo: r
+    };
+}
+window.obterConfiguracaoRamo = obterConfiguracaoRamo;
+
 function renderConfiguracoes() {
+    const ramosDisponiveis = obterConfigRamos();
+    const seletorRamo = document.getElementById("config-seletor-ramo");
+
+    if (!ramoSendoConfigurado || !ramosDisponiveis.some(r => r.nome === ramoSendoConfigurado)) {
+        ramoSendoConfigurado = FABEF.ramo || (ramosDisponiveis[0] ? ramosDisponiveis[0].nome : "Comércio Geral");
+    }
+
+    if (seletorRamo) {
+        seletorRamo.innerHTML = ramosDisponiveis.map(r => {
+            const ehAtivo = r.nome === FABEF.ramo;
+            return `<option value="${escapeHTML(r.nome)}">${escapeHTML(r.nome)}${ehAtivo ? ' (Ramo Ativo)' : ''}</option>`;
+        }).join("");
+        seletorRamo.value = ramoSendoConfigurado;
+    }
+
+    const badgeRamoAtivo = document.getElementById("config-badge-ramo-ativo");
+    if (badgeRamoAtivo) {
+        const ehAtivo = (ramoSendoConfigurado === FABEF.ramo);
+        badgeRamoAtivo.textContent = ehAtivo ? "✅ Ramo Ativo Agora" : "📁 Outro Ramo da Pasta";
+        badgeRamoAtivo.className = ehAtivo ? "badge badge-green" : "badge badge-yellow";
+    }
+
+    const displayNomeRamo = document.getElementById("config-nome-ramo-display");
+    if (displayNomeRamo) displayNomeRamo.textContent = ramoSendoConfigurado;
+
+    const spanRamoAtivo = document.getElementById("config-ramo-ativo-nome");
+    if (spanRamoAtivo) spanRamoAtivo.textContent = ramoSendoConfigurado;
+
+    const config = obterConfiguracaoRamo(ramoSendoConfigurado);
+
     const nomeInput = document.getElementById("config-nome");
     const nuitInput = document.getElementById("config-nuit");
     const telInput = document.getElementById("config-telefone");
     const endInput = document.getElementById("config-endereco");
     const cidInput = document.getElementById("config-cidade");
-    const idEmpresaInput = document.getElementById("config-id");
+    const idEmpresaInput = document.getElementById("config-id-empresa") || document.getElementById("config-id");
     const ivaRegimeInput = document.getElementById("config-iva-regime");
     const ivaTaxaInput = document.getElementById("config-iva-taxa");
     const rodapeInput = document.getElementById("config-rodape");
 
-    const emp = FABEF.empresa || {};
-    if (idEmpresaInput) idEmpresaInput.value = emp.idPersonalizado || emp.codigo || FABEF.empresaId || "";
-    if (nomeInput) nomeInput.value = emp.nome || "";
-    if (nuitInput) nuitInput.value = emp.nuit || "";
-    if (telInput) telInput.value = emp.telefone || "";
-    if (endInput) endInput.value = emp.endereco || "";
-    if (cidInput) cidInput.value = emp.cidade || "";
-    if (ivaRegimeInput) ivaRegimeInput.value = emp.ivaRegime || "isento";
-    if (ivaTaxaInput) ivaTaxaInput.value = emp.ivaTaxa !== undefined ? emp.ivaTaxa : 16;
-    if (rodapeInput) rodapeInput.value = emp.rodapeRecibo || "Obrigado pela sua preferência! Volte sempre.";
+    if (idEmpresaInput) idEmpresaInput.value = config.idPersonalizado || "";
+    if (nomeInput) nomeInput.value = config.nome || "";
+    if (nuitInput) nuitInput.value = config.nuit || "";
+    if (telInput) telInput.value = config.telefone || "";
+    if (endInput) endInput.value = config.endereco || "";
+    if (cidInput) cidInput.value = config.cidade || "";
+    if (ivaRegimeInput) ivaRegimeInput.value = config.ivaRegime || "ISENTO";
+    if (ivaTaxaInput) ivaTaxaInput.value = config.ivaTaxa !== undefined ? config.ivaTaxa : 0;
+    if (rodapeInput) rodapeInput.value = config.rodapeRecibo || "";
+
+    const badgePin = document.getElementById("config-pin-estado");
+    if (badgePin) {
+        const uid = FABEF.user?.uid;
+        const temPin = uid && localStorage.getItem(chavePinLocal(uid));
+        if (temPin) {
+            badgePin.textContent = "🟢 PIN ATIVO E PROTEGIDO";
+            badgePin.style.color = "#16a34a";
+        } else {
+            badgePin.textContent = "🟠 PIN AINDA NÃO DEFINIDO";
+            badgePin.style.color = "#ea580c";
+        }
+    }
 }
 
+document.getElementById("config-seletor-ramo")?.addEventListener("change", (e) => {
+    ramoSendoConfigurado = e.target.value;
+    renderConfiguracoes();
+});
+
+document.getElementById("btn-copiar-dados-empresa")?.addEventListener("click", () => {
+    const emp = FABEF.empresa || {};
+    if (emp.nuit) document.getElementById("config-nuit").value = emp.nuit;
+    if (emp.telefone) document.getElementById("config-telefone").value = emp.telefone;
+    if (emp.endereco) document.getElementById("config-endereco").value = emp.endereco;
+    if (emp.cidade) document.getElementById("config-cidade").value = emp.cidade;
+    alert("📋 Dados gerais preenchidos. Ajuste o nome e os campos necessários deste ramo e clique em 'Guardar'.");
+});
 
 document.getElementById("btn-guardar-config").addEventListener("click", guardarConfiguracoes);
 document.getElementById("btn-alterar-pin")?.addEventListener("click", () => {
     if (FABEF.user?.uid) configurarNovoPin(FABEF.user.uid);
 });
 
-
 async function guardarConfiguracoes() {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
         alert("Apenas o Gerente pode aceder e alterar as configurações.");
         return;
     }
-    const idPersonalizado = document.getElementById("config-id")?.value.trim() || "";
+    const ramo = ramoSendoConfigurado || FABEF.ramo || "Comércio Geral";
+    const idPersonalizado = (document.getElementById("config-id-empresa") || document.getElementById("config-id"))?.value.trim() || "";
     const nome = document.getElementById("config-nome")?.value.trim() || "";
     const nuit = document.getElementById("config-nuit")?.value.trim() || "";
     const telefone = document.getElementById("config-telefone")?.value.trim() || "";
     const endereco = document.getElementById("config-endereco")?.value.trim() || "";
     const cidade = document.getElementById("config-cidade")?.value.trim() || "";
-    const ivaRegime = document.getElementById("config-iva-regime")?.value || "isento";
+    const ivaRegime = document.getElementById("config-iva-regime")?.value || "ISENTO";
     const ivaTaxa = numero(document.getElementById("config-iva-taxa")?.value);
     const rodapeRecibo = document.getElementById("config-rodape")?.value.trim() || "";
 
     if (!nome) {
-        alert("O nome do negócio é um campo de preenchimento obrigatório.");
+        alert("O nome do negócio para este ramo é um campo de preenchimento obrigatório.");
         return;
     }
 
     if (!FABEF.empresa) FABEF.empresa = {};
-    FABEF.empresa.idPersonalizado = idPersonalizado;
-    FABEF.empresa.nome = nome;
-    FABEF.empresa.nuit = nuit;
-    FABEF.empresa.telefone = telefone;
-    FABEF.empresa.endereco = endereco;
-    FABEF.empresa.cidade = cidade;
-    FABEF.empresa.ivaRegime = ivaRegime;
-    FABEF.empresa.ivaTaxa = ivaTaxa;
-    FABEF.empresa.rodapeRecibo = rodapeRecibo;
+    if (!FABEF.empresa.ramos_configuracoes) FABEF.empresa.ramos_configuracoes = {};
+
+    const dadosRamo = {
+        idPersonalizado,
+        nome,
+        nuit,
+        telefone,
+        endereco,
+        cidade,
+        ivaRegime,
+        ivaTaxa,
+        rodapeRecibo,
+        ramo,
+        atualizadoEm: new Date().toISOString()
+    };
+
+    FABEF.empresa.ramos_configuracoes[ramo] = dadosRamo;
+
+    // Se estiver a configurar o ramo atualmente em operação, atualiza os dados ativos
+    if (ramo === FABEF.ramo) {
+        FABEF.empresa.nome = nome;
+        FABEF.empresa.telefone = telefone;
+        FABEF.empresa.endereco = endereco;
+        FABEF.empresa.cidade = cidade;
+        FABEF.empresa.nuit = nuit;
+        FABEF.empresa.ivaRegime = ivaRegime;
+        FABEF.empresa.ivaTaxa = ivaTaxa;
+        FABEF.empresa.rodapeRecibo = rodapeRecibo;
+        FABEF.empresa.idPersonalizado = idPersonalizado;
+    }
+
+    try {
+        localStorage.setItem("fabef_empresa_cache", JSON.stringify(FABEF.empresa));
+    } catch (e) {}
+
+    renderTudo();
+    renderConfiguracoes();
 
     if (window.FABEF?.isDemoMode) {
-        alert("Configurações da empresa e modelo de recibo atualizados com sucesso!");
-        renderTudo();
+        alert(`✅ Configurações do ramo "${ramo}" guardadas com sucesso!`);
         return;
     }
 
     try {
         await updateDoc(empresaRef(), {
-            idPersonalizado: idPersonalizado,
-            nome: nome,
-            nuit: nuit,
-            telefone: telefone,
-            endereco: endereco,
-            cidade: cidade,
-            ivaRegime: ivaRegime,
-            ivaTaxa: ivaTaxa,
-            rodapeRecibo: rodapeRecibo,
+            ramos_configuracoes: FABEF.empresa.ramos_configuracoes,
+            ...(ramo === FABEF.ramo ? {
+                nome: nome,
+                nuit: nuit,
+                telefone: telefone,
+                endereco: endereco,
+                cidade: cidade,
+                ivaRegime: ivaRegime,
+                ivaTaxa: ivaTaxa,
+                rodapeRecibo: rodapeRecibo,
+                idPersonalizado: idPersonalizado
+            } : {}),
             atualizadoEm: serverTimestamp()
         });
 
-        renderTudo();
-
-        await gravarAuditoria("Actualizou as configurações estruturais da empresa e ID do negócio.", "INFO");
-        alert("Dados do negócio e parâmetros de recibo guardados com sucesso na nuvem.");
+        await gravarAuditoria(`Actualizou as configurações específicas do ramo "${ramo}" (${nome}).`, "INFO");
+        alert(`✅ Configurações do ramo "${ramo}" guardadas com sucesso na nuvem e no dispositivo.`);
     } catch (error) {
-        console.error(error);
-        alert("Erro ao salvar configurações do negócio:\n" + mensagemFirebase(error));
+        console.warn("Aviso ao guardar na nuvem:", error);
+        alert(`✅ Configurações do ramo "${ramo}" guardadas no dispositivo com sucesso.\n(Nota: Dados gravados com segurança localmente).`);
     }
 }
 
@@ -5838,13 +6202,16 @@ function renderPastaRamos() {
                             📂 Alternar para este Ramo
                         </button>
                     `}
-                    <div style="display:flex;gap:6px;">
-                        <button class="btn btn-light btn-small" type="button" style="flex:1;font-size:11px;font-weight:600;" onclick="alterarPinRamo('${escapeHTML(r.nome)}')">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button class="btn btn-light btn-small" type="button" style="flex:1;font-size:11px;font-weight:700;color:#1e40af;border:1px solid #bfdbfe;" onclick="abrirConfiguracoesRamo('${escapeHTML(r.nome)}')">
+                            ⚙️ Configurar Ramo
+                        </button>
+                        <button class="btn btn-light btn-small" type="button" style="font-size:11px;font-weight:600;" onclick="alterarPinRamo('${escapeHTML(r.nome)}')">
                             🔑 ${temSenha ? 'Alterar PIN' : 'Definir PIN'}
                         </button>
                         ${!ehAtivo ? `
                         <button class="btn btn-light btn-small" type="button" style="color:#ef4444;font-size:11px;font-weight:600;" onclick="removerRamoPasta('${escapeHTML(r.nome)}')" title="Remover este ramo da pasta">
-                            🗑️ Remover
+                            🗑️
                         </button>
                         ` : ''}
                     </div>
@@ -5854,6 +6221,12 @@ function renderPastaRamos() {
     }).join("");
 }
 window.renderPastaRamos = renderPastaRamos;
+
+window.abrirConfiguracoesRamo = function(nomeRamo) {
+    ramoSendoConfigurado = nomeRamo;
+    mostrarSecao("config");
+    renderConfiguracoes();
+};
 
 window.alternarRamoPasta = async function(nomeRamo) {
     const ramos = obterConfigRamos();
@@ -6283,15 +6656,17 @@ function renderAvisoReconciliacao() {
 function renderDashboard() {
     renderAvisoReconciliacao();
 
+    const configRamo = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(FABEF.ramo) : (FABEF.empresa || {});
     const indicadorEmpresa = document.getElementById("inicio-empresa");
     const painelNomeNegocio = document.getElementById("inicio-nome-negocio");
     const painelIdEmpresa = document.getElementById("inicio-id-empresa");
     const painelUtilizador = document.getElementById("inicio-utilizador");
     const painelRamo = document.getElementById("inicio-ramo");
 
-    if (indicadorEmpresa) indicadorEmpresa.textContent = FABEF.empresa?.nome || "—";
-    if (painelNomeNegocio) painelNomeNegocio.textContent = FABEF.empresa?.nome || "—";
-    if (painelIdEmpresa) painelIdEmpresa.textContent = FABEF.empresaId || "—";
+    const nomeDoNegocio = configRamo.nome || FABEF.ramo || FABEF.empresa?.nome || "—";
+    if (indicadorEmpresa) indicadorEmpresa.textContent = nomeDoNegocio;
+    if (painelNomeNegocio) painelNomeNegocio.textContent = nomeDoNegocio;
+    if (painelIdEmpresa) painelIdEmpresa.textContent = configRamo.idPersonalizado || FABEF.empresa?.idPersonalizado || FABEF.empresaId || "—";
     if (painelUtilizador) painelUtilizador.textContent = FABEF.user?.email || "—";
     if (painelRamo) painelRamo.textContent = FABEF.ramo;
 
