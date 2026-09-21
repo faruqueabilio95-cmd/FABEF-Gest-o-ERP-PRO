@@ -276,17 +276,43 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 </div>
 
 <!-- ================= ECRÃ DE PIN (desbloqueio rápido, funciona offline) ================= -->
-<div id="tela-pin" style="display:none;width:100%;min-height:100vh;justify-content:center;align-items:center;padding:20px;background:radial-gradient(circle at top right, #1e3a8a, #0f172a 60%);">
-  <div class="card-login">
-    <h1>FABEF</h1>
-    <p class="subtitulo">Introduza o seu PIN para continuar</p>
-    <div class="form-group">
-      <label for="pin-input">PIN</label>
-      <input type="password" id="pin-input" inputmode="numeric" maxlength="6" placeholder="••••" style="text-align:center;font-size:22px;letter-spacing:6px;">
+<div id="tela-pin" style="display:none;width:100%;min-height:100vh;justify-content:center;align-items:center;padding:16px;background:radial-gradient(circle at top right, #1e3a8a, #0f172a 60%);">
+  <div class="card-login" style="max-width:380px;width:100%;padding:28px 22px;border-radius:18px;box-shadow:0 20px 40px rgba(0,0,0,0.45);text-align:center;">
+    <div style="width:54px;height:54px;background:#eff6ff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:10px;border:2px solid #bfdbfe;">
+      🔒
     </div>
-    <button type="button" id="btn-pin-entrar" class="btn btn-entrar">🔓 Desbloquear</button>
+    <h1 style="font-size:24px;margin-bottom:4px;letter-spacing:-0.5px;">FABEF PRO</h1>
+    <p id="pin-subtitulo" class="subtitulo" style="font-size:13px;color:#64748b;margin-bottom:16px;">
+      Sessão protegida. Introduza o PIN para aceder.
+    </p>
+
+    <div class="form-group" style="margin-bottom:12px;">
+      <input type="password" id="pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" style="text-align:center;font-size:28px;letter-spacing:10px;font-weight:bold;height:52px;border:2px solid #cbd5e1;border-radius:12px;background:#f8fafc;width:100%;">
+    </div>
+
+    <!-- Teclado Numérico Táctil para Celular -->
+    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;max-width:260px;margin:0 auto 14px auto;">
+      <button type="button" class="pin-num-btn" data-key="1" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">1</button>
+      <button type="button" class="pin-num-btn" data-key="2" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">2</button>
+      <button type="button" class="pin-num-btn" data-key="3" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">3</button>
+      <button type="button" class="pin-num-btn" data-key="4" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">4</button>
+      <button type="button" class="pin-num-btn" data-key="5" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">5</button>
+      <button type="button" class="pin-num-btn" data-key="6" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">6</button>
+      <button type="button" class="pin-num-btn" data-key="7" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">7</button>
+      <button type="button" class="pin-num-btn" data-key="8" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">8</button>
+      <button type="button" class="pin-num-btn" data-key="9" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">9</button>
+      <button type="button" class="pin-num-btn" data-key="clear" style="height:48px;font-size:12px;font-weight:700;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:10px;color:#64748b;cursor:pointer;">Limpar</button>
+      <button type="button" class="pin-num-btn" data-key="0" style="height:48px;font-size:20px;font-weight:700;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;">0</button>
+      <button type="button" class="pin-num-btn" data-key="back" style="height:48px;font-size:18px;font-weight:700;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;color:#dc2626;cursor:pointer;">⌫</button>
+    </div>
+
+    <button type="button" id="btn-pin-entrar" class="btn btn-entrar" style="height:46px;font-size:15px;font-weight:700;background:#2563eb;margin-bottom:8px;">🔓 Desbloquear</button>
     <div id="pin-status" class="status-msg"></div>
-    <p class="rodape-criar-conta"><a id="btn-pin-sair">Não é você? Sair e usar outra conta</a></p>
+
+    <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:12px;">
+      <a id="btn-pin-esqueceu" style="color:#2563eb;cursor:pointer;font-weight:600;">🔑 Esqueci meu PIN / Entrar com senha</a>
+      <a id="btn-pin-sair" style="color:#64748b;cursor:pointer;">🚪 Sair e trocar de conta</a>
+    </div>
   </div>
 </div>
 
@@ -305,6 +331,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <span id="indicador-ligacao" style="font-size:11px;font-weight:700;"></span>
       <button id="btn-abrir-sugestoes" class="btn btn-small" style="background:#f59e0b;color:#0f172a;font-weight:700;padding:6px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:5px;border:none;cursor:pointer;" title="Ver Diagnóstico & Sugestões de Melhoria">
         💡 Sugestões
+      </button>
+      <button id="btn-bloquear-ecra" class="btn btn-small" style="background:#1e293b;border:1px solid #475569;color:#f8fafc;font-weight:700;padding:6px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;" title="Bloquear ecrã com PIN imediatamente">
+        🔒 Bloquear
       </button>
       <span id="header-user" style="font-size:12px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-decoration:underline;" title="Toque para alterar a senha"></span>
       <button id="btn-logout" style="flex-shrink:0;">Sair</button>
@@ -1106,41 +1135,53 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <section class="secao" id="sec-config">
 
       <h2>Configurações do Estabelecimento & Recibo</h2>
-      <div id="aviso-config-ramo-ativo" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 16px; margin-bottom:16px; font-size:14px; color:#1e40af; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-        <div>
-          🏷️ <strong>Ramo / Filial em Configuração:</strong> <span id="config-ramo-ativo-nome" style="font-weight:800; color:#1d4ed8;"></span>
-          <br><small style="color:#64748b;">Cada ramo tem o seu próprio nome de loja, telefone, endereço e rodapé de recibo.</small>
+      <div id="aviso-config-ramo-ativo" style="background:#eff6ff; border:1.5px solid #93c5fd; border-radius:12px; padding:16px; margin-bottom:18px; font-size:14px; color:#1e40af; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div style="flex:1; min-width:260px;">
+          <label for="config-seletor-ramo" style="font-weight:800; color:#1e3a8a; display:block; margin-bottom:6px; font-size:15px;">
+            🏢 Ramo / Filial em Configuração:
+          </label>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <select id="config-seletor-ramo" style="padding:10px 14px; font-size:15px; font-weight:800; border-radius:8px; border:2px solid #2563eb; background:#ffffff; color:#1d4ed8; flex:1; max-width:340px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+            </select>
+            <span id="config-badge-ramo-ativo" class="badge badge-green" style="font-size:12px; padding:6px 12px; font-weight:700;">✅ Ramo Ativo</span>
+          </div>
+          <small style="color:#475569; display:block; margin-top:6px; font-size:12px;">
+            Cada ramo (Salão de Beleza, Talho, etc.) tem o seu próprio nome de loja, telefone, endereço, IVA e rodapé de recibo independentes.
+          </small>
         </div>
-        <button class="btn btn-light btn-small" type="button" onclick="mostrarSecao('ramos')" style="background:#fff; border:1px solid #93c5fd; color:#1e40af; font-weight:700;">Alternar Ramo</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-light btn-small" type="button" id="btn-copiar-dados-empresa" style="background:#fff; border:1px solid #93c5fd; color:#1e40af; font-weight:700;" title="Copiar endereço e NUIT geral para este ramo">📋 Preencher com Dados Gerais</button>
+          <button class="btn btn-light btn-small" type="button" onclick="mostrarSecao('ramos')" style="background:#fff; border:1px solid #cbd5e1; color:#334155; font-weight:700;">📂 Pasta de Ramos</button>
+        </div>
       </div>
       <div class="card">
-        <h3 style="margin-bottom:12px;color:#1e3a8a;">🏢 Dados Oficiais do Ramo (Emitidos no Recibo)</h3>
+        <h3 style="margin-bottom:6px;color:#1e3a8a;" id="config-titulo-ramo">🏢 Definições do Ramo: <span id="config-nome-ramo-display"></span></h3>
         <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
-          O gerente define aqui os dados que aparecem em todos os recibos térmicos (80mm/A4) e no envio por WhatsApp ao cliente para este ramo.
+          Estes dados aparecem no cabeçalho do sistema, em todos os recibos térmicos (80mm/A4), relatórios e no envio por WhatsApp quando este ramo estiver ativo.
         </p>
         <div class="grid">
           <div class="form-group">
-            <label for="config-id-empresa">ID da Empresa / Código do Sistema</label>
-            <input type="text" id="config-id-empresa" placeholder="Ex: EMP-101 ou LOJA-CENTRAL">
+            <label for="config-id-empresa">ID / Código deste Ramo</label>
+            <input type="text" id="config-id-empresa" placeholder="Ex: SALAO-01 ou TALHO-CENTRAL">
           </div>
           <div class="form-group">
-            <label for="config-nome">Nome do negócio / Estabelecimento</label>
-            <input type="text" id="config-nome" placeholder="Ex: Supermercado & Talho Central FABEF PRO">
+            <label for="config-nome">Nome do Negócio neste Ramo (Exibido no Cabeçalho e Recibo)</label>
+            <input type="text" id="config-nome" placeholder="Ex: Salão de Beleza Dona Aurora ou Talho Dona Aurora">
           </div>
         </div>
         <div class="grid">
           <div class="form-group">
-            <label for="config-nuit">NUIT da Empresa (Número Fiscal)</label>
+            <label for="config-nuit">NUIT (Número Fiscal do Ramo / Empresa)</label>
             <input type="text" id="config-nuit" placeholder="Ex: 400892019" maxlength="14">
           </div>
           <div class="form-group">
-            <label for="config-telefone">Número de Celular / WhatsApp</label>
+            <label for="config-telefone">Contacto / WhatsApp deste Ramo</label>
             <input type="text" id="config-telefone" placeholder="Ex: +258 84 123 4567">
           </div>
         </div>
         <div class="grid">
           <div class="form-group">
-            <label for="config-endereco">Endereço / Localização física da loja</label>
+            <label for="config-endereco">Endereço / Localização física deste Ramo</label>
             <input type="text" id="config-endereco" placeholder="Ex: Av. Eduardo Mondlane nº 104, R/C">
           </div>
           <div class="form-group">
@@ -1150,7 +1191,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         </div>
         <div class="grid">
           <div class="form-group">
-            <label for="config-iva-regime">Regime de IVA para o Recibo</label>
+            <label for="config-iva-regime">Regime de IVA deste Ramo</label>
             <select id="config-iva-regime">
               <option value="ISENTO">Isento de IVA nos termos do Artigo 9º do CIVA</option>
               <option value="GERAL_16">Regime Geral (16% IVA)</option>
@@ -1164,16 +1205,27 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           </div>
         </div>
         <div class="form-group">
-          <label for="config-rodape">Mensagem de Rodapé no Recibo (Agradecimento / Política de Trocas)</label>
-          <input type="text" id="config-rodape" placeholder="Ex: Obrigado pela sua preferência! Volte sempre ao nosso estabelecimento.">
+          <label for="config-rodape">Mensagem de Rodapé no Recibo deste Ramo (Agradecimento / Cuidados / Política)</label>
+          <input type="text" id="config-rodape" placeholder="Ex: Obrigado por cuidar da sua beleza no Salão Aurora! Volte sempre.">
         </div>
-        <button id="btn-guardar-config" class="btn btn-entrar" style="width:auto;padding:12px 26px;font-weight:700;">💾 Guardar Configurações da Empresa</button>
+        <button id="btn-guardar-config" class="btn btn-entrar" style="width:auto;padding:12px 26px;font-weight:700;">💾 Guardar Configurações deste Ramo</button>
       </div><div class="card">
-        <h3 style="margin-bottom:10px;">Segurança & Bloqueio por PIN</h3>
-        <p style="font-size:13px;color:#64748b;margin-bottom:10px;">
-          Ao minimizar a aplicação no telemóvel ou computador, o sistema exige o PIN de 4 dígitos para proteger o caixa e os dados. Ao clicar em "Sair", o sistema exige e-mail e palavra-passe.
+        <h3 style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+          <span>🛡️</span> Segurança, Proteção de Caixa & Bloqueio por PIN
+        </h3>
+        <p style="font-size:13px;color:#64748b;margin-bottom:12px;">
+          Para garantir total segurança e sigilo dos seus dados de vendas e stock, a aplicação exige autenticação através do código PIN de 4 a 6 dígitos sempre que for reaberta no celular ou quando for minimizada.
         </p>
-        <button id="btn-alterar-pin" class="btn btn-light" type="button" style="width:auto;padding:10px 20px;">🔑 Definir/Alterar PIN deste dispositivo</button>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:12px;color:#64748b;">Estado da Proteção por PIN neste aparelho:</div>
+            <strong id="config-pin-estado" style="font-size:14px;color:#16a34a;">🟢 PIN ATIVO E PROTEGIDO</strong>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="btn-alterar-pin" class="btn btn-primary" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;">🔑 Alterar PIN</button>
+            <button id="btn-testar-bloqueio" class="btn btn-light" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:600;">🔒 Testar Bloqueio Agora</button>
+          </div>
+        </div>
       </div>
 
       <div class="card" style="border: 2px solid #3b82f6; background: #eff6ff;">
@@ -1357,6 +1409,36 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="modal-acoes">
         <button class="btn btn-light" type="button" onclick="fecharModal('modal-alterar-senha')" style="flex:1;">Cancelar</button>
         <button id="btn-guardar-nova-senha" class="btn btn-entrar" style="flex:1;">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIGURAR / DEFINIR PIN DE SEGURANÇA -->
+  <div class="modal-overlay" id="modal-configurar-pin">
+    <div class="modal-box" style="max-width:420px;text-align:center;">
+      <div style="width:54px;height:54px;background:#eff6ff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px auto;border:2px solid #bfdbfe;">
+        🛡️
+      </div>
+      <h3 id="titulo-config-pin" style="color:#0f172a;margin-bottom:6px;">Definir PIN de Segurança</h3>
+      <p id="desc-config-pin" style="font-size:13px;color:#64748b;margin-bottom:16px;">
+        Para proteger o seu telemóvel e garantir que ninguém aceda ao seu negócio sem autorização, defina um código PIN de 4 a 6 dígitos numéricos.
+      </p>
+
+      <div class="form-group" style="text-align:left;">
+        <label for="input-novo-pin" style="font-weight:700;">Novo Código PIN (4 a 6 números)</label>
+        <input type="password" id="input-novo-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:22px;letter-spacing:6px;font-weight:bold;">
+      </div>
+
+      <div class="form-group" style="text-align:left;">
+        <label for="input-confirmar-pin" style="font-weight:700;">Confirmar Novo PIN</label>
+        <input type="password" id="input-confirmar-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:22px;letter-spacing:6px;font-weight:bold;">
+      </div>
+
+      <div id="status-config-pin" class="status-msg"></div>
+
+      <div class="modal-acoes" style="margin-top:16px;">
+        <button type="button" class="btn btn-light" id="btn-cancelar-pin" style="flex:1;">Cancelar</button>
+        <button type="button" class="btn btn-entrar" id="btn-salvar-pin" style="flex:1;background:#2563eb;">🔒 Ativar PIN</button>
       </div>
     </div>
   </div>
