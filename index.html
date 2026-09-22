@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script type="importmap">
 {
   "imports": {
@@ -11,9 +13,6 @@
   }
 }
 </script>
-
-<meta charset="UTF-8">
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#10b981">
 <meta name="mobile-web-app-capable" content="yes">
@@ -82,7 +81,7 @@ header#topo select#select-idioma { background: #1e293b; color: #fff; border: 1px
 .sidebar details summary::before { content: "▸ "; }
 .sidebar details[open] summary::before { content: "▾ "; }
 
-main#conteudo { margin-left: 0 !important; margin-top: 56px; padding: 20px; width: 100%; transition: margin-left .2s; }
+main#conteudo { margin-left: 0 !important; margin-top: 56px; padding: 20px 20px 100px 20px; width: 100%; transition: margin-left .2s; }
 body.menu-fechado main#conteudo { margin-left: 0; }
 body.menu-fechado .sidebar { transform: translateX(-100%); }
 
@@ -153,7 +152,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 @media (max-width: 850px) {
   .sidebar { transform: translateX(-100%); z-index: 450; box-shadow: 4px 0 25px rgba(0,0,0,0.5); }
   .sidebar.open { transform: translateX(0) !important; }
-  main#conteudo { margin-left: 0 !important; padding: 12px !important; }
+  main#conteudo { margin-left: 0 !important; padding: 12px 12px 100px 12px !important; }
   .pos-layout { grid-template-columns: 1fr; }
 }
 </style>
@@ -2011,14 +2010,27 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 <!-- Biblioteca de leitura de código de barras/QR por câmara — funciona em Chrome, Safari (iOS) e Firefox, porque faz a descodificação em JavaScript puro, sem depender de nenhuma função nativa do navegador -->
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script type="module" src="./src/app.js"></script>
+<script type="module" charset="UTF-8" src="./src/app.js"></script>
 
-<!-- Regista o Service Worker: é isto que permite abrir a aplicação sem internet -->
+<!-- Regista o Service Worker: é isto que permite abrir a aplicação sem internet e manter o PWA sempre atualizado -->
 <script>
     if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
             navigator.serviceWorker.register("./service-worker.js")
-                .catch((erro) => console.error("Falha ao registar o service worker (a app pode não funcionar totalmente offline):", erro));
+                .then((reg) => {
+                    // Verifica imediatamente atualizações no servidor
+                    reg.update();
+                })
+                .catch((erro) => console.error("Falha ao registar o service worker:", erro));
+        });
+
+        // Quando o novo service worker assume o controlo (versão nova ativada), recarrega para manter PWA e abas idênticos
+        let recarregando = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+            if (!recarregando) {
+                recarregando = true;
+                window.location.reload();
+            }
         });
     }
 </script>
