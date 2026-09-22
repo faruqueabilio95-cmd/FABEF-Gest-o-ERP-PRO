@@ -188,6 +188,7 @@ window.FABEF = {
     encomendas: [],
     funcionarios: [],
     pagamentos: [],
+    dispensas: [],
     auditoria: [],
     carrinho: [],
     turnoId: null,
@@ -196,6 +197,28 @@ window.FABEF = {
     _raw: {},
     listeners: []
 };
+
+/* =====================================================
+   HELPER DE AUTORIZAÇÃO: VERIFICA SE É GERENTE / ADMIN
+===================================================== */
+function ehUsuarioGerente() {
+    if (window.FABEF?.isDemoMode) {
+        return (window.FABEF.demoPerfil || "gerente") === "gerente";
+    }
+    if (FABEF.empresa && (FABEF.empresa.donoId === FABEF.user?.uid || FABEF.empresa.criadoPor === FABEF.user?.uid)) {
+        return true;
+    }
+    const perfil = String(FABEF.userData?.perfil || FABEF.userData?.role || "").toLowerCase();
+    if (perfil === "gerente" || perfil === "admin" || perfil === "administrador" || perfil === "proprietario" || perfil === "dono") {
+        return true;
+    }
+    // Se o usuário está autenticado e não é estritamente funcionário, assume gerente
+    if (FABEF.user && perfil !== "funcionario" && perfil !== "operador") {
+        return true;
+    }
+    return false;
+}
+window.ehUsuarioGerente = ehUsuarioGerente;
 
 
 /* =====================================================
@@ -1428,6 +1451,7 @@ async function carregarDados() {
         escutarColecao("encomendas", "encomendas"),
         escutarColecao("funcionarios", "funcionarios"),
         escutarColecao("gastos_funcionarios", "gastosFuncionarios"),
+        escutarColecao("dispensas", "dispensas"),
         escutarColecao("pagamentos", "pagamentos"),
         escutarColecao("auditoria_logs", "auditoria"),
         escutarColecao("sugestoes", "sugestoes")
@@ -1782,6 +1806,10 @@ function mostrarSecao(nome) {
         atualizarCalculadoraSubscricao();
     } else if (nome === "pos") {
         verificarAcessoPosGerente();
+    } else if (nome === "dispensas") {
+        if (typeof renderDispensas === "function") renderDispensas();
+    } else if (nome === "config") {
+        if (typeof renderConfiguracoes === "function") renderConfiguracoes();
     }
 }
 window.mostrarSecao = mostrarSecao;
@@ -2485,13 +2513,16 @@ function renderProdutos() {
     const tabelaCorpo = document.getElementById("tabela-produtos");
     if (!tabelaCorpo) return;
 
-    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const ehGerente = ehUsuarioGerente();
 
     tabelaCorpo.innerHTML = produtosFiltrados.map(p => {
         const stock = numero(p.stock);
         const minimo = numero(p.stockMinimo);
         const baixo = stock <= minimo;
         const corStock = baixo ? "#ef4444" : "#10b981";
+        const custoUnit = numero(p.custo ?? p.precoCusto ?? p.preco_custo ?? 0);
+        const precoUnit = numero(p.preco ?? p.precoVenda ?? 0);
+        const margem = precoUnit - custoUnit;
 
         return `
         <tr>
@@ -2501,8 +2532,13 @@ function renderProdutos() {
                 ${p.idPersonalizado ? `<br><small style="color:#64748b;font-size:11px;">ID: ${escapeHTML(p.idPersonalizado)}</small>` : ""}
             </td>
             <td>${escapeHTML(p.codigo || "—")}</td>
-            <td>${ehGerente ? dinheiro(p.custo) : "—"}</td>
-            <td>${dinheiro(p.preco)}</td>
+            <td>
+                ${ehGerente ? `
+                    <div style="font-weight:700;color:#0f172a;">${custoUnit > 0 ? dinheiro(custoUnit) : '<span style="color:#94a3b8;font-size:12px;">MT 0,00</span>'}</div>
+                    ${custoUnit > 0 ? `<small style="color:${margem >= 0 ? '#16a34a' : '#dc2626'};font-size:11px;font-weight:600;">Lucro: ${dinheiro(margem)}</small>` : ''}
+                ` : `<span style="color:#94a3b8;font-size:12px;">🔒 Só Gerente</span>`}
+            </td>
+            <td><strong>${dinheiro(precoUnit)}</strong></td>
             <td 
                 class="stock-click" 
                 style="color: ${corStock}; font-weight: 900;" 
@@ -2562,9 +2598,9 @@ function renderInventario() {
     const esgotados = produtos.filter(p => numero(p.stock) <= 0).length;
 
     // Executa a valoração monetária do stock baseado no preço de custo
-    const custo = produtos.reduce((s, p) => s + (numero(p.stock) * numero(p.custo)), 0);
+    const custo = produtos.reduce((s, p) => s + (numero(p.stock) * numero(p.custo ?? p.precoCusto ?? p.preco_custo ?? 0)), 0);
 
-    const ehGerenteInv = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const ehGerenteInv = ehUsuarioGerente();
 
     // Atualiza os cartões de sumário de indicadores no topo do painel
     document.getElementById("inv-total-artigos").textContent = produtos.length;
@@ -2582,6 +2618,7 @@ function renderInventario() {
         const esgotado = stock <= 0;
         const baixo = !esgotado && stock <= minimo;
         const corStock = esgotado ? "#ef4444" : (baixo ? "#f59e0b" : "#10b981");
+        const custoUnit = numero(p.custo ?? p.precoCusto ?? p.preco_custo ?? 0);
 
         return `
         <tr>
@@ -2596,8 +2633,8 @@ function renderInventario() {
                 ${stock}
             </td>
             <td>${minimo}</td>
-            <td>${ehGerenteInv ? dinheiro(p.custo) : "—"}</td>
-            <td>${ehGerenteInv ? dinheiro(stock * numero(p.custo)) : "—"}</td>
+            <td>${ehGerenteInv ? (custoUnit > 0 ? dinheiro(custoUnit) : '<span style="color:#94a3b8;">MT 0,00</span>') : "—"}</td>
+            <td>${ehGerenteInv ? (custoUnit > 0 ? dinheiro(stock * custoUnit) : '<span style="color:#94a3b8;">MT 0,00</span>') : "—"}</td>
             <td>
                 ${esgotado ?
                     '<span class="badge badge-red">ESGOTADO</span>' :
@@ -2606,7 +2643,7 @@ function renderInventario() {
                         '<span class="badge badge-green">NORMAL</span>')
                 }
             </td>
-            <td><button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock('${escapeHTML(p.id)}')">⚙️ Ajustar</button></td>
+            <td><button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock('${escapeHTML(p.id)}')">⚙️  Ajustar</button></td>
         </tr>
         `;
     }).join("") || `
@@ -3736,11 +3773,13 @@ function renderVendas() {
             <td>${escapeHTML(v.nuitCliente || "Isento")}</td>
             <td>${escapeHTML(v.ramo || "—")}</td>
             <td>
-                <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                    <button class="btn btn-light btn-small" onclick="imprimirReciboVenda('${escapeHTML(v.id)}')" type="button">🖨️ Recibo</button>
-                    <button class="btn btn-success btn-small" onclick="enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;">📱 WhatsApp</button>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+                    <button class="btn btn-light btn-small" onclick="imprimirReciboVenda('${escapeHTML(v.id)}')" type="button" title="Imprimir Recibo Térmico ou A4">🖨️ Recibo</button>
+                    <button class="btn btn-success btn-small" onclick="enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;" title="Enviar Recibo pelo WhatsApp">📱 WhatsApp</button>
+                    <button class="btn btn-primary btn-small" onclick="abrirModalEditarVenda('${escapeHTML(v.id)}')" type="button" style="background:#2563eb;color:#fff;font-weight:700;" title="Editar valor, forma de pagamento ou cliente desta venda">✏️ Editar</button>
+                    <button class="btn btn-small" onclick="apagarVenda('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;" title="Apagar definitivamente esta venda errada e repor stock">🗑️ Apagar</button>
                     ${!ehFalhada ? `
-                        <button class="btn btn-small" onclick="abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;" title="Registar falha ou corrigir preço com justificativa obrigatória ao Gerente">⚠️ Falhou / Corrigir</button>
+                        <button class="btn btn-small" onclick="abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:11px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar</button>
                     ` : ""}
                 </div>
             </td>
@@ -5505,6 +5544,44 @@ function renderConfiguracoes() {
         ramoSendoConfigurado = FABEF.ramo || (ramosDisponiveis[0] ? ramosDisponiveis[0].nome : "Comércio Geral");
     }
 
+    // Desenha as abas visuais de todos os negócios cadastrados para seleção rápida
+    const tabsBar = document.getElementById("config-ramos-tabs-bar");
+    if (tabsBar) {
+        tabsBar.innerHTML = ramosDisponiveis.map(r => {
+            const isCurrentConfig = r.nome === ramoSendoConfigurado;
+            const isOperacionalAtivo = r.nome === FABEF.ramo;
+            const cfg = (FABEF.empresa?.ramos_configuracoes || {})[r.nome] || {};
+            const nomeExibicao = cfg.nome || r.nome;
+            const icone = r.icone || "🏬";
+
+            return `
+            <button 
+                type="button" 
+                class="btn btn-small" 
+                onclick="selecionarRamoParaConfigurar('${escapeHTML(r.nome)}')"
+                style="
+                    display:flex;
+                    align-items:center;
+                    gap:8px;
+                    padding:9px 15px;
+                    border-radius:10px;
+                    font-weight:700;
+                    cursor:pointer;
+                    transition:all 0.15s ease;
+                    border: 2px solid ${isCurrentConfig ? '#2563eb' : '#cbd5e1'};
+                    background: ${isCurrentConfig ? '#eff6ff' : '#ffffff'};
+                    color: ${isCurrentConfig ? '#1d4ed8' : '#334155'};
+                    box-shadow: ${isCurrentConfig ? '0 2px 5px rgba(37,99,235,0.18)' : 'none'};
+                "
+            >
+                <span style="font-size:18px;">${icone}</span>
+                <span>${escapeHTML(nomeExibicao)}</span>
+                ${isOperacionalAtivo ? '<span class="badge badge-green" style="font-size:10px;padding:2px 6px;">ATIVO</span>' : ''}
+            </button>
+            `;
+        }).join("");
+    }
+
     if (seletorRamo) {
         seletorRamo.innerHTML = ramosDisponiveis.map(r => {
             const ehAtivo = r.nome === FABEF.ramo;
@@ -5516,7 +5593,7 @@ function renderConfiguracoes() {
     const badgeRamoAtivo = document.getElementById("config-badge-ramo-ativo");
     if (badgeRamoAtivo) {
         const ehAtivo = (ramoSendoConfigurado === FABEF.ramo);
-        badgeRamoAtivo.textContent = ehAtivo ? "✅ Ramo Ativo Agora" : "📁 Outro Ramo da Pasta";
+        badgeRamoAtivo.textContent = ehAtivo ? "✅ Ramo Ativo Agora" : "📁 Outro Negócio da Pasta";
         badgeRamoAtivo.className = ehAtivo ? "badge badge-green" : "badge badge-yellow";
     }
 
@@ -5562,6 +5639,20 @@ function renderConfiguracoes() {
     }
 }
 
+window.selecionarRamoParaConfigurar = function(ramoNome) {
+    ramoSendoConfigurado = ramoNome;
+    renderConfiguracoes();
+};
+
+document.getElementById("btn-ativar-este-ramo")?.addEventListener("click", () => {
+    const ramo = ramoSendoConfigurado || FABEF.ramo;
+    if (ramo) {
+        mudarRamo(ramo);
+        renderConfiguracoes();
+        alert(`🚀 O negócio ativo foi alterado para "${ramo}"!\nTodas as telas, vendas, produtos e recibos agora pertencem a este negócio.`);
+    }
+});
+
 document.getElementById("config-seletor-ramo")?.addEventListener("change", (e) => {
     ramoSendoConfigurado = e.target.value;
     renderConfiguracoes();
@@ -5582,7 +5673,7 @@ document.getElementById("btn-alterar-pin")?.addEventListener("click", () => {
 });
 
 async function guardarConfiguracoes() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+    if (!ehUsuarioGerente()) {
         alert("Apenas o Gerente pode aceder e alterar as configurações.");
         return;
     }
@@ -5847,6 +5938,488 @@ window.alternarEstadoFuncionario = async function(id) {
         alert("Erro ao alterar o estado do funcionário:\n" + mensagemFirebase(error));
     }
 };
+
+/* =====================================================
+   MÓDULO LÓGICO: GESTÃO DE DISPENSAS, LICENÇAS & FALTAS
+===================================================== */
+
+function renderDispensas() {
+    const tabela = document.getElementById("tabela-dispensas");
+    if (!tabela) return;
+
+    const termo = (document.getElementById("dispensas-pesquisa")?.value || "").toLowerCase().trim();
+    const filtroEstado = document.getElementById("dispensas-filtro-estado")?.value || "TODOS";
+    const hojeStr = new Date().toISOString().slice(0, 10);
+
+    const dispensas = Array.isArray(FABEF.dispensas) ? FABEF.dispensas : [];
+
+    // Filtros
+    const listaFiltrada = dispensas.filter(d => {
+        if (filtroEstado !== "TODOS" && (d.estado || "PENDENTE") !== filtroEstado) return false;
+        if (termo) {
+            const strBusca = `${d.funcionarioNome || ""} ${d.motivo || ""} ${d.tipo || ""} ${d.ramo || ""}`.toLowerCase();
+            if (!strBusca.includes(termo)) return false;
+        }
+        return true;
+    });
+
+    // Ordenar da mais recente para a mais antiga
+    listaFiltrada.sort((a, b) => new Date(b.criadoEm || b.dataInicio || 0) - new Date(a.criadoEm || a.dataInicio || 0));
+
+    // Cálculos de KPIs
+    let ativasHoje = 0;
+    let pendentes = 0;
+    let aprovadas = 0;
+    let totalDiasAprovados = 0;
+
+    dispensas.forEach(d => {
+        const est = d.estado || "PENDENTE";
+        if (est === "PENDENTE") pendentes++;
+        if (est === "APROVADA") {
+            aprovadas++;
+            totalDiasAprovados += numero(d.dias || 1);
+            if (d.dataInicio <= hojeStr && d.dataFim >= hojeStr) {
+                ativasHoje++;
+            }
+        }
+    });
+
+    const kpiAtivas = document.getElementById("dispensas-kpi-ativas");
+    const kpiPendentes = document.getElementById("dispensas-kpi-pendentes");
+    const kpiAprovadas = document.getElementById("dispensas-kpi-aprovadas");
+    const kpiDias = document.getElementById("dispensas-kpi-dias");
+
+    if (kpiAtivas) kpiAtivas.textContent = ativasHoje;
+    if (kpiPendentes) kpiPendentes.textContent = pendentes;
+    if (kpiAprovadas) kpiAprovadas.textContent = aprovadas;
+    if (kpiDias) kpiDias.textContent = `${totalDiasAprovados} dia${totalDiasAprovados !== 1 ? 's' : ''}`;
+
+    const ehGerente = ehUsuarioGerente();
+
+    tabela.innerHTML = listaFiltrada.map(d => {
+        const est = d.estado || "PENDENTE";
+        let badgeEstado = '<span class="badge badge-yellow">🟡 PENDENTE</span>';
+        if (est === "APROVADA") badgeEstado = '<span class="badge badge-green">🟢 APROVADA</span>';
+        if (est === "RECUSADA") badgeEstado = '<span class="badge badge-red">🔴 RECUSADA</span>';
+
+        const periodoFormatado = `${dataTexto(d.dataInicio)} até ${dataTexto(d.dataFim)}`;
+        const remuneraTxt = d.remunerada ? '<span style="color:#16a34a;font-weight:700;">🟢 Remunerada</span>' : '<span style="color:#64748b;">⚪ Sem Vencimento</span>';
+
+        return `
+        <tr>
+            <td>
+                <strong>${escapeHTML(d.funcionarioNome || "Funcionário")}</strong>
+                ${d.cargo ? `<br><small style="color:#64748b;">${escapeHTML(d.cargo)}</small>` : ""}
+            </td>
+            <td><span class="badge badge-blue">${escapeHTML(d.ramo || "—")}</span></td>
+            <td><strong>${escapeHTML(d.tipo || "Geral")}</strong></td>
+            <td>${periodoFormatado}</td>
+            <td><strong>${d.dias || 1} dia${numero(d.dias) !== 1 ? 's' : ''}</strong></td>
+            <td>${remuneraTxt}</td>
+            <td style="max-width:220px;white-space:normal;">
+                ${escapeHTML(d.motivo || "—")}
+                ${d.motivoRecusa ? `<br><small style="color:#dc2626;font-weight:600;">Motivo Recusa: ${escapeHTML(d.motivoRecusa)}</small>` : ""}
+            </td>
+            <td>${badgeEstado}</td>
+            <td>
+                <small style="color:#475569;font-weight:600;">${escapeHTML(d.aprovadoPor || (est === "PENDENTE" ? "Aguardando Gerente" : "—"))}</small>
+            </td>
+            <td>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+                    ${(ehGerente && est === "PENDENTE") ? `
+                        <button class="btn btn-success btn-small" type="button" onclick="aprovarDispensa('${escapeHTML(d.id)}')" style="background:#10b981;color:#fff;font-weight:700;padding:4px 8px;" title="Aprovar formalmente esta dispensa">✅ Aprovar</button>
+                        <button class="btn btn-danger btn-small" type="button" onclick="recusarDispensa('${escapeHTML(d.id)}')" style="background:#ef4444;color:#fff;font-weight:700;padding:4px 8px;" title="Recusar pedido de dispensa">❌ Recusar</button>
+                    ` : ""}
+                    <button class="btn btn-light btn-small" type="button" onclick="imprimirGuiaDispensa('${escapeHTML(d.id)}')" style="padding:4px 8px;" title="Imprimir Guia de Dispensa / Comprovativo">🖨️ Guia</button>
+                    ${ehGerente ? `
+                        <button class="btn btn-small" type="button" onclick="apagarDispensa('${escapeHTML(d.id)}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;" title="Eliminar registo de dispensa">🗑️</button>
+                    ` : ""}
+                </div>
+            </td>
+        </tr>
+        `;
+    }).join("") || `
+    <tr>
+        <td colspan="10" style="text-align:center;color:#64748b;padding:24px;">
+            Nenhum registo de dispensa ou licença encontrado. Clique em "➕ Solicitar / Registar Dispensa" acima.
+        </td>
+    </tr>
+    `;
+}
+window.renderDispensas = renderDispensas;
+
+window.abrirModalNovaDispensa = function() {
+    const modal = document.getElementById("modal-dispensa-funcionario");
+    if (!modal) return;
+
+    const selectFunc = document.getElementById("dispensa-funcionario-select");
+    const selectRamo = document.getElementById("dispensa-ramo");
+    const dataInicio = document.getElementById("dispensa-data-inicio");
+    const dataFim = document.getElementById("dispensa-data-fim");
+    const inputDias = document.getElementById("dispensa-dias");
+    const checkRemunerada = document.getElementById("dispensa-remunerada");
+    const inputMotivo = document.getElementById("dispensa-motivo");
+    const inputId = document.getElementById("dispensa-id");
+    const blocoEstado = document.getElementById("bloco-dispensa-estado");
+    const selectEstado = document.getElementById("dispensa-estado");
+
+    if (inputId) inputId.value = "";
+    if (inputMotivo) inputMotivo.value = "";
+    if (checkRemunerada) checkRemunerada.checked = true;
+
+    // Preenche funcionários
+    if (selectFunc) {
+        const funcs = FABEF.funcionarios || [];
+        let html = "";
+        if (ehUsuarioGerente()) {
+            html += `<option value="GERENTE:${FABEF.empresa?.donoNome || 'Gerente / Proprietário'}">👑 ${FABEF.empresa?.donoNome || 'Gerente / Proprietário'} (Gerência)</option>`;
+        }
+        funcs.forEach(f => {
+            html += `<option value="${f.id}:${escapeHTML(f.nome || 'Funcionário')}">${escapeHTML(f.nome || 'Funcionário')} (${f.ramo || 'Geral'})</option>`;
+        });
+        if (!html) {
+            html = `<option value="FUNC:Funcionário Geral">Funcionário Geral</option>`;
+        }
+        selectFunc.innerHTML = html;
+    }
+
+    // Preenche ramos
+    if (selectRamo) {
+        const ramos = typeof obterConfigRamos === "function" ? obterConfigRamos() : [];
+        selectRamo.innerHTML = ramos.map(r => `<option value="${escapeHTML(r.nome)}">${escapeHTML(r.nome)}</option>`).join("");
+        selectRamo.value = FABEF.ramo || (ramos[0] ? ramos[0].nome : "Comércio Geral");
+    }
+
+    const hojeStr = new Date().toISOString().slice(0, 10);
+    if (dataInicio) dataInicio.value = hojeStr;
+    if (dataFim) dataFim.value = hojeStr;
+    if (inputDias) inputDias.value = "1";
+
+    const ehGerente = ehUsuarioGerente();
+    if (blocoEstado) blocoEstado.style.display = ehGerente ? "block" : "none";
+    if (selectEstado) selectEstado.value = ehGerente ? "APROVADA" : "PENDENTE";
+
+    function recalcularDias() {
+        if (!dataInicio?.value || !dataFim?.value) return;
+        const d1 = new Date(dataInicio.value);
+        const d2 = new Date(dataFim.value);
+        if (d2 >= d1) {
+            const diffTime = Math.abs(d2 - d1);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            if (inputDias) inputDias.value = diffDays;
+        } else {
+            if (inputDias) inputDias.value = 1;
+        }
+    }
+
+    if (dataInicio) dataInicio.onchange = recalcularDias;
+    if (dataFim) dataFim.onchange = recalcularDias;
+
+    modal.classList.add("show");
+};
+
+window.salvarDispensa = async function() {
+    const selectFunc = document.getElementById("dispensa-funcionario-select");
+    const tipo = document.getElementById("dispensa-tipo")?.value || "Baixa / Consulta Médica";
+    const ramo = document.getElementById("dispensa-ramo")?.value || FABEF.ramo || "Geral";
+    const dataInicio = document.getElementById("dispensa-data-inicio")?.value;
+    const dataFim = document.getElementById("dispensa-data-fim")?.value;
+    const dias = numero(document.getElementById("dispensa-dias")?.value || 1);
+    const remunerada = Boolean(document.getElementById("dispensa-remunerada")?.checked);
+    const motivo = (document.getElementById("dispensa-motivo")?.value || "").trim();
+    const idExistente = document.getElementById("dispensa-id")?.value;
+
+    if (!selectFunc || !selectFunc.value) {
+        alert("Por favor, selecione o funcionário.");
+        return;
+    }
+    if (!dataInicio || !dataFim) {
+        alert("Por favor, indique as datas de início e fim da ausência.");
+        return;
+    }
+    if (new Date(dataFim) < new Date(dataInicio)) {
+        alert("A data de término não pode ser anterior à data de início.");
+        return;
+    }
+    if (!motivo) {
+        alert("Por favor, escreva o motivo ou justificação detalhada da dispensa.");
+        document.getElementById("dispensa-motivo")?.focus();
+        return;
+    }
+
+    const [funcId, funcNome] = selectFunc.value.split(":");
+    const ehGerente = ehUsuarioGerente();
+    const estadoEscolhido = document.getElementById("dispensa-estado")?.value || (ehGerente ? "APROVADA" : "PENDENTE");
+
+    const usuarioAtual = FABEF.userData?.nome || auth.currentUser?.email || "Operador";
+
+    const payload = {
+        funcionarioId: funcId,
+        funcionarioNome: funcNome || "Funcionário",
+        ramo,
+        tipo,
+        dataInicio,
+        dataFim,
+        dias: Math.max(1, dias),
+        remunerada,
+        motivo,
+        estado: estadoEscolhido,
+        aprovadoPor: estadoEscolhido === "APROVADA" ? usuarioAtual : null,
+        aprovadoEm: estadoEscolhido === "APROVADA" ? new Date().toISOString() : null,
+        criadoPor: usuarioAtual,
+        criadoEm: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString()
+    };
+
+    try {
+        if (!Array.isArray(FABEF.dispensas)) FABEF.dispensas = [];
+
+        if (idExistente) {
+            if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+                await updateDoc(doc(db, "empresas", FABEF.empresaId, "dispensas", idExistente), payload);
+            }
+            const idx = FABEF.dispensas.findIndex(x => x.id === idExistente);
+            if (idx >= 0) FABEF.dispensas[idx] = { id: idExistente, ...payload };
+        } else {
+            let novoId = "disp_" + Date.now();
+            if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+                const docRef = await addDoc(collection(db, "empresas", FABEF.empresaId, "dispensas"), {
+                    ...payload,
+                    criadoEm: serverTimestamp(),
+                    atualizadoEm: serverTimestamp()
+                });
+                novoId = docRef.id;
+            }
+            FABEF.dispensas.unshift({ id: novoId, ...payload });
+        }
+
+        await gravarAuditoria(`🏖️ DISPENSA REGISTADA (${payload.funcionarioNome} - ${payload.tipo} - ${payload.dias} dias) por ${usuarioAtual}. Estado: ${payload.estado}.`, "INFO");
+
+        fecharModal("modal-dispensa-funcionario");
+        renderDispensas();
+
+        alert(`✅ Dispensa registada com sucesso!\n• Funcionário: ${payload.funcionarioNome}\n• Duração: ${payload.dias} dias (${dataTexto(payload.dataInicio)} a ${dataTexto(payload.dataFim)})\n• Estado: ${payload.estado}`);
+    } catch (err) {
+        console.error("Erro ao salvar dispensa:", err);
+        alert("Erro ao gravar dispensa:\n" + (err.message || err));
+    }
+};
+
+window.aprovarDispensa = async function(id) {
+    if (!ehUsuarioGerente()) {
+        alert("Apenas o Gerente tem autorização para aprovar dispensas.");
+        return;
+    }
+    const d = (FABEF.dispensas || []).find(x => x.id === id);
+    if (!d) return;
+
+    if (!confirm(`Deseja APROVAR formalmente a dispensa de "${d.funcionarioNome}" (${d.dias} dias)?`)) return;
+
+    try {
+        const usuarioAtual = FABEF.userData?.nome || auth.currentUser?.email || "Gerente";
+        const updateData = {
+            estado: "APROVADA",
+            aprovadoPor: usuarioAtual,
+            aprovadoEm: new Date().toISOString(),
+            atualizadoEm: new Date().toISOString()
+        };
+
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            await updateDoc(doc(db, "empresas", FABEF.empresaId, "dispensas", id), updateData);
+        }
+
+        Object.assign(d, updateData);
+        await gravarAuditoria(`✅ DISPENSA APROVADA: ${d.funcionarioNome} (${d.dias} dias - ${d.tipo}) pelo Gerente ${usuarioAtual}.`, "INFO");
+
+        renderDispensas();
+        alert(`✅ Dispensa de "${d.funcionarioNome}" foi APROVADA com sucesso!`);
+    } catch (err) {
+        console.error("Erro ao aprovar dispensa:", err);
+        alert("Erro ao aprovar dispensa:\n" + (err.message || err));
+    }
+};
+
+window.recusarDispensa = async function(id) {
+    if (!ehUsuarioGerente()) {
+        alert("Apenas o Gerente tem autorização para recusar dispensas.");
+        return;
+    }
+    const d = (FABEF.dispensas || []).find(x => x.id === id);
+    if (!d) return;
+
+    const motivoRecusa = prompt(`Indique a justificativa para a RECUSA da dispensa de "${d.funcionarioNome}":`);
+    if (motivoRecusa === null) return;
+    if (!motivoRecusa.trim()) {
+        alert("A justificativa de recusa é obrigatória.");
+        return;
+    }
+
+    try {
+        const usuarioAtual = FABEF.userData?.nome || auth.currentUser?.email || "Gerente";
+        const updateData = {
+            estado: "RECUSADA",
+            motivoRecusa: motivoRecusa.trim(),
+            recusadoPor: usuarioAtual,
+            recusadoEm: new Date().toISOString(),
+            atualizadoEm: new Date().toISOString()
+        };
+
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            await updateDoc(doc(db, "empresas", FABEF.empresaId, "dispensas", id), updateData);
+        }
+
+        Object.assign(d, updateData);
+        await gravarAuditoria(`🔴 DISPENSA RECUSADA: ${d.funcionarioNome} (${d.tipo}) pelo Gerente ${usuarioAtual}. Motivo: "${motivoRecusa}"`, "ALERTA");
+
+        renderDispensas();
+        alert(`Dispensa de "${d.funcionarioNome}" foi recusada.`);
+    } catch (err) {
+        console.error("Erro ao recusar dispensa:", err);
+        alert("Erro ao recusar dispensa:\n" + (err.message || err));
+    }
+};
+
+window.apagarDispensa = async function(id) {
+    if (!ehUsuarioGerente()) {
+        alert("Apenas o Gerente pode eliminar registos de dispensas.");
+        return;
+    }
+    const d = (FABEF.dispensas || []).find(x => x.id === id);
+    if (!d) return;
+
+    if (!confirm(`Deseja eliminar definitivamente este registo de dispensa de "${d.funcionarioNome}"?`)) return;
+
+    try {
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            await deleteDoc(doc(db, "empresas", FABEF.empresaId, "dispensas", id));
+        }
+        FABEF.dispensas = (FABEF.dispensas || []).filter(x => x.id !== id);
+        await gravarAuditoria(`🗑️ Eliminação de registo de dispensa de ${d.funcionarioNome}.`, "INFO");
+
+        renderDispensas();
+        alert("Registo de dispensa eliminado com sucesso.");
+    } catch (err) {
+        console.error("Erro ao apagar dispensa:", err);
+        alert("Erro ao apagar registo:\n" + (err.message || err));
+    }
+};
+
+window.imprimirGuiaDispensa = function(id) {
+    const d = (FABEF.dispensas || []).find(x => x.id === id);
+    if (!d) {
+        alert("Registo não encontrado.");
+        return;
+    }
+
+    const emp = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(d.ramo) : (FABEF.empresa || {});
+    const nomeEmp = emp.nome || d.ramo || "EMPRESA";
+    const nuitEmp = emp.nuit || "Isento";
+    const telEmp = emp.telefone || "—";
+    const endEmp = emp.endereco || "Moçambique";
+
+    const w = window.open("", "_blank");
+    const guiaHtml = `
+    <!DOCTYPE html>
+    <html lang="pt">
+    <head>
+        <meta charset="UTF-8">
+        <title>Guia de Dispensa - ${escapeHTML(d.funcionarioNome)}</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 30px; color: #0f172a; line-height: 1.5; font-size: 14px; }
+            .cabecalho { border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px; }
+            .titulo { font-size: 20px; font-weight: 800; color: #0369a1; text-transform: uppercase; }
+            .subtitulo { font-size: 13px; color: #64748b; }
+            .dados-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+            .linha { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 4px; }
+            .rotulo { font-weight: 700; color: #334155; }
+            .valor { font-weight: 600; color: #0f172a; }
+            .assinaturas { display: flex; justify-content: space-between; margin-top: 60px; text-align: center; }
+            .campo-assinatura { width: 45%; border-top: 1px solid #334155; padding-top: 8px; font-size: 12px; }
+            @media print { body { margin: 15mm; } }
+        </style>
+    </head>
+    <body>
+        <div class="cabecalho">
+            <div class="titulo">${escapeHTML(nomeEmp)}</div>
+            <div class="subtitulo">NUIT: ${escapeHTML(nuitEmp)} | Telefone: ${escapeHTML(telEmp)} | ${escapeHTML(endEmp)}</div>
+            <div style="margin-top: 8px; font-weight: 800; font-size: 16px; color: #0f172a;">
+                📋 GUIA OFICIAL DE DISPENSA / AUTORIZAÇÃO DE AUSÊNCIA
+            </div>
+        </div>
+
+        <div class="dados-box">
+            <div class="linha">
+                <span class="rotulo">Nome do Colaborador:</span>
+                <span class="valor" style="font-size:15px;color:#0284c7;">${escapeHTML(d.funcionarioNome)}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Ramo / Estabelecimento:</span>
+                <span class="valor">${escapeHTML(d.ramo || "Geral")}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Motivo / Tipo de Ausência:</span>
+                <span class="valor">${escapeHTML(d.tipo || "Dispensa Geral")}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Período Autorizado:</span>
+                <span class="valor">De <strong>${dataTexto(d.dataInicio)}</strong> até <strong>${dataTexto(d.dataFim)}</strong></span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Total de Dias Úteis:</span>
+                <span class="valor">${d.dias || 1} dia(s)</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Remuneração:</span>
+                <span class="valor">${d.remunerada ? "🟢 Remunerada (Sem Desconto Salarial)" : "⚪ Não Remunerada"}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Estado da Solicitação:</span>
+                <span class="valor" style="font-weight:800;color:${d.estado === 'APROVADA' ? '#16a34a' : '#ea580c'};">${escapeHTML(d.estado || 'PENDENTE')}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Autorizado / Aprovado Por:</span>
+                <span class="valor">${escapeHTML(d.aprovadoPor || "Gerência")}</span>
+            </div>
+            <div style="margin-top: 12px;">
+                <span class="rotulo">Justificativa / Observações:</span>
+                <div style="margin-top: 4px; padding: 10px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px;">
+                    ${escapeHTML(d.motivo || "Sem observações adicionais.")}
+                </div>
+            </div>
+        </div>
+
+        <div style="font-size: 11px; color: #64748b; margin-top: 10px;">
+            Documento emitido em ${new Date().toLocaleDateString("pt-MZ")} às ${new Date().toLocaleTimeString("pt-MZ")} via FABEF Gestão ERP PRO.
+        </div>
+
+        <div class="assinaturas">
+            <div class="campo-assinatura">
+                <strong>${escapeHTML(d.funcionarioNome)}</strong><br>
+                Assinatura do Colaborador
+            </div>
+            <div class="campo-assinatura">
+                <strong>${escapeHTML(d.aprovadoPor || "A Gerência")}</strong><br>
+                Assinatura & Carimbo da Empresa
+            </div>
+        </div>
+
+        <script>
+            window.addEventListener('load', () => { setTimeout(() => window.print(), 250); });
+        </script>
+    </body>
+    </html>
+    `;
+
+    if (w) {
+        w.document.write(guiaHtml);
+        w.document.close();
+    }
+};
+
+document.getElementById("btn-nova-dispensa")?.addEventListener("click", window.abrirModalNovaDispensa);
+document.getElementById("btn-guardar-dispensa")?.addEventListener("click", window.salvarDispensa);
+document.getElementById("dispensas-pesquisa")?.addEventListener("input", window.renderDispensas);
+document.getElementById("dispensas-filtro-estado")?.addEventListener("change", window.renderDispensas);
 
 /* CONTROLO DE SUBSCRIÇão */
 
@@ -6702,6 +7275,221 @@ document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click"
     }
 });
 
+/* =====================================================
+   MÓDULO LÓGICO: EDIÇÃO DIRETA E EXCLUSÃO DE VENDAS
+===================================================== */
+window.abrirModalEditarVenda = function(vendaId) {
+    const v = (FABEF.vendas || []).find(x => x.id === vendaId) || (FABEF._raw?.vendas || []).find(x => x.id === vendaId);
+    if (!v) {
+        alert("Venda não localizada.");
+        return;
+    }
+
+    const modal = document.getElementById("modal-editar-venda");
+    if (!modal) return;
+
+    const elId = document.getElementById("edit-venda-id");
+    const elRef = document.getElementById("edit-venda-ref");
+    const elData = document.getElementById("edit-venda-data");
+    const elOp = document.getElementById("edit-venda-operador");
+    const elArtigos = document.getElementById("edit-venda-artigos");
+    const elTotal = document.getElementById("edit-venda-total");
+    const elPagamento = document.getElementById("edit-venda-pagamento");
+    const elCliente = document.getElementById("edit-venda-cliente");
+    const elNuit = document.getElementById("edit-venda-nuit");
+    const elJust = document.getElementById("edit-venda-justificativa");
+
+    if (elId) elId.value = v.id;
+    if (elRef) elRef.textContent = "#" + v.id.slice(0, 8);
+    if (elData) elData.textContent = dataTexto(v.data || v.date);
+    if (elOp) elOp.textContent = v.operadorNome || v.user || "Operador";
+
+    const itensDesc = (v.itens || v.items || []).map(it => `${it.nome || "Item"} (${it.quantidade || it.qty || 1}${it.unidade && it.unidade !== "unidade" ? " " + it.unidade : ""})`).join(", ");
+    if (elArtigos) elArtigos.textContent = itensDesc || "Artigos diversos";
+
+    if (elTotal) elTotal.value = numero(v.total);
+    if (elPagamento) elPagamento.value = v.pagamento || "Dinheiro";
+    if (elCliente) elCliente.value = v.clienteNome || v.cliente || "";
+    if (elNuit) elNuit.value = v.nuitCliente || "";
+    if (elJust) elJust.value = v.justificativaGerente || "";
+
+    const btnApagarModal = document.getElementById("btn-modal-apagar-venda");
+    if (btnApagarModal) {
+        btnApagarModal.onclick = () => window.apagarVenda(v.id);
+    }
+
+    modal.classList.add("show");
+    setTimeout(() => { if (elTotal) elTotal.focus(); }, 150);
+};
+
+window.salvarEdicaoVenda = async function() {
+    const vendaId = document.getElementById("edit-venda-id")?.value;
+    if (!vendaId) return;
+
+    const v = (FABEF.vendas || []).find(x => x.id === vendaId) || (FABEF._raw?.vendas || []).find(x => x.id === vendaId);
+    if (!v) {
+        alert("Venda não localizada.");
+        return;
+    }
+
+    const novoTotal = numero(document.getElementById("edit-venda-total")?.value);
+    const novoPagamento = document.getElementById("edit-venda-pagamento")?.value || "Dinheiro";
+    const novoCliente = (document.getElementById("edit-venda-cliente")?.value || "").trim();
+    const novoNuit = (document.getElementById("edit-venda-nuit")?.value || "").trim();
+    const justificativa = (document.getElementById("edit-venda-justificativa")?.value || "").trim();
+
+    if (isNaN(novoTotal) || novoTotal < 0) {
+        alert("Por favor, introduza um valor total válido para a venda.");
+        document.getElementById("edit-venda-total")?.focus();
+        return;
+    }
+
+    if (!justificativa) {
+        alert("⚠️ Justificativa Obrigatória:\nPor favor, informe a justificativa da alteração para o histórico do Gerente.");
+        document.getElementById("edit-venda-justificativa")?.focus();
+        return;
+    }
+
+    try {
+        const usuarioNome = FABEF.userData?.nome || auth.currentUser?.email || "Operador";
+        const totalAntigo = numero(v.total);
+        const diferenca = novoTotal - totalAntigo;
+
+        const updateData = {
+            total: novoTotal,
+            totalOriginal: v.totalOriginal || totalAntigo,
+            pagamento: novoPagamento,
+            clienteNome: novoCliente,
+            cliente: novoCliente,
+            nuitCliente: novoNuit,
+            justificativaGerente: justificativa,
+            editadoPor: usuarioNome,
+            editadoEm: new Date().toISOString(),
+            status: "EDITADA"
+        };
+
+        // Se a venda pertencer ao turno atual e for Dinheiro, ajusta o caixa
+        if (FABEF.turnoId && v.turnoId === FABEF.turnoId && FABEF.turno) {
+            FABEF.turno.totalVendas = Math.max(0, numero(FABEF.turno.totalVendas) + diferenca);
+            if (novoPagamento === "Dinheiro" || v.pagamento === "Dinheiro" || v.pagamento === "Numerário") {
+                FABEF.turno.totalVendasDinheiro = Math.max(0, numero(FABEF.turno.totalVendasDinheiro) + diferenca);
+            }
+            if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+                await updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+                    totalVendas: FABEF.turno.totalVendas,
+                    totalVendasDinheiro: FABEF.turno.totalVendasDinheiro || 0
+                }).catch(e => console.warn("Aviso ao atualizar turno:", e));
+            }
+            atualizarTelaCaixa();
+        }
+
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            await updateDoc(doc(db, "empresas", FABEF.empresaId, "vendas", vendaId), updateData);
+        }
+
+        Object.assign(v, updateData);
+
+        await gravarAuditoria(`✏️ VENDA EDITADA (#${v.id.slice(0, 8)}) por ${usuarioNome}. Novo total: ${dinheiro(novoTotal)} (Antes: ${dinheiro(totalAntigo)}). Motivo: "${justificativa}"`, "ALERTA");
+
+        fecharModal("modal-editar-venda");
+        renderVendas();
+        renderDashboard();
+
+        alert(`✅ Venda atualizada com sucesso!\nO novo valor de ${dinheiro(novoTotal)} e as alterações foram gravadas.`);
+    } catch (err) {
+        console.error("Erro ao salvar edição da venda:", err);
+        alert("Erro ao salvar alterações da venda:\n" + (err.message || err));
+    }
+};
+
+document.getElementById("btn-guardar-edicao-venda")?.addEventListener("click", window.salvarEdicaoVenda);
+
+window.apagarVenda = async function(vendaId) {
+    const v = (FABEF.vendas || []).find(x => x.id === vendaId) || (FABEF._raw?.vendas || []).find(x => x.id === vendaId);
+    if (!v) {
+        alert("Venda não encontrada.");
+        return;
+    }
+
+    const valorVenda = dinheiro(v.total || 0);
+    const dataVenda = dataTexto(v.data || v.date);
+    const confirmMsg = `⚠️ ATENÇÃO: Deseja APAGAR definitivamente esta venda errada?\n\n` +
+        `• Referência: #${v.id.slice(0, 8)}\n` +
+        `• Valor: ${valorVenda}\n` +
+        `• Data: ${dataVenda}\n` +
+        `• Pagamento: ${v.pagamento || "Dinheiro"}\n\n` +
+        `O stock de todos os artigos vendidos nesta operação será reposto automaticamente no inventário.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const usuarioNome = FABEF.userData?.nome || auth.currentUser?.email || "Operador";
+
+        // 1. Repor stock dos artigos
+        const itens = v.itens || v.items || [];
+        for (const it of itens) {
+            const prodId = it.id || it.produtoId;
+            const prod = (FABEF.produtos || []).find(p => p.id === prodId);
+            const qtdRepor = numero(it.quantidade || it.qty || 1);
+            if (prod) {
+                const novoStock = numero(prod.stock) + qtdRepor;
+                prod.stock = novoStock;
+                if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+                    await updateDoc(produtoRef(prod.id), {
+                        stock: novoStock,
+                        atualizadoEm: serverTimestamp()
+                    }).catch(err => console.warn("Erro ao repor stock do produto:", err));
+                }
+            }
+        }
+
+        // 2. Ajustar caixa do turno se aplicável
+        if (FABEF.turnoId && v.turnoId === FABEF.turnoId && FABEF.turno) {
+            const totalEstornado = numero(v.total);
+            FABEF.turno.totalVendas = Math.max(0, numero(FABEF.turno.totalVendas) - totalEstornado);
+            if ((v.pagamento || "").toUpperCase() === "DINHEIRO" || (v.pagamento || "").toUpperCase() === "NUMERÁRIO") {
+                FABEF.turno.totalVendasDinheiro = Math.max(0, numero(FABEF.turno.totalVendasDinheiro) - totalEstornado);
+            }
+            if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+                await updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+                    totalVendas: FABEF.turno.totalVendas,
+                    totalVendasDinheiro: FABEF.turno.totalVendasDinheiro || 0
+                }).catch(e => console.warn("Aviso ao atualizar turno:", e));
+            }
+            atualizarTelaCaixa();
+        }
+
+        // 3. Deletar do Firestore
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            await deleteDoc(doc(db, "empresas", FABEF.empresaId, "vendas", vendaId));
+        }
+
+        // 4. Remover do estado local
+        FABEF.vendas = (FABEF.vendas || []).filter(x => x.id !== vendaId);
+        if (FABEF._raw?.vendas) {
+            FABEF._raw.vendas = FABEF._raw.vendas.filter(x => x.id !== vendaId);
+        }
+        if (FABEF.vendasTurno) {
+            FABEF.vendasTurno = FABEF.vendasTurno.filter(x => x.id !== vendaId);
+        }
+
+        // 5. Auditoria
+        await gravarAuditoria(`🗑️ VENDA APAGADA (#${v.id.slice(0, 8)} - ${valorVenda}) por ${usuarioNome}. O stock dos artigos foi reposto.`, "ALERTA");
+
+        // 6. Fechar modal se aberto e atualizar ecrãs
+        fecharModal("modal-editar-venda");
+        renderVendas();
+        renderProdutos();
+        renderInventario();
+        renderDashboard();
+
+        alert(`✅ Venda apagada com sucesso!\nO valor de ${valorVenda} foi removido e o stock dos produtos foi reposto.`);
+    } catch (err) {
+        console.error("Erro ao apagar venda:", err);
+        alert("Erro ao apagar venda:\n" + (err.message || err));
+    }
+};
+
 window.abrirModalEncomendaFalhada = function(encomendaId) {
     const e = (FABEF.encomendas || []).find(x => x.id === encomendaId);
     if (!e) { alert("Encomenda não localizada."); return; }
@@ -7420,6 +8208,7 @@ function renderTudo() {
     // Proteções de segurança contra erros de inicialização de funções secundárias
     if (typeof renderFuncionarios === "function") renderFuncionarios();
     if (typeof renderGastosFuncionarios === "function") renderGastosFuncionarios();
+    if (typeof renderDispensas === "function") renderDispensas();
     if (typeof renderAuditoria === "function") renderAuditoria();
     if (typeof renderMetas === "function") renderMetas();
     if (typeof renderDesempenho === "function") renderDesempenho();
