@@ -188,6 +188,12 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         Acesso instantâneo com catálogo em Meticais (MT), caixa aberto, vendas e relatórios sem registo no Firebase.
       </div>
 
+      <div style="margin-top: 14px; padding: 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; text-align: center;">
+        <button type="button" onclick="acionarInstalacaoPWA()" class="btn" style="width: 100%; background: #1e40af; color: #fff; font-size: 12px; font-weight: 700; padding: 8px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+          📲 Instalar Aplicativo no Celular
+        </button>
+      </div>
+
       <p class="rodape-criar-conta">Ainda não tem conta? <a id="btn-mostrar-registo">Criar conta</a></p>
       <p class="rodape-criar-conta"><a id="btn-esqueci-senha">Esqueci a senha</a></p>
     </form>
@@ -311,6 +317,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:12px;">
       <a id="btn-pin-esqueceu" style="color:#2563eb;cursor:pointer;font-weight:600;">🔑 Esqueci meu PIN / Entrar com senha</a>
+      <a onclick="acionarInstalacaoPWA()" style="color:#059669;cursor:pointer;font-weight:700;display:inline-flex;align-items:center;gap:4px;justify-content:center;">📲 Instalar Aplicativo no Celular</a>
       <a id="btn-pin-sair" style="color:#64748b;cursor:pointer;">🚪 Sair e trocar de conta</a>
     </div>
   </div>
@@ -329,6 +336,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
     <div class="lado">
       <span id="indicador-ligacao" style="font-size:11px;font-weight:700;"></span>
+      <button id="btn-header-instalar" class="btn btn-small" type="button" onclick="acionarInstalacaoPWA()" style="background:#2563eb;color:#fff;font-weight:700;padding:6px 12px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:5px;border:none;cursor:pointer;" title="Instalar aplicativo no seu celular">
+        📲 Instalar no Celular
+      </button>
       <button id="btn-abrir-sugestoes" class="btn btn-small" style="background:#f59e0b;color:#0f172a;font-weight:700;padding:6px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:5px;border:none;cursor:pointer;" title="Ver Diagnóstico & Sugestões de Melhoria">
         💡 Sugestões
       </button>
@@ -344,6 +354,12 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
   <nav class="sidebar" id="sidebar">
     <button data-sec="inicio" class="active">🏠 Início</button>
+
+    <div style="padding: 4px 6px 2px;">
+      <button id="btn-sidebar-instalar-topo" type="button" onclick="acionarInstalacaoPWA()" style="width:100%;background:#1d4ed8;border:1px solid #3b82f6;color:#ffffff;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);">
+        📲 <span>Instalar no Celular</span>
+      </button>
+    </div>
 
     <details open style="margin-top:6px;">
       <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Comercial</summary>
@@ -683,6 +699,32 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         </div>
         <button id="btn-registar-compra" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar compra</button>
       </div>
+
+      <!-- SUGESTÕES DE COMPRAS / ENTRADAS PARA O RAMO -->
+      <div class="card" id="card-sugestoes-compras-ramo" style="border-top:3px solid #2563eb;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+          <div>
+            <h3 style="margin:0;color:#1e40af;font-size:15px;display:flex;align-items:center;gap:6px;">
+              <span>💡</span> Sugestões de Compras & Reabastecimento — <span id="compra-ramo-atual-nome" style="color:#0284c7;">Ramo Atual</span>
+            </h3>
+            <p style="margin:3px 0 0;font-size:12px;color:#64748b;">
+              Artigos com stock baixo ou em rutura pertencentes estritamente a este ramo. Os fornecedores sugeridos são vinculados exclusivamente a este ramo.
+            </p>
+          </div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Artigo / Produto</th>
+            <th>Stock Atual</th>
+            <th>Stock Mínimo</th>
+            <th>Fornecedor Sugerido (deste Ramo)</th>
+            <th>Último Custo</th>
+            <th>Ação</th>
+          </tr></thead>
+          <tbody id="tabela-sugestoes-compras-ramo"></tbody>
+        </table></div>
+      </div>
+
       <div class="card">
         <div class="table-wrap"><table>
           <thead><tr><th>Data</th><th>Produto</th><th>Fornecedor</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th></tr></thead>
@@ -716,8 +758,11 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- CLIENTES -->
     <section class="secao" id="sec-clientes">
       <h2>Clientes</h2>
-      <div class="card">
+      <div class="card" id="card-adicionar-cliente">
         <h3 style="margin-bottom:12px;color:#1e3a8a;font-size:15px;">➕ Adicionar Cliente</h3>
+        <div id="aviso-gerente-bloqueado-cliente" class="alert" style="display:none;background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;line-height:1.4;">
+          🔒 <strong>Regra de Operação:</strong> O Gerente não pode registar clientes. Esta missão é exclusiva dos <strong>Funcionários / Operadores</strong> no atendimento ao balcão.
+        </div>
         <div class="grid">
           <div class="form-group"><label for="cliente-id-custom">ID / Código do Cliente (opcional)</label><input type="text" id="cliente-id-custom" placeholder="Ex: CLI-01"></div>
           <div class="form-group"><label for="cliente-nome">Nome</label><input type="text" id="cliente-nome"></div>
@@ -738,7 +783,11 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- DÍVIDAS -->
     <section class="secao" id="sec-dividas">
       <h2>Fiado / Dívidas</h2>
-      <div class="card">
+      <div class="card" id="card-registar-divida">
+        <h3 style="margin-bottom:12px;color:#1e3a8a;font-size:15px;">➕ Registar Dívida / Fiado</h3>
+        <div id="aviso-gerente-bloqueado-divida" class="alert" style="display:none;background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;line-height:1.4;">
+          🔒 <strong>Regra de Operação:</strong> O Gerente não pode registar dívidas ou fiado. Esta missão é de competência exclusiva dos <strong>Funcionários / Operadores</strong> no caixa e atendimento.
+        </div>
         <div class="grid">
           <div class="form-group"><label for="divida-cliente">Cliente</label><input type="text" id="divida-cliente"></div>
           <div class="form-group"><label for="divida-telefone">Telefone</label><input type="text" id="divida-telefone"></div>
@@ -997,9 +1046,14 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
               Registe adiantamentos salariais (vales), refeições, transportes, quebras ou produtos consumidos pelo funcionário.
             </p>
           </div>
-          <button id="btn-abrir-modal-gasto-func" class="btn btn-warning" type="button" style="background:#f59e0b;color:#fff;font-weight:700;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;">
-            ➕ Registar Gasto na Conta
-          </button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="btn-adiantamento-salarial" class="btn" type="button" onclick="abrirModalAdiantamentoSalarial()" style="background:#059669;color:#fff;font-weight:700;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              💸 Adiantamento Salarial (Vale)
+            </button>
+            <button id="btn-abrir-modal-gasto-func" class="btn btn-warning" type="button" style="background:#f59e0b;color:#fff;font-weight:700;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;">
+              ➕ Registar Outro Gasto
+            </button>
+          </div>
         </div>
         <div class="table-wrap"><table>
           <thead><tr>
@@ -2214,6 +2268,54 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
       <button class="btn btn-light" type="button" onclick="fecharModal('modal-dispensa-funcionario')" style="flex:1;">Cancelar</button>
       <button id="btn-guardar-dispensa" class="btn btn-primary" type="button" style="flex:1.4;font-weight:800;background:#10b981;color:#fff;border:none;padding:11px;border-radius:8px;cursor:pointer;">
         💾 Guardar Dispensa
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL INSTALAR NO CELULAR (PWA) ================= -->
+<div class="modal-overlay" id="modal-instalar-celular">
+  <div class="modal-box" style="max-width: 480px; text-align: left;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:28px;">📲</span>
+      <div>
+        <h3 style="color:#1e3a8a;margin:0;font-size:18px;">Instalar FABEF ERP no Celular</h3>
+        <p style="margin:2px 0 0;font-size:12px;color:#64748b;">Acesse mais rápido como um aplicativo nativo</p>
+      </div>
+    </div>
+
+    <p style="font-size:13px;color:#334155;margin-bottom:14px;line-height:1.5;">
+      O FABEF ERP funciona como um aplicativo completo no seu telefone, sem precisar descarregar da Play Store. Fica em ecrã inteiro e abre instantaneamente.
+    </p>
+
+    <!-- Instruções Android -->
+    <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:6px;font-weight:700;color:#0f172a;font-size:13px;margin-bottom:6px;">
+        <span>🤖</span> No Android (Google Chrome / Edge):
+      </div>
+      <ol style="margin-left:20px;font-size:12.5px;color:#475569;line-height:1.6;">
+        <li>Toque nos <strong>três pontos (⋮)</strong> no canto superior direito do navegador.</li>
+        <li>Selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar ao ecrã inicial"</strong>.</li>
+        <li>Toque em <strong>Instalar</strong> para confirmar.</li>
+      </ol>
+    </div>
+
+    <!-- Instruções iPhone -->
+    <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:6px;font-weight:700;color:#0f172a;font-size:13px;margin-bottom:6px;">
+        <span>🍏</span> No iPhone / iPad (Safari):
+      </div>
+      <ol style="margin-left:20px;font-size:12.5px;color:#475569;line-height:1.6;">
+        <li>Toque no botão <strong>Partilhar 📤</strong> (ícone com quadrado e seta para cima).</li>
+        <li>Desça e toque em <strong>"Adicionar ao Ecrã Principal ➕"</strong>.</li>
+        <li>Toque em <strong>"Adicionar"</strong> no canto superior direito.</li>
+      </ol>
+    </div>
+
+    <div class="modal-acoes" style="display:flex;gap:10px;">
+      <button class="btn btn-light" type="button" onclick="fecharModal('modal-instalar-celular')" style="flex:1;">Fechar</button>
+      <button class="btn btn-primary" type="button" onclick="acionarInstalacaoPWA()" style="flex:1.4;background:#2563eb;color:#fff;font-weight:700;border:none;padding:11px;border-radius:8px;cursor:pointer;">
+        📲 Instalar Agora
       </button>
     </div>
   </div>
