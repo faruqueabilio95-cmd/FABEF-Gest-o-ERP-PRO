@@ -369,6 +369,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <button data-sec="relatorios">📈 Relatórios</button>
       <button data-sec="metas">🎯 Metas</button>
       <button data-sec="desempenho">👤 Desempenho</button>
+      <button data-sec="dispensas">🏖️ Dispensas</button>
       <button data-sec="sugestoes">💡 Sugestões</button>
     </details>
 
@@ -376,6 +377,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <summary style="cursor:pointer;color:#93c5fd;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;letter-spacing:0.5px;">⚙️ Configurações & Sistema</summary>
       <button data-sec="config" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
       <button data-sec="funcionarios">🧑‍💼 Funcionários</button>
+      <button data-sec="dispensas" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #fde68a;">🏖️ Dispensas Funcionários</button>
       <button data-sec="ramos">🏷️ Ramos</button>
       <button data-sec="auditoria">📝 Auditoria</button>
       <button data-sec="subscricao">💳 Subscrição</button>
@@ -1014,6 +1016,74 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
     </section>
 
+    <!-- DISPENSAS E LICENÇAS DOS FUNCIONÁRIOS -->
+    <section class="secao" id="sec-dispensas">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+        <div>
+          <h2>🏖️ Dispensas, Licenças & Faltas dos Funcionários</h2>
+          <p style="font-size:13px;color:#64748b;margin-top:2px;">
+            Controlo e registo completo de ausências, baixas médicas, férias anuais, dispensas pontuais e justificação de faltas da equipa.
+          </p>
+        </div>
+        <button id="btn-nova-dispensa" class="btn btn-entrar" type="button" style="width:auto;padding:10px 20px;font-weight:700;display:inline-flex;align-items:center;gap:6px;">
+          ➕ Solicitar / Registar Dispensa
+        </button>
+      </div>
+
+      <!-- KPIs DE DISPENSAS -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:16px;">
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #3b82f6;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Dispensas Ativas Hoje</div>
+          <div id="dispensas-kpi-ativas" style="font-size:24px;font-weight:800;color:#1e40af;margin-top:4px;">0</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #f59e0b;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Pedidos Pendentes (Aprovação)</div>
+          <div id="dispensas-kpi-pendentes" style="font-size:24px;font-weight:800;color:#b45309;margin-top:4px;">0</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #10b981;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Dispensas Aprovadas</div>
+          <div id="dispensas-kpi-aprovadas" style="font-size:24px;font-weight:800;color:#059669;margin-top:4px;">0</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #8b5cf6;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Total de Dias Dispensados</div>
+          <div id="dispensas-kpi-dias" style="font-size:24px;font-weight:800;color:#6d28d9;margin-top:4px;">0 dias</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1;">
+            <input type="text" id="dispensas-pesquisa" placeholder="🔍 Pesquisar funcionário, motivo ou tipo..." style="max-width:280px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">
+            <select id="dispensas-filtro-estado" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;">
+              <option value="TODOS">Todos os Estados</option>
+              <option value="PENDENTE">🟡 Pendentes de Aprovação</option>
+              <option value="APROVADA">🟢 Aprovadas pelo Gerente</option>
+              <option value="RECUSADA">🔴 Recusadas</option>
+            </select>
+          </div>
+          <div style="font-size:12px;color:#64748b;">
+            👑 O Gerente tem permissão exclusiva para Aprovar ou Recusar dispensas
+          </div>
+        </div>
+
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Funcionário</th>
+            <th>Ramo / Filial</th>
+            <th>Tipo de Dispensa</th>
+            <th>Período</th>
+            <th>Duração</th>
+            <th>Remuneração</th>
+            <th>Motivo / Justificativa</th>
+            <th>Estado</th>
+            <th>Aprovado Por</th>
+            <th>Ações</th>
+          </tr></thead>
+          <tbody id="tabela-dispensas"></tbody>
+        </table></div>
+      </div>
+    </section>
+
     <!-- RAMOS -->
     <section class="secao" id="sec-ramos">
       <h2>Ramos de Atividade & Filiais da Empresa</h2>
@@ -1216,10 +1286,25 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <section class="secao" id="sec-config">
 
       <h2>Configurações do Estabelecimento & Recibo</h2>
+      
+      <!-- ABAS VISUAIS DE SELEÇÃO DOS NEGÓCIOS / FILIAIS -->
+      <div class="card" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:16px; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+          <div>
+            <strong style="color:#0f172a; font-size:15px; display:block;">🏬 Negócios & Filiais Cadastrados</strong>
+            <small style="color:#64748b;">Clique no negócio que deseja configurar individualmente. Cada ramo tem o seu próprio nome comercial, NUIT, telefone, endereço e recibo.</small>
+          </div>
+          <button class="btn btn-light btn-small" type="button" onclick="mostrarSecao('ramos')" style="background:#fff; border:1px solid #cbd5e1; color:#334155; font-weight:700;">➕ Adicionar Novo Ramo / Filial</button>
+        </div>
+        <div id="config-ramos-tabs-bar" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+          <!-- Botões/Pills gerados dinamicamente para cada negócio -->
+        </div>
+      </div>
+
       <div id="aviso-config-ramo-ativo" style="background:#eff6ff; border:1.5px solid #93c5fd; border-radius:12px; padding:16px; margin-bottom:18px; font-size:14px; color:#1e40af; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
         <div style="flex:1; min-width:260px;">
           <label for="config-seletor-ramo" style="font-weight:800; color:#1e3a8a; display:block; margin-bottom:6px; font-size:15px;">
-            🏢 Ramo / Filial em Configuração:
+            🏢 Negócio / Filial em Configuração:
           </label>
           <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <select id="config-seletor-ramo" style="padding:10px 14px; font-size:15px; font-weight:800; border-radius:8px; border:2px solid #2563eb; background:#ffffff; color:#1d4ed8; flex:1; max-width:340px; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
@@ -1230,9 +1315,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             Cada ramo (Salão de Beleza, Talho, etc.) tem o seu próprio nome de loja, telefone, endereço, IVA e rodapé de recibo independentes.
           </small>
         </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
           <button class="btn btn-light btn-small" type="button" id="btn-copiar-dados-empresa" style="background:#fff; border:1px solid #93c5fd; color:#1e40af; font-weight:700;" title="Copiar endereço e NUIT geral para este ramo">📋 Preencher com Dados Gerais</button>
-          <button class="btn btn-light btn-small" type="button" onclick="mostrarSecao('ramos')" style="background:#fff; border:1px solid #cbd5e1; color:#334155; font-weight:700;">📂 Pasta de Ramos</button>
+          <button id="btn-ativar-este-ramo" type="button" class="btn btn-small" style="background:#10b981; color:#fff; font-weight:700; border:none; padding:7px 14px; border-radius:6px; cursor:pointer;" title="Alternar imediatamente a aplicação para este negócio">🚀 Ativar este Negócio Agora</button>
         </div>
       </div>
       <div class="card">
@@ -1969,6 +2054,167 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 
     <div style="margin-top: 20px; display: flex; justify-content: flex-end; align-items: center;">
       <button class="btn btn-primary" onclick="fecharModal('modal-sugestoes')" style="padding: 8px 20px;">Entendido</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE EDIÇÃO DE VENDA / CORREÇÃO -->
+<div class="modal-overlay" id="modal-editar-venda">
+  <div class="modal-box" style="max-width: 520px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:24px;">✏️</span>
+        <h3 style="color:#1e40af; margin:0;">Editar Venda / Corrigir Erro</h3>
+      </div>
+      <button type="button" class="btn btn-light btn-small" onclick="fecharModal('modal-editar-venda')">✕</button>
+    </div>
+    <p style="font-size:13px; color:#64748b; margin-bottom:14px;">
+      Altere o valor, método de pagamento, cliente ou notas desta venda. Se a venda foi lançada por engano, pode também apagá-la definitivamente.
+    </p>
+
+    <input type="hidden" id="edit-venda-id">
+
+    <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:12px; margin-bottom:14px; font-size:13px;">
+      <div style="display:flex;justify-content:space-between;">
+        <span><strong>Venda:</strong> <span id="edit-venda-ref">—</span></span>
+        <span><strong>Data:</strong> <span id="edit-venda-data">—</span></span>
+      </div>
+      <div style="margin-top:4px;"><strong>Operador:</strong> <span id="edit-venda-operador">—</span></div>
+      <div style="margin-top:4px;"><strong>Artigos Vendidos:</strong> <span id="edit-venda-artigos">—</span></div>
+    </div>
+
+    <div class="grid">
+      <div class="form-group">
+        <label for="edit-venda-total" style="font-weight:800;color:#0f172a;">Valor Total da Venda (MT) *</label>
+        <input type="number" id="edit-venda-total" step="0.01" min="0" style="font-size:18px;font-weight:800;color:#1e40af;border:2px solid #3b82f6;">
+      </div>
+      <div class="form-group">
+        <label for="edit-venda-pagamento">Forma de Pagamento *</label>
+        <select id="edit-venda-pagamento" style="font-weight:600;">
+          <option value="Dinheiro">Dinheiro (Numerário)</option>
+          <option value="M-Pesa">M-Pesa</option>
+          <option value="E-Mola">E-Mola</option>
+          <option value="POS / Cartão">POS / Cartão Bancário</option>
+          <option value="Transferência">Transferência Bancária</option>
+          <option value="Fiado">Fiado (A Prazo / Dívida)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="form-group">
+        <label for="edit-venda-cliente">Nome do Cliente</label>
+        <input type="text" id="edit-venda-cliente" placeholder="Consumidor Final ou Nome">
+      </div>
+      <div class="form-group">
+        <label for="edit-venda-nuit">NUIT do Cliente</label>
+        <input type="text" id="edit-venda-nuit" placeholder="Isento ou NUIT">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="edit-venda-justificativa" style="font-weight:700;color:#b91c1c;">Motivo / Justificativa da Correção *</label>
+      <textarea id="edit-venda-justificativa" rows="2" placeholder="Explique o motivo da alteração (ex: erro no troco, valor digitado com engano, etc.)" style="width:100%;padding:8px 10px;border:1px solid #ef4444;border-radius:6px;font-size:13px;"></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center;">
+      <button type="button" id="btn-modal-apagar-venda" class="btn" style="background:#ef4444;color:#fff;font-weight:700;padding:10px 16px;border:none;border-radius:8px;cursor:pointer;">
+        🗑️ Apagar Esta Venda
+      </button>
+      <div style="flex:1;"></div>
+      <button type="button" class="btn btn-light" onclick="fecharModal('modal-editar-venda')" style="padding:10px 16px;">
+        Cancelar
+      </button>
+      <button type="button" id="btn-guardar-edicao-venda" class="btn btn-primary" style="background:#2563eb;color:#fff;font-weight:800;padding:10px 20px;border:none;border-radius:8px;cursor:pointer;">
+        💾 Guardar Alterações
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE DISPENSA DO FUNCIONÁRIO -->
+<div class="modal-overlay" id="modal-dispensa-funcionario">
+  <div class="modal-box" style="max-width: 520px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:24px;">🏖️</span>
+        <h3 style="color:#0f172a; margin:0;" id="modal-dispensa-titulo">Registar Dispensa de Funcionário</h3>
+      </div>
+      <button type="button" class="btn btn-light btn-small" onclick="fecharModal('modal-dispensa-funcionario')">✕</button>
+    </div>
+    <p style="font-size:13px; color:#64748b; margin-bottom:14px;">
+      Registe pedidos de ausência, faltas justificadas, consultas médicas ou férias para acompanhamento e aprovação do Gerente.
+    </p>
+
+    <input type="hidden" id="dispensa-id">
+
+    <div class="form-group">
+      <label for="dispensa-funcionario-select">Funcionário *</label>
+      <select id="dispensa-funcionario-select" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;font-size:14px;">
+      </select>
+    </div>
+
+    <div class="grid">
+      <div class="form-group">
+        <label for="dispensa-tipo">Tipo de Dispensa / Ausência *</label>
+        <select id="dispensa-tipo" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+          <option value="Baixa / Consulta Médica">🏥 Baixa / Consulta Médica</option>
+          <option value="Assuntos Pessoais Urgentes">👤 Assuntos Pessoais Urgentes</option>
+          <option value="Férias Anuais">🏖️ Férias Anuais</option>
+          <option value="Luto / Falecimento">🕊️ Luto / Falecimento</option>
+          <option value="Licença Maternidade/Paternidade">👶 Licença Maternidade/Paternidade</option>
+          <option value="Estudo / Exames / Formação">🎓 Estudo / Exames / Formação</option>
+          <option value="Folga / Compensação de Horas">⏰ Folga / Compensação de Horas</option>
+          <option value="Outro Motivo">📋 Outro Motivo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="dispensa-ramo">Ramo / Filial *</label>
+        <select id="dispensa-ramo" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;"></select>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="form-group">
+        <label for="dispensa-data-inicio">Data de Início *</label>
+        <input type="date" id="dispensa-data-inicio" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+      </div>
+      <div class="form-group">
+        <label for="dispensa-data-fim">Data de Fim (inclusive) *</label>
+        <input type="date" id="dispensa-data-fim" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="form-group">
+        <label for="dispensa-dias">Total de Dias de Ausência</label>
+        <input type="number" id="dispensa-dias" min="1" value="1" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;">
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;margin-top:22px;gap:8px;">
+        <input type="checkbox" id="dispensa-remunerada" checked style="width:auto;height:18px;">
+        <label for="dispensa-remunerada" style="margin:0;font-size:13px;font-weight:600;cursor:pointer;">Dispensa Remunerada</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="dispensa-motivo">Motivo / Justificativa Detalhada *</label>
+      <textarea id="dispensa-motivo" rows="3" placeholder="Explique os detalhes do pedido de dispensa ou número do atestado médico..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+    </div>
+
+    <div class="form-group" id="bloco-dispensa-estado" style="display:none;">
+      <label for="dispensa-estado">Estado da Dispensa</label>
+      <select id="dispensa-estado" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;">
+        <option value="PENDENTE">🟡 Pendente (Aguardando Aprovação do Gerente)</option>
+        <option value="APROVADA">🟢 Aprovada pelo Gerente</option>
+        <option value="RECUSADA">🔴 Recusada</option>
+      </select>
+    </div>
+
+    <div class="modal-acoes">
+      <button class="btn btn-light" type="button" onclick="fecharModal('modal-dispensa-funcionario')" style="flex:1;">Cancelar</button>
+      <button id="btn-guardar-dispensa" class="btn btn-primary" type="button" style="flex:1.4;font-weight:800;background:#10b981;color:#fff;border:none;padding:11px;border-radius:8px;cursor:pointer;">
+        💾 Guardar Dispensa
+      </button>
     </div>
   </div>
 </div>
