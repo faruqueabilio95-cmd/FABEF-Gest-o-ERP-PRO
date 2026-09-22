@@ -99,6 +99,9 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 table th { text-align: left; background: #f1f5f9; padding: 8px; font-size: 11px; text-transform: uppercase; color: #475569; }
 table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
 .table-wrap { overflow-x: auto; }
+.pasta-acoes-venda summary { list-style: none; }
+.pasta-acoes-venda summary::-webkit-details-marker { display: none; }
+.pasta-acoes-venda[open] summary { border-color: #2563eb !important; background: #eff6ff !important; color: #1d4ed8 !important; }
 
 .badge { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 .badge-green { background: #dcfce7; color: #15803d; }
@@ -185,12 +188,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </button>
       <div style="font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4;">
         Acesso instantâneo com catálogo em Meticais (MT), caixa aberto, vendas e relatórios sem registo no Firebase.
-      </div>
-
-      <div style="margin-top: 14px; padding: 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; text-align: center;">
-        <button type="button" onclick="acionarInstalacaoPWA()" class="btn" style="width: 100%; background: #1e40af; color: #fff; font-size: 12px; font-weight: 700; padding: 8px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
-          📲 Instalar Aplicativo no Celular
-        </button>
       </div>
 
       <p class="rodape-criar-conta">Ainda não tem conta? <a id="btn-mostrar-registo">Criar conta</a></p>
@@ -316,7 +313,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:12px;">
       <a id="btn-pin-esqueceu" style="color:#2563eb;cursor:pointer;font-weight:600;">🔑 Esqueci meu PIN / Entrar com senha</a>
-      <a onclick="acionarInstalacaoPWA()" style="color:#059669;cursor:pointer;font-weight:700;display:inline-flex;align-items:center;gap:4px;justify-content:center;">📲 Instalar Aplicativo no Celular</a>
       <a id="btn-pin-sair" style="color:#64748b;cursor:pointer;">🚪 Sair e trocar de conta</a>
     </div>
   </div>
@@ -335,9 +331,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
     <div class="lado">
       <span id="indicador-ligacao" style="font-size:11px;font-weight:700;"></span>
-      <button id="btn-header-instalar" class="btn btn-small" type="button" onclick="acionarInstalacaoPWA()" style="background:#2563eb;color:#fff;font-weight:700;padding:6px 12px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:5px;border:none;cursor:pointer;" title="Instalar aplicativo no seu celular">
-        📲 Instalar no Celular
-      </button>
       <button id="btn-abrir-sugestoes" class="btn btn-small" style="background:#f59e0b;color:#0f172a;font-weight:700;padding:6px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:5px;border:none;cursor:pointer;" title="Ver Diagnóstico & Sugestões de Melhoria">
         💡 Sugestões
       </button>
@@ -353,12 +346,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
   <nav class="sidebar" id="sidebar">
     <button data-sec="inicio" class="active">🏠 Início</button>
-
-    <div style="padding: 4px 6px 2px;">
-      <button id="btn-sidebar-instalar-topo" type="button" onclick="acionarInstalacaoPWA()" style="width:100%;background:#1d4ed8;border:1px solid #3b82f6;color:#ffffff;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);">
-        📲 <span>Instalar no Celular</span>
-      </button>
-    </div>
 
     <details open style="margin-top:6px;">
       <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Comercial</summary>
