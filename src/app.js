@@ -1666,20 +1666,48 @@ function aplicarRestricoesDeAcessoPorPapel() {
     const btnNovoProd = document.getElementById("btn-novo-produto");
     if (btnNovoProd) btnNovoProd.style.display = ehGerenteLogado ? "" : "none";
 
-    // Clientes e Dívidas: o funcionário e o gerente DEVEM conseguir adicionar clientes e registar dívidas (fiado)
+    // Regra Operacional: Gerente NÃO pode registar clientes nem registar dívidas (fiado). Essa missão é exclusiva de funcionário!
+    const avisoCli = document.getElementById("aviso-gerente-bloqueado-cliente");
+    const avisoDiv = document.getElementById("aviso-gerente-bloqueado-divida");
     const btnAddCli = document.getElementById("btn-adicionar-cliente");
-    if (btnAddCli) {
-        btnAddCli.disabled = false;
-        btnAddCli.style.display = "";
-        btnAddCli.style.pointerEvents = "auto";
-        btnAddCli.style.opacity = "1";
-    }
     const btnRegDiv = document.getElementById("btn-registar-divida");
-    if (btnRegDiv) {
-        btnRegDiv.disabled = false;
-        btnRegDiv.style.display = "";
-        btnRegDiv.style.pointerEvents = "auto";
-        btnRegDiv.style.opacity = "1";
+
+    if (ehGerenteLogado) {
+        if (avisoCli) avisoCli.style.display = "block";
+        if (avisoDiv) avisoDiv.style.display = "block";
+        if (btnAddCli) {
+            btnAddCli.disabled = true;
+            btnAddCli.style.display = "";
+            btnAddCli.style.opacity = "0.5";
+            btnAddCli.style.cursor = "not-allowed";
+            btnAddCli.title = "O Gerente não pode registar clientes. Missão exclusiva do Funcionário.";
+        }
+        if (btnRegDiv) {
+            btnRegDiv.disabled = true;
+            btnRegDiv.style.display = "";
+            btnRegDiv.style.opacity = "0.5";
+            btnRegDiv.style.cursor = "not-allowed";
+            btnRegDiv.title = "O Gerente não pode registar dívidas. Missão exclusiva do Funcionário.";
+        }
+    } else {
+        if (avisoCli) avisoCli.style.display = "none";
+        if (avisoDiv) avisoDiv.style.display = "none";
+        if (btnAddCli) {
+            btnAddCli.disabled = false;
+            btnAddCli.style.display = "";
+            btnAddCli.style.pointerEvents = "auto";
+            btnAddCli.style.opacity = "1";
+            btnAddCli.style.cursor = "pointer";
+            btnAddCli.title = "Adicionar novo cliente";
+        }
+        if (btnRegDiv) {
+            btnRegDiv.disabled = false;
+            btnRegDiv.style.display = "";
+            btnRegDiv.style.pointerEvents = "auto";
+            btnRegDiv.style.opacity = "1";
+            btnRegDiv.style.cursor = "pointer";
+            btnRegDiv.title = "Registar nova dívida";
+        }
     }
 
     // Garante que o menu lateral para Clientes e Fiado/Dívidas permanece acessível
@@ -1717,6 +1745,11 @@ function verificarAcessoPosGerente() {
         btnFinalizar.title = "Finalizar venda";
         btnFinalizar.style.opacity = "1";
         btnFinalizar.style.cursor = "pointer";
+    }
+
+    const btnPosNovoCliente = document.getElementById("btn-pos-novo-cliente");
+    if (btnPosNovoCliente) {
+        btnPosNovoCliente.style.display = ehGerente ? "none" : "";
     }
 }
 window.verificarAcessoPosGerente = verificarAcessoPosGerente;
@@ -2814,6 +2847,7 @@ function preencherProdutosCompra() {
     const select = document.getElementById("compra-produto");
     if (!select) return;
 
+    // Filtra estritamente os produtos pertencentes ao ramo de atividade atual
     select.innerHTML = `
     <option value="">Seleccione o produto</option>
     ` + FABEF.produtos
@@ -2824,14 +2858,116 @@ function preencherProdutosCompra() {
         </option>
         `).join("");
 
-    // Sugestões de fornecedores já cadastrados, para evitar erros de digitação
+    // Sugestões de fornecedores isoladas e filtradas ESTRITAMENTE para este ramo (não mistura fornecedores)
     const listaFornecedores = document.getElementById("lista-fornecedores-compra");
     if (listaFornecedores) {
-        listaFornecedores.innerHTML = FABEF.fornecedores
+        listaFornecedores.innerHTML = (FABEF.fornecedores || [])
+            .filter(f => !f.ramo || f.ramo === FABEF.ramo)
             .map(f => `<option value="${escapeHTML(f.nome)}">`)
             .join("");
     }
+
+    renderSugestoesComprasRamo();
 }
+
+// Ao selecionar o produto, preenche automaticamente o custo e sugere o fornecedor habitual do respetivo ramo
+document.getElementById("compra-produto")?.addEventListener("change", (e) => {
+    const prodId = e.target.value;
+    if (!prodId) return;
+    const prod = (FABEF.produtos || []).find(p => p.id === prodId);
+    if (!prod) return;
+
+    const inputCusto = document.getElementById("compra-custo");
+    if (inputCusto && (!inputCusto.value || Number(inputCusto.value) <= 0)) {
+        if (prod.custo) inputCusto.value = prod.custo;
+    }
+
+    const inputForn = document.getElementById("compra-fornecedor");
+    if (inputForn && !inputForn.value) {
+        const ultCompra = (FABEF.compras || [])
+            .filter(c => c.produtoId === prod.id && (!c.ramo || c.ramo === FABEF.ramo))
+            .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))[0];
+        if (ultCompra && ultCompra.fornecedorNome) {
+            inputForn.value = ultCompra.fornecedorNome;
+        } else {
+            const primeiroFornRamo = (FABEF.fornecedores || []).find(f => !f.ramo || f.ramo === FABEF.ramo);
+            if (primeiroFornRamo) inputForn.value = primeiroFornRamo.nome;
+        }
+    }
+});
+
+window.renderSugestoesComprasRamo = function() {
+    const labelRamo = document.getElementById("compra-ramo-atual-nome");
+    if (labelRamo) labelRamo.textContent = FABEF.ramo || "Geral";
+
+    const tbody = document.getElementById("tabela-sugestoes-compras-ramo");
+    if (!tbody) return;
+
+    // Filtra estritamente os produtos pertencentes ao ramo de atividade atual
+    const produtosDoRamo = (FABEF.produtos || []).filter(p => p.ramo === FABEF.ramo);
+    // Produtos que estão abaixo ou no nível de stock mínimo
+    const produtosSugeridos = produtosDoRamo.filter(p => {
+        const stockAtual = numero(p.stock);
+        const stockMin = numero(p.minimo || p.stockMinimo || 5);
+        return stockAtual <= stockMin;
+    });
+
+    if (produtosSugeridos.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align:center;padding:14px;color:#10b981;font-weight:600;">
+                    ✅ Todos os artigos do ramo <strong>"${escapeHTML(FABEF.ramo || 'Geral')}"</strong> estão com níveis regulares de stock. Não há compras urgentes recomendadas.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const fornecedoresDoRamo = (FABEF.fornecedores || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
+
+    tbody.innerHTML = produtosSugeridos.map(p => {
+        const stockAtual = numero(p.stock);
+        const stockMin = numero(p.minimo || p.stockMinimo || 5);
+        const comprasDoProduto = (FABEF.compras || [])
+            .filter(c => c.produtoId === p.id && (!c.ramo || c.ramo === FABEF.ramo))
+            .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+
+        const ultCompra = comprasDoProduto[0];
+        const fornecedorSugerido = ultCompra?.fornecedorNome || (fornecedoresDoRamo[0]?.nome || "Fornecedor do Ramo");
+        const custoSugerido = ultCompra?.custoUnitario || p.custo || 0;
+        const qtdSugerida = Math.max(1, (stockMin * 2) - stockAtual);
+
+        return `
+            <tr>
+                <td><strong>${escapeHTML(p.nome)}</strong></td>
+                <td><span style="color:${stockAtual === 0 ? '#ef4444' : '#f59e0b'};font-weight:700;">${stockAtual} un</span></td>
+                <td>${stockMin} un</td>
+                <td><span style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;">${escapeHTML(fornecedorSugerido)}</span></td>
+                <td>${dinheiro(custoSugerido)}</td>
+                <td>
+                    <button class="btn btn-primary btn-small" type="button" onclick="prepararCompraArtigo('${escapeHTML(p.id)}', '${escapeHTML(fornecedorSugerido)}', ${custoSugerido}, ${qtdSugerida})" style="background:#2563eb;color:#fff;font-weight:700;padding:5px 10px;font-size:12px;border:none;border-radius:6px;cursor:pointer;">
+                        🛒 Preparar Compra (${qtdSugerida} un)
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join("");
+};
+
+window.prepararCompraArtigo = function(produtoId, fornecedorNome, custoUnit, qtd) {
+    const selProd = document.getElementById("compra-produto");
+    if (selProd) selProd.value = produtoId;
+    const inputForn = document.getElementById("compra-fornecedor");
+    if (inputForn) inputForn.value = fornecedorNome;
+    const inputCusto = document.getElementById("compra-custo");
+    if (inputCusto) inputCusto.value = custoUnit;
+    const inputQtd = document.getElementById("compra-quantidade");
+    if (inputQtd) {
+        inputQtd.value = qtd || 1;
+        inputQtd.focus();
+    }
+    document.getElementById("compra-produto")?.scrollIntoView({ behavior: "smooth", block: "center" });
+};
 
 
 document.getElementById("btn-registar-compra").addEventListener("click", registarCompra);
@@ -2968,6 +3104,8 @@ function renderCompras() {
         </td>
     </tr>
     `;
+
+    if (typeof renderSugestoesComprasRamo === "function") renderSugestoesComprasRamo();
 }
 
 
@@ -4121,9 +4259,12 @@ function renderFornecedores() {
 
     const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
 
-    tabelaCorpo.innerHTML = FABEF.fornecedores.map(f => {
+    // Fornecedores isolados para o respetivo ramo (não mistura fornecedores)
+    const fornecedoresDoRamo = (FABEF.fornecedores || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
+
+    tabelaCorpo.innerHTML = fornecedoresDoRamo.map(f => {
         const divida = numero(f.divida);
-        const compras = FABEF.compras.filter(c => (c.fornecedorNome || "").toLowerCase() === (f.nome || "").toLowerCase());
+        const compras = (FABEF.compras || []).filter(c => (!c.ramo || c.ramo === FABEF.ramo) && (c.fornecedorNome || "").toLowerCase() === (f.nome || "").toLowerCase());
         return `
     <tr>
         <td>
@@ -4217,6 +4358,18 @@ function guardarDividasLocalmente() {
 }
 
 async function adicionarCliente() {
+    let perfilAtual = "gerente";
+    if (window.FABEF?.isDemoMode) {
+        perfilAtual = window.FABEF.demoPerfil || "gerente";
+    } else if (FABEF.userData) {
+        perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
+    }
+
+    if (perfilAtual === "gerente") {
+        alert("🔒 Acesso Restrito:\n\nO Gerente não tem permissão para registar clientes. Esta missão é exclusiva dos Funcionários no atendimento.");
+        return;
+    }
+
     const idCustom = document.getElementById("cliente-id")?.value.trim() || "";
     const nome = document.getElementById("cliente-nome").value.trim();
     const telefone = document.getElementById("cliente-telefone").value.trim();
@@ -4481,6 +4634,18 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
 
 
 async function registarDivida() {
+    let perfilAtual = "gerente";
+    if (window.FABEF?.isDemoMode) {
+        perfilAtual = window.FABEF.demoPerfil || "gerente";
+    } else if (FABEF.userData) {
+        perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
+    }
+
+    if (perfilAtual === "gerente") {
+        alert("🔒 Acesso Restrito:\n\nO Gerente não tem permissão para registar dívidas (fiado). Esta missão é exclusiva dos Funcionários no atendimento.");
+        return;
+    }
+
     const cliente = document.getElementById("divida-cliente").value.trim();
     const telefone = document.getElementById("divida-telefone").value.trim();
     const valor = numero(document.getElementById("divida-valor").value);
@@ -5851,7 +6016,8 @@ function renderFuncionarios(){
 
         const acoes = souGerente ? `
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario('${escapeHTML(f.id)}')" style="background:#f59e0b;color:#fff;font-weight:700;" title="Adicionar gasto ou vale na conta deste funcionário">➕ Gasto</button>
+                <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial('${escapeHTML(f.id)}')" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale)">💸 Vale</button>
+                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario('${escapeHTML(f.id)}')" style="background:#f59e0b;color:#fff;font-weight:700;" title="Adicionar outros gastos ou vales na conta">➕ Gasto</button>
                 <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario('${escapeHTML(f.id)}')">✏️ Editar</button>
                 <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario('${escapeHTML(f.id)}')">${ativo ? '🚫 Desativar' : '✅ Reativar'}</button>
             </div>` : "—";
@@ -7909,8 +8075,42 @@ window.abrirModalGastoFuncionario = function(funcionarioId) {
     setTimeout(() => inputValor?.focus(), 150);
 };
 
+window.abrirModalAdiantamentoSalarial = function(funcionarioId) {
+    const modal = document.getElementById("modal-gasto-funcionario");
+    if (!modal) return;
+
+    const select = document.getElementById("gasto-func-select");
+    if (select) {
+        const lista = (FABEF.funcionarios || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
+        select.innerHTML = lista.map(f => `<option value="${escapeHTML(f.id)}">${escapeHTML(f.nome)} (${escapeHTML(f.telefone || f.email || 'Funcionário')})</option>`).join("") || `<option value="">Nenhum funcionário cadastrado</option>`;
+        if (funcionarioId) select.value = funcionarioId;
+    }
+
+    const selectTipo = document.getElementById("gasto-func-tipo");
+    if (selectTipo) selectTipo.value = "Adiantamento de Salário (Vale)";
+
+    const inputData = document.getElementById("gasto-func-data");
+    if (inputData) inputData.value = dataHojeStr();
+
+    const inputValor = document.getElementById("gasto-func-valor");
+    if (inputValor) inputValor.value = "";
+
+    const inputDesc = document.getElementById("gasto-func-descricao");
+    if (inputDesc) inputDesc.value = "Adiantamento salarial / vale a descontar no final do mês";
+
+    const chkDespesa = document.getElementById("gasto-func-lancar-despesa");
+    if (chkDespesa) chkDespesa.checked = true;
+
+    modal.classList.add("show");
+    setTimeout(() => inputValor?.focus(), 150);
+};
+
 document.getElementById("btn-abrir-modal-gasto-func")?.addEventListener("click", () => {
     abrirModalGastoFuncionario();
+});
+
+document.getElementById("btn-adiantamento-salarial")?.addEventListener("click", () => {
+    abrirModalAdiantamentoSalarial();
 });
 
 document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click", async () => {
@@ -7953,13 +8153,22 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
             criadoEm: serverTimestamp()
         };
 
-        const ref = await addDoc(subRef("gastos_funcionarios"), payloadGasto);
+        let idGasto = "gasto_" + Date.now();
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            try {
+                const ref = await addDoc(subRef("gastos_funcionarios"), payloadGasto);
+                idGasto = ref.id;
+            } catch (fbErr) {
+                console.warn("Aviso ao guardar gasto no Firestore:", fbErr);
+            }
+        }
+
         if (!FABEF.gastosFuncionarios) FABEF.gastosFuncionarios = [];
-        FABEF.gastosFuncionarios.push({ id: ref.id, ...payloadGasto, criadoEm: undefined });
+        FABEF.gastosFuncionarios.push({ id: idGasto, ...payloadGasto, criadoEm: undefined });
 
         // Lança também como despesa operacional se solicitado
         if (lancarDespesa) {
-            await addDoc(subRef("despesas"), {
+            const payloadDesp = {
                 descricao: `Gasto Func.: ${funcionarioNome} (${tipoGasto} - ${descricao})`,
                 valor,
                 categoria: "Pessoal / Salários",
@@ -7968,7 +8177,13 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
                 ramo: FABEF.ramo,
                 criadoPor: quemRegistou,
                 criadoEm: serverTimestamp()
-            }).catch(e => console.warn("Aviso ao registar despesa reflexa:", e));
+            };
+            if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+                await addDoc(subRef("despesas"), payloadDesp).catch(e => console.warn("Aviso ao registar despesa reflexa:", e));
+            }
+            if (!FABEF.despesas) FABEF.despesas = [];
+            FABEF.despesas.push({ id: "desp_" + Date.now(), ...payloadDesp });
+            if (typeof renderDespesas === "function") renderDespesas();
         }
 
         await gravarAuditoria(`💳 GASTO NA CONTA: Registado ${dinheiro(valor)} para o funcionário ${funcionarioNome} (${tipoGasto} - "${descricao}") por ${quemRegistou}.`, "INFO");
@@ -7976,12 +8191,12 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
         fecharModal("modal-gasto-funcionario");
         renderGastosFuncionarios();
         renderFuncionarios();
-        renderDesempenho();
+        if (typeof renderDesempenho === "function") renderDesempenho();
 
-        alert(`✅ Gasto de ${dinheiro(valor)} registado com sucesso na conta de ${funcionarioNome}!`);
+        alert(`✅ Registado com sucesso na conta de ${funcionarioNome}!\n\nTipo: ${tipoGasto}\nValor: ${dinheiro(valor)}`);
     } catch(err) {
         console.error("Erro ao guardar gasto do funcionário:", err);
-        alert("Erro ao guardar gasto:\n" + mensagemFirebase(err));
+        alert("Erro ao guardar gasto:\n" + (err.message || err));
     }
 });
 
@@ -8047,6 +8262,18 @@ document.getElementById("btn-pos-novo-cliente")?.addEventListener("click", () =>
 });
 
 document.getElementById("btn-salvar-pos-rapido-cliente")?.addEventListener("click", async () => {
+    let perfilAtual = "gerente";
+    if (window.FABEF?.isDemoMode) {
+        perfilAtual = window.FABEF.demoPerfil || "gerente";
+    } else if (FABEF.userData) {
+        perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
+    }
+
+    if (perfilAtual === "gerente") {
+        alert("🔒 Acesso Restrito:\n\nO Gerente não tem permissão para registar clientes. Esta missão é exclusiva dos Funcionários no atendimento.");
+        return;
+    }
+
     const nome = (document.getElementById("pos-rapido-cliente-nome")?.value || "").trim();
     const telefone = (document.getElementById("pos-rapido-cliente-telefone")?.value || "").trim();
     const limiteCredito = numero(document.getElementById("pos-rapido-cliente-limite")?.value) || 0;
@@ -8213,6 +8440,7 @@ function renderTudo() {
     if (typeof renderMetas === "function") renderMetas();
     if (typeof renderDesempenho === "function") renderDesempenho();
     if (typeof renderSugestoes === "function") renderSugestoes();
+    if (typeof renderSugestoesComprasRamo === "function") renderSugestoesComprasRamo();
     if (typeof renderConfiguracoes === "function") renderConfiguracoes();
     if (typeof verificarSubscricao === "function") verificarSubscricao();
 }
@@ -8493,27 +8721,46 @@ window.addEventListener("beforeinstallprompt", (e) => {
     deferredPromptInstalacao = e;
 });
 
-const acionarInstalacaoPWA = async () => {
+window.acionarInstalacaoPWA = async function() {
     if (deferredPromptInstalacao) {
         deferredPromptInstalacao.prompt();
         const { outcome } = await deferredPromptInstalacao.userChoice;
         if (outcome === "accepted") {
-            toast("✅ Aplicativo adicionado ao seu ecrã!");
+            if (typeof toast === "function") toast("✅ Aplicativo adicionado ao seu ecrã!");
+            else alert("✅ Aplicativo instalado com sucesso no seu dispositivo!");
         }
         deferredPromptInstalacao = null;
     } else {
-        alert(
-            "📱 Como colocar o FABEF ERP no ecrã do seu celular:\n\n" +
-            "• No Android (Chrome):\n" +
-            "Toque no menu ⋮ (3 pontos) no canto superior direito e selecione 'Instalar aplicativo' ou 'Adicionar ao ecrã principal'.\n\n" +
-            "• No iPhone / iPad (Safari):\n" +
-            "Toque no botão Partilhar 📤 na barra inferior e toque em 'Adicionar ao Ecrã Principal ➕'."
-        );
+        const modalPWA = document.getElementById("modal-instalar-celular");
+        if (modalPWA) {
+            modalPWA.classList.add("show");
+        } else {
+            alert(
+                "📱 Como colocar o FABEF ERP no ecrã do seu celular:\n\n" +
+                "• No Android (Chrome):\n" +
+                "Toque no menu ⋮ (3 pontos) no canto superior direito e selecione 'Instalar aplicativo' ou 'Adicionar ao ecrã principal'.\n\n" +
+                "• No iPhone / iPad (Safari):\n" +
+                "Toque no botão Partilhar 📤 na barra inferior e toque em 'Adicionar ao Ecrã Principal ➕'."
+            );
+        }
     }
 };
 
-document.getElementById("btn-instalar-app")?.addEventListener("click", acionarInstalacaoPWA);
-document.getElementById("btn-sidebar-instalar")?.addEventListener("click", acionarInstalacaoPWA);
+const acionarInstalacaoPWA = window.acionarInstalacaoPWA;
+
+document.getElementById("btn-instalar-app")?.addEventListener("click", window.acionarInstalacaoPWA);
+document.getElementById("btn-sidebar-instalar")?.addEventListener("click", window.acionarInstalacaoPWA);
+document.getElementById("btn-instalar-app-login")?.addEventListener("click", window.acionarInstalacaoPWA);
+document.getElementById("btn-instalar-app-pin")?.addEventListener("click", window.acionarInstalacaoPWA);
+
+// Registo automático do Service Worker para suporte PWA
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./service-worker.js").catch(err => {
+            console.warn("Aviso ao registar Service Worker PWA:", err);
+        });
+    });
+}
 
 
 async function abrirCaixaAutomatico(saldoInicial = 0) {
