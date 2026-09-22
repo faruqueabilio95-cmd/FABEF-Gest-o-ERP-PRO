@@ -1558,18 +1558,16 @@ function escutarColecao(nome, estado) {
 }
 
 /* =====================================================
-   MÓDULO LÓGICO: INDICADOR DE LIGAÇão / MODO OFFLINE
+   MÓDULO LÓGICO: INDICADOR DE LIGAÇÃO / MODO OFFLINE
 ===================================================== */
 function atualizarIndicadorLigacao() {
     const indicador = document.getElementById("indicador-ligacao");
     if (!indicador) return;
     if (navigator.onLine) {
-        indicador.textContent = "🟢 Online";
-        indicador.style.color = "#10b981";
+        indicador.innerHTML = '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;margin-right:5px;vertical-align:middle;"></span><span style="color:#10b981;font-weight:700;vertical-align:middle;">Online</span>';
         indicador.title = "Ligado à internet — os dados sincronizam em tempo real.";
     } else {
-        indicador.textContent = "🔴 Offline";
-        indicador.style.color = "#ef4444";
+        indicador.innerHTML = '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#ef4444;box-shadow:0 0 6px #ef4444;margin-right:5px;vertical-align:middle;"></span><span style="color:#ef4444;font-weight:700;vertical-align:middle;">Offline</span>';
         indicador.title = "Sem internet. Pode continuar a vender e a trabalhar — tudo será sincronizado assim que a ligação voltar.";
     }
 }
@@ -6997,59 +6995,59 @@ function renderPastaRamos() {
         const temSenha = Boolean(r.senha && r.senha.trim());
 
         return `
-            <div class="card card-ramo-pasta" style="border: 2px solid ${ehAtivo ? '#10b981' : '#cbd5e1'}; background:${ehAtivo ? '#f0fdf4' : '#ffffff'}; padding:16px; border-radius:12px; position:relative; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06);">
+            <div class="card card-ramo-pasta" style="border: 2px solid ${ehAtivo ? '#10b981' : '#cbd5e1'}; background:${ehAtivo ? '#f0fdf4' : '#ffffff'}; padding:16px; border-radius:12px; position:relative; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06); color:#0f172a !important;">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span style="font-size:32px;">📁</span>
                         <div>
                             <h4 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">${escapeHTML(r.nome)}</h4>
-                            <small style="color:#64748b;font-weight:500;">${escapeHTML(r.tipo || r.nome)}</small>
+                            <small style="color:#64748b;font-weight:600;">${escapeHTML(r.tipo || r.nome)}</small>
                         </div>
                     </div>
                     <div>
                         ${ehAtivo 
-                            ? `<span class="badge badge-green" style="font-size:11px;padding:3px 8px;">✅ Ativo</span>` 
-                            : `<span class="badge badge-yellow" style="font-size:11px;padding:3px 7px;">Alternativo</span>`
+                            ? `<span class="badge badge-green" style="font-size:11px;padding:3px 8px;font-weight:700;">✅ Ativo</span>` 
+                            : `<span class="badge badge-yellow" style="font-size:11px;padding:3px 7px;font-weight:700;">Alternativo</span>`
                         }
                     </div>
                 </div>
 
-                <div style="background:rgba(0,0,0,0.03);padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="background:${ehAtivo ? '#e6f7ec' : '#f8fafc'};padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border:1px solid ${ehAtivo ? '#bbf7d0' : '#e2e8f0'};color:#0f172a;">
                     <div>
-                        <span style="color:#64748b;display:block;font-size:11px;">📦 Artigos:</span>
-                        <strong>${totalProds} no stock</strong>
+                        <span style="color:#475569;display:block;font-size:11px;font-weight:700;">📦 Artigos:</span>
+                        <strong style="color:#0f172a;font-size:14px;display:block;margin-top:2px;">${totalProds} no stock</strong>
                     </div>
                     <div>
-                        <span style="color:#64748b;display:block;font-size:11px;">💰 Vendas Hoje:</span>
-                        <strong>${dinheiro(totalHojeRamo)}</strong>
+                        <span style="color:#475569;display:block;font-size:11px;font-weight:700;">💰 Vendas Hoje:</span>
+                        <strong style="color:${totalHojeRamo > 0 ? '#059669' : '#0f172a'};font-size:14px;display:block;margin-top:2px;">${dinheiro(totalHojeRamo)}</strong>
                     </div>
-                    <div style="grid-column:1/-1;border-top:1px dashed #cbd5e1;padding-top:6px;font-size:12px;">
+                    <div style="grid-column:1/-1;border-top:1px dashed #cbd5e1;padding-top:8px;margin-top:2px;font-size:12px;">
                         ${temSenha 
-                            ? `<span style="color:#b45309;font-weight:600;">🔒 Protegido com Senha</span>` 
-                            : `<span style="color:#10b981;font-weight:600;">🔓 Acesso Livre</span>`
+                            ? `<span style="color:#b45309;font-weight:700;display:inline-flex;align-items:center;gap:4px;">🔒 Protegido com Senha</span>` 
+                            : `<span style="color:#059669;font-weight:700;display:inline-flex;align-items:center;gap:4px;">🔓 Acesso Livre</span>`
                         }
                     </div>
                 </div>
 
                 <div style="display:flex;gap:8px;flex-direction:column;">
                     ${ehAtivo ? `
-                        <button class="btn btn-success btn-small" type="button" style="width:100%;font-weight:700;" disabled>
+                        <button class="btn btn-success btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#10b981;color:#fff;border:none;border-radius:8px;" disabled>
                             ✔ Ramo Selecionado Agora
                         </button>
                     ` : `
-                        <button class="btn btn-primary btn-small" type="button" style="width:100%;font-weight:700;" onclick="alternarRamoPasta('${escapeHTML(r.nome)}')">
+                        <button class="btn btn-primary btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;" onclick="alternarRamoPasta('${escapeHTML(r.nome)}')">
                             📂 Alternar para este Ramo
                         </button>
                     `}
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <button class="btn btn-light btn-small" type="button" style="flex:1;font-size:11px;font-weight:700;color:#1e40af;border:1px solid #bfdbfe;" onclick="abrirConfiguracoesRamo('${escapeHTML(r.nome)}')">
+                        <button class="btn btn-light btn-small" type="button" style="flex:1;min-width:120px;font-size:12px;font-weight:700;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;padding:8px 10px;border-radius:6px;cursor:pointer;" onclick="abrirConfiguracoesRamo('${escapeHTML(r.nome)}')">
                             ⚙️ Configurar Ramo
                         </button>
-                        <button class="btn btn-light btn-small" type="button" style="font-size:11px;font-weight:600;" onclick="alterarPinRamo('${escapeHTML(r.nome)}')">
+                        <button class="btn btn-light btn-small" type="button" style="font-size:12px;font-weight:600;padding:8px 10px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;border-radius:6px;cursor:pointer;" onclick="alterarPinRamo('${escapeHTML(r.nome)}')">
                             🔑 ${temSenha ? 'Alterar PIN' : 'Definir PIN'}
                         </button>
                         ${!ehAtivo ? `
-                        <button class="btn btn-light btn-small" type="button" style="color:#ef4444;font-size:11px;font-weight:600;" onclick="removerRamoPasta('${escapeHTML(r.nome)}')" title="Remover este ramo da pasta">
+                        <button class="btn btn-light btn-small" type="button" style="color:#ef4444;font-size:13px;font-weight:600;padding:8px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:6px;cursor:pointer;" onclick="removerRamoPasta('${escapeHTML(r.nome)}')" title="Remover este ramo da pasta">
                             🗑️
                         </button>
                         ` : ''}
