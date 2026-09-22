@@ -1548,6 +1548,19 @@ function escutarColecao(nome, estado) {
                     }
                 } catch(e){}
             }
+            if (estado === "gastosFuncionarios") {
+                try {
+                    const localRaw = localStorage.getItem("fabef_local_gastos_" + FABEF.empresaId);
+                    if (localRaw) {
+                        const localG = JSON.parse(localRaw);
+                        localG.forEach(g => {
+                            if (!dados.some(d => d.id === g.id)) {
+                                dados.push(g);
+                            }
+                        });
+                    }
+                } catch(e){}
+            }
             if(COLECOES_POR_DIA.has(nome)){ FABEF._raw=FABEF._raw||{}; FABEF._raw[nome]=dados; } else FABEF[estado]=dados;
             aplicarFiltroDia();
             if(estado==="produtos") verificarReconciliacaoStock();
@@ -3687,6 +3700,7 @@ async function finalizarVenda() {
 
     try {
         const vendaRef = doc(subRef("vendas"));
+        const novaVendaId = vendaRef.id;
 
         /*
          COMPATÍVEL COM OFFLINE: em vez de uma transação (que exige ligação
@@ -3909,15 +3923,20 @@ function renderVendas() {
             <td>${escapeHTML(v.nuitCliente || "Isento")}</td>
             <td>${escapeHTML(v.ramo || "—")}</td>
             <td>
-                <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
-                    <button class="btn btn-light btn-small" onclick="imprimirReciboVenda('${escapeHTML(v.id)}')" type="button" title="Imprimir Recibo Térmico ou A4">🖨️ Recibo</button>
-                    <button class="btn btn-success btn-small" onclick="enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;" title="Enviar Recibo pelo WhatsApp">📱 WhatsApp</button>
-                    <button class="btn btn-primary btn-small" onclick="abrirModalEditarVenda('${escapeHTML(v.id)}')" type="button" style="background:#2563eb;color:#fff;font-weight:700;" title="Editar valor, forma de pagamento ou cliente desta venda">✏️ Editar</button>
-                    <button class="btn btn-small" onclick="apagarVenda('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;" title="Apagar definitivamente esta venda errada e repor stock">🗑️ Apagar</button>
-                    ${!ehFalhada ? `
-                        <button class="btn btn-small" onclick="abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:11px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar</button>
-                    ` : ""}
-                </div>
+                <details class="pasta-acoes-venda" style="display:inline-block;position:relative;">
+                    <summary class="btn btn-small" style="cursor:pointer;list-style:none;background:#f8fafc;border:1.5px solid #cbd5e1;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;color:#1e293b;display:inline-flex;align-items:center;gap:6px;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,0.05);white-space:nowrap;">
+                        📁 Opções da Venda ▾
+                    </summary>
+                    <div style="position:absolute;right:0;top:calc(100% + 4px);z-index:90;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);min-width:190px;padding:6px;display:flex;flex-direction:column;gap:5px;">
+                        <button class="btn btn-light btn-small" onclick="this.closest('details').removeAttribute('open'); imprimirReciboVenda('${escapeHTML(v.id)}')" type="button" style="text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;" title="Imprimir Recibo Térmico ou A4">🖨️ Imprimir Recibo</button>
+                        <button class="btn btn-success btn-small" onclick="this.closest('details').removeAttribute('open'); enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;color:#fff;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;border:none;" title="Enviar Recibo pelo WhatsApp">📱 Enviar WhatsApp</button>
+                        <button class="btn btn-primary btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalEditarVenda('${escapeHTML(v.id)}')" type="button" style="background:#2563eb;color:#fff;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;border:none;" title="Editar valor, forma de pagamento ou cliente">✏️ Editar Venda</button>
+                        ${!ehFalhada ? `
+                            <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:12px;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;border-radius:6px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar ao Gerente</button>
+                        ` : ""}
+                        <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); apagarVenda('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;" title="Apagar definitivamente e repor stock">🗑️ Apagar Venda</button>
+                    </div>
+                </details>
             </td>
         </tr>`;
     }).join("") || `<tr><td colspan="8" style="text-align:center;color:#64748b;">Nenhuma operação de venda localizada nos critérios definidos.</td></tr>`;
@@ -5990,6 +6009,17 @@ function renderFuncionarios(){
     const tabela = document.getElementById("tabela-funcionarios");
     if (!tabela) return;
 
+    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const gerenteId = "gerente_" + (FABEF.user?.uid || "admin");
+    const gastosGerente = (FABEF.gastosFuncionarios || []).filter(g => g.funcionarioId === gerenteId || g.funcionarioId === (FABEF.user?.uid || "gerente") || g.funcionarioId?.startsWith("gerente"));
+    const totalGastosGerente = gastosGerente.reduce((s, g) => s + numero(g.valor), 0);
+
+    const acoesGerente = souGerente ? `
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial('${escapeHTML(gerenteId)}')" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale) do Gerente">💸 Vale</button>
+            <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario('${escapeHTML(gerenteId)}')" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales do Gerente">➕ Gasto</button>
+        </div>` : "—";
+
     const gerente = `
         <tr style="background:#f8fafc;">
             <td><strong>${escapeHTML(FABEF.userData?.nome || "Gerente Principal")}</strong></td>
@@ -5997,17 +6027,18 @@ function renderFuncionarios(){
             <td>${escapeHTML(FABEF.empresa?.telefone || "—")}</td>
             <td><span class="badge" style="background:#0284c7;color:#fff;">Todos os Ramos</span></td>
             <td><span class="badge badge-green" style="background-color:#0f172a;color:#fff;">GERENTE</span></td>
-            <td><span style="color:#64748b;font-size:12px;">—</span></td>
+            <td>
+                <strong style="${totalGastosGerente > 0 ? 'color:#b45309;' : 'color:#64748b;'}">${dinheiro(totalGastosGerente)}</strong>
+                ${gastosGerente.length > 0 ? `<small style="display:block;color:#64748b;font-size:11px;">(${gastosGerente.length} registo${gastosGerente.length > 1 ? 's' : ''})</small>` : ''}
+            </td>
             <td><span class="badge badge-green">ATIVO</span></td>
-            <td>—</td>
+            <td>${acoesGerente}</td>
         </tr>`;
 
-    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    // Mostra os funcionários do ramo ou todos da empresa se for Gerente
+    const listaFuncionarios = (FABEF.funcionarios || []).filter(f => souGerente || !f.ramo || f.ramo === FABEF.ramo);
 
-    // Mostra apenas os funcionários pertencentes ao ramo atual ou que tenham sido cadastrados neste ramo
-    const listaFuncionariosDoRamo = (FABEF.funcionarios || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
-
-    const funcionarios = listaFuncionariosDoRamo.map(f => {
+    const funcionarios = listaFuncionarios.map(f => {
         const ativo = (f.estado || "ATIVO") === "ATIVO";
         const gastosDoFunc = (FABEF.gastosFuncionarios || []).filter(g => g.funcionarioId === f.id);
         const totalGastos = gastosDoFunc.reduce((s, g) => s + numero(g.valor), 0);
@@ -6015,7 +6046,7 @@ function renderFuncionarios(){
         const acoes = souGerente ? `
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
                 <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial('${escapeHTML(f.id)}')" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale)">💸 Vale</button>
-                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario('${escapeHTML(f.id)}')" style="background:#f59e0b;color:#fff;font-weight:700;" title="Adicionar outros gastos ou vales na conta">➕ Gasto</button>
+                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario('${escapeHTML(f.id)}')" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales na conta">➕ Gasto</button>
                 <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario('${escapeHTML(f.id)}')">✏️ Editar</button>
                 <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario('${escapeHTML(f.id)}')">${ativo ? '🚫 Desativar' : '✅ Reativar'}</button>
             </div>` : "—";
@@ -8049,16 +8080,44 @@ window.salvarAvaliacaoFuncionario = async function(funcionarioId, avaliacao) {
 /* =====================================================
    MÓDULO LÓGICO: GASTOS NA CONTA DO FUNCIONÁRIO (VALES, ADIANTAMENTOS)
 ===================================================== */
+function popularSelectFuncionariosGasto(funcionarioId) {
+    const select = document.getElementById("gasto-func-select");
+    if (!select) return;
+
+    const options = [];
+    const gerenteId = "gerente_" + (FABEF.user?.uid || "admin");
+    const gerenteNome = FABEF.userData?.nome || "Gerente Principal";
+
+    // 1. Opção do Gerente Principal
+    options.push({
+        id: gerenteId,
+        nome: `${gerenteNome} (Gerente Principal - Todos os Ramos)`,
+        selected: funcionarioId === gerenteId || (!funcionarioId && !(FABEF.funcionarios || []).length)
+    });
+
+    // 2. Todos os funcionários da empresa
+    const funcs = FABEF.funcionarios || [];
+    funcs.forEach(f => {
+        const ramoTxt = f.ramo ? ` [${f.ramo}]` : '';
+        const telTxt = f.telefone || f.email || 'Funcionário';
+        options.push({
+            id: f.id,
+            nome: `${f.nome}${ramoTxt} (${telTxt})`,
+            selected: funcionarioId === f.id
+        });
+    });
+
+    select.innerHTML = options.map(opt => `<option value="${escapeHTML(opt.id)}" ${opt.selected ? 'selected' : ''}>${escapeHTML(opt.nome)}</option>`).join("");
+    if (funcionarioId) {
+        select.value = funcionarioId;
+    }
+}
+
 window.abrirModalGastoFuncionario = function(funcionarioId) {
     const modal = document.getElementById("modal-gasto-funcionario");
     if (!modal) return;
 
-    const select = document.getElementById("gasto-func-select");
-    if (select) {
-        const lista = (FABEF.funcionarios || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
-        select.innerHTML = lista.map(f => `<option value="${escapeHTML(f.id)}">${escapeHTML(f.nome)} (${escapeHTML(f.telefone || f.email || 'Funcionário')})</option>`).join("") || `<option value="">Nenhum funcionário cadastrado</option>`;
-        if (funcionarioId) select.value = funcionarioId;
-    }
+    popularSelectFuncionariosGasto(funcionarioId);
 
     const inputData = document.getElementById("gasto-func-data");
     if (inputData) inputData.value = dataHojeStr();
@@ -8077,12 +8136,7 @@ window.abrirModalAdiantamentoSalarial = function(funcionarioId) {
     const modal = document.getElementById("modal-gasto-funcionario");
     if (!modal) return;
 
-    const select = document.getElementById("gasto-func-select");
-    if (select) {
-        const lista = (FABEF.funcionarios || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
-        select.innerHTML = lista.map(f => `<option value="${escapeHTML(f.id)}">${escapeHTML(f.nome)} (${escapeHTML(f.telefone || f.email || 'Funcionário')})</option>`).join("") || `<option value="">Nenhum funcionário cadastrado</option>`;
-        if (funcionarioId) select.value = funcionarioId;
-    }
+    popularSelectFuncionariosGasto(funcionarioId);
 
     const selectTipo = document.getElementById("gasto-func-tipo");
     if (selectTipo) selectTipo.value = "Adiantamento de Salário (Vale)";
@@ -8164,6 +8218,11 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
         if (!FABEF.gastosFuncionarios) FABEF.gastosFuncionarios = [];
         FABEF.gastosFuncionarios.push({ id: idGasto, ...payloadGasto, criadoEm: undefined });
 
+        // Guarda cópia no armazenamento local para resiliência imediata
+        try {
+            localStorage.setItem("fabef_local_gastos_" + FABEF.empresaId, JSON.stringify(FABEF.gastosFuncionarios || []));
+        } catch(e) {}
+
         // Lança também como despesa operacional se solicitado
         if (lancarDespesa) {
             const payloadDesp = {
@@ -8204,7 +8263,7 @@ function renderGastosFuncionarios() {
 
     const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
     const lista = (FABEF.gastosFuncionarios || [])
-        .filter(g => !g.ramo || g.ramo === FABEF.ramo)
+        .filter(g => souGerente || !g.ramo || g.ramo === FABEF.ramo)
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
 
     corpo.innerHTML = lista.map(g => `
@@ -8232,6 +8291,9 @@ window.eliminarGastoFuncionario = async function(gastoId) {
     try {
         await deleteDoc(doc(db, "empresas", FABEF.empresaId, "gastos_funcionarios", gastoId));
         FABEF.gastosFuncionarios = (FABEF.gastosFuncionarios || []).filter(g => g.id !== gastoId);
+        try {
+            localStorage.setItem("fabef_local_gastos_" + FABEF.empresaId, JSON.stringify(FABEF.gastosFuncionarios || []));
+        } catch(e) {}
         await gravarAuditoria(`Gerente eliminou registo de gasto de funcionário (#${gastoId.slice(0, 6)}).`, "ALERTA");
         renderGastosFuncionarios();
         renderFuncionarios();
