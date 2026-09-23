@@ -2446,6 +2446,16 @@ function limparProdutoForm() {
 
     const stockMinimoInput = document.getElementById("novo-produto-minimo");
     if (stockMinimoInput) stockMinimoInput.value = "5";
+
+    const selUnidade = document.getElementById("novo-produto-unidade");
+    if (selUnidade) {
+        const ramoLower = String(FABEF.ramo || "").toLowerCase();
+        if (ramoLower.includes("talho") || ramoLower.includes("açougue") || ramoLower.includes("acougue") || ramoLower.includes("peixaria")) {
+            selUnidade.value = "kg";
+        } else {
+            selUnidade.value = "unidade";
+        }
+    }
 }
 
 
@@ -3180,13 +3190,12 @@ function renderPOS() {
         if (p.cor) atributos.push(`Cor: ${escapeHTML(p.cor)}`);
         const atrBadge = atributos.length ? `<small style="color:#0284c7;font-weight:600;display:block;margin:2px 0;">${atributos.join(" | ")}</small>` : "";
 
-        const unidadeNormalizada = (p.unidade || "").toLowerCase();
-        const ehPesavel = unidadeNormalizada === "kg" || unidadeNormalizada === "g" || unidadeNormalizada === "litro";
+        const ehPesavel = ehArtigoPesavel(p);
 
         const botoesOpcaoVenda = ehPesavel ? `
             <div style="display:flex;gap:4px;width:100%;margin-top:6px;z-index:2;" onclick="event.stopPropagation();">
-                <button type="button" class="btn btn-small btn-primary" onclick="abrirModalVendaFracionadaById('${escapeHTML(p.id)}', 'peso')" style="flex:1;padding:4px 2px;font-size:11px;font-weight:700;" title="Vender indicando o peso exato em KG ou Gramas">⚖️ Vender KG</button>
-                <button type="button" class="btn btn-small btn-light" onclick="abrirModalVendaFracionadaById('${escapeHTML(p.id)}', 'valor')" style="flex:1;padding:4px 2px;font-size:11px;font-weight:700;color:#1e3a8a;border:1px solid #93c5fd;" title="Vender indicando o valor em Meticais (calcula os KG automaticamente)">💵 Digitar MT</button>
+                <button type="button" class="btn btn-small btn-primary" onclick="abrirModalVendaFracionadaById('${escapeHTML(p.id)}', 'peso')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o peso exato na balança em KG ou Gramas">⚖️ Pesar KG</button>
+                <button type="button" class="btn btn-small btn-light" onclick="abrirModalVendaFracionadaById('${escapeHTML(p.id)}', 'valor')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;color:#1e3a8a;border:1px solid #93c5fd;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o valor em Meticais (calcula os KG automaticamente)">💵 Digitar MT</button>
             </div>
         ` : "";
 
@@ -3231,8 +3240,30 @@ function renderPOS() {
 
 
 /* =====================================================
-   MÓDULO LÓGICO: ADIÇão E CONTROLO DE STOCK DO CARRINHO
+   MÓDULO LÓGICO: ADIÇÃO E CONTROLO DE STOCK DO CARRINHO
 ===================================================== */
+
+function ehArtigoPesavel(produto) {
+    if (!produto) return false;
+    const u = String(produto.unidade || "").toLowerCase().trim();
+    if (["kg", "kilo", "kilos", "quilo", "quilos", "quilograma", "g", "gr", "grama", "gramas", "litro", "litros", "l"].includes(u)) {
+        return true;
+    }
+    if (produto.vendaPorPeso || produto.fracionado) return true;
+
+    // Atividades que exigem kg por padrão (Talho / Açougue / Peixaria / Granel)
+    const ramo = String(produto.ramo || FABEF.ramo || "").toLowerCase();
+    const nome = String(produto.nome || "").toLowerCase();
+    if (ramo.includes("talho") || ramo.includes("açougue") || ramo.includes("acougue") || ramo.includes("peixaria")) {
+        if (!produto.unidade || u === "kg" || u === "g" || u === "unidade") {
+            return true;
+        }
+    }
+    if (nome.includes("/kg") || nome.includes("/ kg") || nome.includes(" ao kg") || nome.includes(" p/ kg") || nome.includes("(kg)")) {
+        return true;
+    }
+    return false;
+}
 
 window.abrirModalVendaFracionadaById = function(produtoId, modoInicial) {
     const produto = (FABEF.produtos || []).find(p => p.id === produtoId);
@@ -3267,10 +3298,10 @@ async function adicionarCarrinho(id) {
         return;
     }
 
-    const unidadeFracionada = produto.unidade === "kg" || produto.unidade === "litro" || produto.unidade === "g";
+    const unidadeFracionada = ehArtigoPesavel(produto);
 
-    // Produtos vendidos por peso/volume (ex: carne no talho, granel, líquidos) abrem a calculadora fracionada
-    // onde o funcionário escolhe se vende em kg ou se escreve o preço em Meticais
+    // Em atividades que exigem kg (ex: talhos, carnes, peixarias, granel)
+    // ao atender ou vender o funcionário vê de imediato a janela de peso/valor para indicar a pesagem na balança
     if (unidadeFracionada) {
         abrirModalVendaFracionada(produto, "peso");
         return;
@@ -3311,8 +3342,19 @@ function abrirModalVendaFracionada(produto, modoInicial) {
     if (!modal) return;
 
     document.getElementById("frac-produto-id").value = produto.id;
-    document.getElementById("frac-titulo").textContent = `🥩 ${produto.nome}`;
-    document.getElementById("frac-subtitulo").textContent = `Preço: ${dinheiro(produto.preco)} / ${produto.unidade} | Stock na banca: ${numero(produto.stock)} ${produto.unidade}`;
+
+    // Deteta ícone temático de acordo com a mercadoria
+    const nomeBaixo = String(produto.nome || "").toLowerCase();
+    let icone = "🥩";
+    if (nomeBaixo.includes("peixe") || nomeBaixo.includes("camar") || nomeBaixo.includes("chicoa") || nomeBaixo.includes("carapau")) icone = "🐟";
+    else if (nomeBaixo.includes("frango") || nomeBaixo.includes("galinha") || nomeBaixo.includes("moela") || nomeBaixo.includes("asa")) icone = "🍗";
+    else if (nomeBaixo.includes("fruta") || nomeBaixo.includes("banana") || nomeBaixo.includes("maçã") || nomeBaixo.includes("laranja")) icone = "🍎";
+    else if (nomeBaixo.includes("tomate") || nomeBaixo.includes("batata") || nomeBaixo.includes("cebola") || nomeBaixo.includes("legume")) icone = "🥔";
+    else if (nomeBaixo.includes("leite") || nomeBaixo.includes("óleo") || nomeBaixo.includes("oleo") || produto.unidade === "litro") icone = "🥛";
+
+    const unidTexto = produto.unidade || "kg";
+    document.getElementById("frac-titulo").textContent = `${icone} ${produto.nome}`;
+    document.getElementById("frac-subtitulo").textContent = `Preço: ${dinheiro(produto.preco)} / ${unidTexto} | Stock na banca: ${numero(produto.stock)} ${unidTexto}`;
 
     const inputPeso = document.getElementById("frac-peso");
     const inputValor = document.getElementById("frac-valor");
@@ -3411,6 +3453,19 @@ document.getElementById("frac-peso")?.addEventListener("input", () => recalcular
 document.getElementById("frac-unidade-medida")?.addEventListener("change", () => recalcularFracionada());
 document.getElementById("frac-valor")?.addEventListener("input", () => recalcularFracionada());
 
+document.getElementById("frac-peso")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("btn-confirmar-fracionada")?.click();
+    }
+});
+document.getElementById("frac-valor")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("btn-confirmar-fracionada")?.click();
+    }
+});
+
 document.getElementById("btn-confirmar-fracionada")?.addEventListener("click", () => {
     const id = document.getElementById("frac-produto-id")?.value;
     const produto = FABEF.produtos.find(p => p.id === id);
@@ -3437,7 +3492,7 @@ document.getElementById("btn-confirmar-fracionada")?.addEventListener("click", (
     const existentePeso = FABEF.carrinho.find(x => x.produtoId === id);
     const totalPretendido = (existentePeso ? existentePeso.quantidade : 0) + quantidadeDesejada;
     if (totalPretendido > numero(produto.stock)) {
-        alert(`Quantidade solicitada (${totalPretendido.toFixed(3)} ${produto.unidade}) superior ao stock físico disponível na banca (${numero(produto.stock)} ${produto.unidade}).`);
+        alert(`Quantidade solicitada (${totalPretendido.toFixed(3)} ${produto.unidade || "kg"}) superior ao stock físico disponível na banca (${numero(produto.stock)} ${produto.unidade || "kg"}).`);
         return;
     }
 
@@ -3461,7 +3516,7 @@ document.getElementById("btn-confirmar-fracionada")?.addEventListener("click", (
 
 
 /* =====================================================
-   MÓDULO LÓGICO: EXECUÇão E RENDERIZAÇão DO CARRINHO
+   MÓDULO LÓGICO: EXECUÇÃO E RENDERIZAÇÃO DO CARRINHO
 ===================================================== */
 
 function renderCarrinho() {
@@ -3483,8 +3538,9 @@ function renderCarrinho() {
         const subtotal = numero(item.preco) * numero(item.quantidade);
         totalAcumulado += subtotal;
 
-        const qtdFormatada = (item.unidade === "kg" || item.unidade === "litro" || item.unidade === "g") ?
-            `${numero(item.quantidade).toFixed(3)} ${item.unidade}` :
+        const ehPesavel = ehArtigoPesavel(item);
+        const qtdFormatada = ehPesavel ?
+            `${numero(item.quantidade).toFixed(3)} ${item.unidade || "kg"}` :
             `${numero(item.quantidade)} ${item.unidade || "un"}`;
 
         const atributos = [];
@@ -3501,14 +3557,28 @@ function renderCarrinho() {
             <div style="font-weight: 700; font-size: 13px; margin-right: 5px; color: #065f46;">
                 ${dinheiro(subtotal)}
             </div>
-            <button 
-                class="btn btn-danger btn-small" 
-                style="padding: 2px 6px; font-size: 11px;" 
-                onclick="removerItemCarrinho(${index})"
-                type="button"
-            >
-                ✕
-            </button>
+            <div style="display:flex;gap:4px;align-items:center;">
+                ${ehPesavel ? `
+                <button 
+                    class="btn btn-light btn-small" 
+                    style="padding: 2px 6px; font-size: 11px; border: 1px solid #cbd5e1;" 
+                    onclick="abrirModalVendaFracionadaById('${escapeHTML(item.produtoId)}', 'peso')"
+                    type="button"
+                    title="Ajustar peso ou valor da pesagem"
+                >
+                    ⚖️
+                </button>
+                ` : ''}
+                <button 
+                    class="btn btn-danger btn-small" 
+                    style="padding: 2px 6px; font-size: 11px;" 
+                    onclick="removerItemCarrinho(${index})"
+                    type="button"
+                    title="Remover do carrinho"
+                >
+                    ✕
+                </button>
+            </div>
         </div>
         `;
     }).join("");
