@@ -45,7 +45,7 @@ const addDoc = async (collRef, data) => {
         const path = collRef?.path || "";
         const parts = path.split("/");
         const collName = parts[parts.length - 1];
-        if (["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","dispensas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"].includes(collName) && window.FABEF?.ramo && data?.ramo == null) data={...data,ramo:window.FABEF.ramo};
+        if (["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"].includes(collName) && window.FABEF?.ramo && data?.ramo == null) data={...data,ramo:window.FABEF.ramo};
         if (collName && window.FABEF[collName] && Array.isArray(window.FABEF[collName])) {
             window.FABEF[collName].unshift(item);
         }
@@ -56,7 +56,7 @@ const addDoc = async (collRef, data) => {
 
 const setDoc = async (documentRef, data, options) => {
     const pp=documentRef?.path||""; const aa=pp.split("/"); const cc=aa[aa.length-2]||"";
-    if (["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","dispensas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"].includes(cc) && window.FABEF?.ramo && data?.ramo == null) data={...data,ramo:window.FABEF.ramo};
+    if (["produtos","clientes","fornecedores","compras","vendas","despesas","dividas","encomendas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"].includes(cc) && window.FABEF?.ramo && data?.ramo == null) data={...data,ramo:window.FABEF.ramo};
     if (window.FABEF?.isDemoMode) {
         const path = documentRef?.path || "";
         const parts = path.split("/");
@@ -706,7 +706,6 @@ async function gravarAuditoria(mensagem, nivel) {
             nivel: nivel || "INFO",
             utilizadorId: FABEF.user.uid,
             utilizadorNome: FABEF.userData?.nome || FABEF.user.email,
-            ramo: FABEF.ramo || null,
             data: new Date().toISOString(),
             criadoEm: serverTimestamp()
         });
@@ -981,21 +980,9 @@ async function iniciarSessaoFABEF(user) {
         if (loginStatus) loginStatus.textContent = "â³ A carregar a empresa...";
 
         // Não existe fallback para perfil inexistente.
-        try {
-            await carregarPerfil(user);
-        } catch (e) {
-            throw new Error("Autenticação aceite, mas o perfil do utilizador não pôde ser carregado: " + (e?.message || e));
-        }
-        try {
-            await carregarEmpresa();
-        } catch (e) {
-            throw new Error("Autenticação aceite, mas os dados da empresa não puderam ser carregados: " + (e?.message || e));
-        }
-        try {
-            await carregarDados();
-        } catch (e) {
-            throw new Error("Autenticação aceite, mas os dados do sistema não puderam ser carregados: " + (e?.message || e));
-        }
+        await carregarPerfil(user);
+        await carregarEmpresa();
+        await carregarDados();
 
         abrirAplicacao();
         FABEF.carregado = true;
@@ -1030,62 +1017,10 @@ function chavePinLocal(uid) {
     return "fabef_pin_" + uid;
 }
 
-const PIN_PBKDF2_ITERACOES = 210000;
-const PIN_MAX_TENTATIVAS = 5;
-const PIN_BLOQUEIO_BASE_MS = 30000;
-
-function pinEstadoKey(uid) { return "fabef_pin_estado_" + uid; }
-function bytesBase64(bytes) {
-    let binary = "";
-    bytes.forEach(b => binary += String.fromCharCode(b));
-    return btoa(binary);
-}
-function base64Bytes(texto) {
-    const binary = atob(texto);
-    return Uint8Array.from(binary, c => c.charCodeAt(0));
-}
-async function calcularHashPinSeguro(pin) {
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), {name:"PBKDF2"}, false, ["deriveBits"]);
-    const bits = await crypto.subtle.deriveBits({name:"PBKDF2", salt, iterations:PIN_PBKDF2_ITERACOES, hash:"SHA-256"}, keyMaterial, 256);
-    return `PBKDF2$SHA-256$${PIN_PBKDF2_ITERACOES}$${bytesBase64(salt)}$${bytesBase64(new Uint8Array(bits))}`;
-}
-async function verificarHashPinSeguro(pin, formato) {
-    const partes = String(formato || "").split("$");
-    if (partes.length !== 5 || partes[0] !== "PBKDF2") return false;
-    const iter = Number(partes[2]);
-    if (!Number.isInteger(iter) || iter < 100000 || iter > 1000000) return false;
-    const salt = base64Bytes(partes[3]);
-    const esperado = base64Bytes(partes[4]);
-    const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), {name:"PBKDF2"}, false, ["deriveBits"]);
-    const bits = new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2", salt, iterations:iter, hash:"SHA-256"}, keyMaterial, 256));
-    if (bits.length !== esperado.length) return false;
-    let diff = 0;
-    for (let i=0;i<bits.length;i++) diff |= bits[i] ^ esperado[i];
-    return diff === 0;
-}
-function pinFraco(pin) {
-    return /^(\d)\1{5}$/.test(pin) || ["123456","654321","000000","121212","112233"].includes(pin);
-}
-function lerEstadoPin(uid) {
-    try { return JSON.parse(localStorage.getItem(pinEstadoKey(uid)) || "{}"); } catch (_) { return {}; }
-}
-function guardarEstadoPin(uid, estado) {
-    try { localStorage.setItem(pinEstadoKey(uid), JSON.stringify(estado)); } catch (_) {}
-}
-function limparEstadoPin(uid) { guardarEstadoPin(uid, {falhas:0, bloqueadoAte:0}); }
-function pinBloqueado(uid) {
-    const e = lerEstadoPin(uid);
-    const agora = Date.now();
-    if (Number(e.bloqueadoAte || 0) > agora) return Number(e.bloqueadoAte) - agora;
-    return 0;
-}
-function registarFalhaPin(uid) {
-    const e = lerEstadoPin(uid);
-    const falhas = Number(e.falhas || 0) + 1;
-    const bloqueadoAte = falhas >= PIN_MAX_TENTATIVAS ? Date.now() + Math.min(PIN_BLOQUEIO_BASE_MS * Math.pow(2, falhas - PIN_MAX_TENTATIVAS), 5 * 60 * 1000) : 0;
-    guardarEstadoPin(uid, {falhas, bloqueadoAte});
-    return {falhas, bloqueadoAte};
+async function calcularHashPin(pin) {
+    const dados = new TextEncoder().encode(pin);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", dados);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function configurarNovoPin(uid) {
@@ -1192,23 +1127,6 @@ async function validarEEntrarPin() {
         return;
     }
 
-    if (!/^\d{6}$/.test(pinDigitado)) {
-        if (statusPin) { statusPin.textContent = "🔴 O PIN deve ter exatamente 6 números."; statusPin.style.color = "#dc2626"; }
-        if (input) input.value = "";
-        return;
-    }
-    if (pinFraco(pinDigitado)) {
-        if (statusPin) { statusPin.textContent = "🔴 Escolha um PIN de 6 números que não seja previsível."; statusPin.style.color = "#dc2626"; }
-        if (input) input.value = "";
-        return;
-    }
-    const espera = pinBloqueado(user.uid);
-    if (espera > 0) {
-        if (statusPin) { statusPin.textContent = `🔒 Muitas tentativas. Aguarde ${Math.ceil(espera/1000)} segundos.`; statusPin.style.color = "#dc2626"; }
-        if (input) input.value = "";
-        return;
-    }
-
     let hashGuardado = localStorage.getItem(chavePinLocal(user.uid));
     if (!hashGuardado && FABEF.userData?.pinHash) {
         hashGuardado = FABEF.userData.pinHash;
@@ -1220,24 +1138,8 @@ async function validarEEntrarPin() {
         return;
     }
 
-    let valido = false;
-    let pinAntigo = false;
-    if (String(hashGuardado).startsWith("PBKDF2$")) {
-        valido = await verificarHashPinSeguro(pinDigitado, hashGuardado);
-    } else {
-        const dados = new TextEncoder().encode(pinDigitado);
-        const hb = await crypto.subtle.digest("SHA-256", dados);
-        const antigo = Array.from(new Uint8Array(hb)).map(b => b.toString(16).padStart(2, "0")).join("");
-        valido = antigo === hashGuardado;
-        pinAntigo = valido;
-    }
-    if (valido) {
-        limparEstadoPin(user.uid);
-        if (pinAntigo) {
-            if (statusPin) { statusPin.textContent = "⚠️ PIN antigo detetado. Defina agora um novo PIN de 6 números."; statusPin.style.color = "#b45309"; }
-            mostrarModalConfigurarPin(user, true);
-            return;
-        }
+    const hashDigitado = await calcularHashPin(pinDigitado);
+    if (hashDigitado === hashGuardado) {
         if (statusPin) {
             statusPin.textContent = "🟢 PIN correto! A abrir o sistema...";
             statusPin.style.color = "#16a34a";
@@ -1249,7 +1151,6 @@ async function validarEEntrarPin() {
             await iniciarSessaoFABEF(user);
         }, 150);
     } else {
-        const falha = registarFalhaPin(user.uid);
         if (input) input.value = "";
         if (statusPin) {
             statusPin.textContent = "🔴 PIN incorreto. Tente novamente ou use a palavra-passe.";
@@ -1264,7 +1165,7 @@ document.getElementById("btn-pin-entrar")?.addEventListener("click", validarEEnt
 
 document.getElementById("pin-input")?.addEventListener("input", e => {
     e.target.value = e.target.value.replace(/\D/g, "");
-    if (e.target.value.length === 6) {
+    if (e.target.value.length === 4) {
         validarEEntrarPin();
     }
 });
@@ -1330,9 +1231,9 @@ document.getElementById("btn-salvar-pin")?.addEventListener("click", async () =>
     const p1 = (inpNovo?.value || "").trim();
     const p2 = (inpConf?.value || "").trim();
 
-    if (!/^\d{6}$/.test(p1) || pinFraco(p1)) {
+    if (!/^\d{4,6}$/.test(p1)) {
         if (status) {
-            status.textContent = "⚠️ O PIN deve ter exatamente 6 números e não pode ser previsível.";
+            status.textContent = "⚠️ O PIN deve ter entre 4 e 6 números.";
             status.style.color = "#dc2626";
         }
         return;
@@ -1352,7 +1253,7 @@ document.getElementById("btn-salvar-pin")?.addEventListener("click", async () =>
     }
 
     try {
-        const hash = await calcularHashPinSeguro(p1);
+        const hash = await calcularHashPin(p1);
         if (user?.uid) {
             localStorage.setItem(chavePinLocal(user.uid), hash);
             try {
@@ -1579,7 +1480,7 @@ function pedirRenderTudo() {
    é assim que os dados chegam quando o dispositivo estava offline
    e volta a ligar-se à internet.
 ===================================================== */
-const COLECOES_POR_RAMO = new Set(["produtos","compras","vendas","despesas","encomendas","funcionarios","gastos_funcionarios","dispensas","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
+const COLECOES_POR_RAMO = new Set(["produtos","compras","vendas","despesas","encomendas","funcionarios","gastos_funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
 const COLECOES_POR_DIA = new Set(["despesas","compras","encomendas","auditoria_logs","sugestoes"]);
 function referenciaColecaoFiltrada(nome) {
     const ref = subRef(nome);
@@ -6461,18 +6362,12 @@ window.salvarDispensa = async function() {
         aprovadoPor: estadoEscolhido === "APROVADA" ? usuarioAtual : null,
         aprovadoEm: estadoEscolhido === "APROVADA" ? new Date().toISOString() : null,
         criadoPor: usuarioAtual,
-        criadoPorUid: auth.currentUser?.uid || FABEF.user?.uid || null,
         criadoEm: new Date().toISOString(),
         atualizadoEm: new Date().toISOString()
     };
 
     try {
         if (!Array.isArray(FABEF.dispensas)) FABEF.dispensas = [];
-
-        if (idExistente && !ehGerente) {
-            alert("🔒 Apenas o Gerente pode alterar uma dispensa já registada.");
-            return;
-        }
 
         if (idExistente) {
             if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
@@ -8201,7 +8096,7 @@ function popularSelectFuncionariosGasto(funcionarioId) {
     });
 
     // 2. Todos os funcionários da empresa
-    const funcs = (FABEF.funcionarios || []).filter(f => !FABEF.ramo || f.ramo === FABEF.ramo);
+    const funcs = FABEF.funcionarios || [];
     funcs.forEach(f => {
         const ramoTxt = f.ramo ? ` [${f.ramo}]` : '';
         const telTxt = f.telefone || f.email || 'Funcionário';
@@ -8295,11 +8190,6 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
         return;
     }
 
-    if (FABEF.userData?.perfil !== "gerente" && FABEF.userData?.role !== "gerente") {
-        alert("Apenas o Gerente pode registar adiantamentos salariais, vales e outros gastos na conta dos funcionários.");
-        return;
-    }
-
     try {
         const quemRegistou = FABEF.userData?.nome || auth.currentUser?.email || "Gerente";
         const payloadGasto = {
@@ -8312,14 +8202,17 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
             lancarDespesa,
             ramo: FABEF.ramo,
             registadoPor: quemRegistou,
-            registadoPorUid: FABEF.user?.uid || auth.currentUser?.uid || null,
             criadoEm: serverTimestamp()
         };
 
         let idGasto = "gasto_" + Date.now();
         if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
-            const ref = await addDoc(subRef("gastos_funcionarios"), payloadGasto);
-            idGasto = ref.id;
+            try {
+                const ref = await addDoc(subRef("gastos_funcionarios"), payloadGasto);
+                idGasto = ref.id;
+            } catch (fbErr) {
+                console.warn("Aviso ao guardar gasto no Firestore:", fbErr);
+            }
         }
 
         if (!FABEF.gastosFuncionarios) FABEF.gastosFuncionarios = [];
@@ -8340,11 +8233,10 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
                 turnoId: FABEF.turnoId || null,
                 ramo: FABEF.ramo,
                 criadoPor: quemRegistou,
-                criadoPorUid: FABEF.user?.uid || auth.currentUser?.uid || null,
                 criadoEm: serverTimestamp()
             };
             if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
-                await addDoc(subRef("despesas"), payloadDesp);
+                await addDoc(subRef("despesas"), payloadDesp).catch(e => console.warn("Aviso ao registar despesa reflexa:", e));
             }
             if (!FABEF.despesas) FABEF.despesas = [];
             FABEF.despesas.push({ id: "desp_" + Date.now(), ...payloadDesp });
@@ -8496,11 +8388,6 @@ document.getElementById("btn-pos-ver-dividas")?.addEventListener("click", () => 
    MÓDULO LÓGICO: SUGESTÕES DO FUNCIONÁRIO
 ===================================================== */
 document.getElementById("btn-enviar-sugestao")?.addEventListener("click", async () => {
-    const perfilSugestao = FABEF.userData?.perfil || FABEF.userData?.role || "";
-    if (perfilSugestao === "gerente") {
-        alert("🔒 As sugestões são exclusivas dos funcionários. O Gerente recebe e avalia as sugestões, mas não pode enviar uma sugestão como funcionário.");
-        return;
-    }
     const texto = document.getElementById("sugestao-texto")?.value.trim();
     if (!texto) { alert("Escreva a sua sugestão antes de enviar."); return; }
 
@@ -8510,7 +8397,6 @@ document.getElementById("btn-enviar-sugestao")?.addEventListener("click", async 
             estado: "NOVA",
             criadoPor: FABEF.user.uid,
             criadoPorNome: FABEF.userData?.nome || FABEF.user.email,
-            ramo: FABEF.ramo,
             data: new Date().toISOString(),
             criadoEm: serverTimestamp()
         };
