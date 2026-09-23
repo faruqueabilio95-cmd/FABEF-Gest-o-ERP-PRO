@@ -706,6 +706,7 @@ async function gravarAuditoria(mensagem, nivel) {
             nivel: nivel || "INFO",
             utilizadorId: FABEF.user.uid,
             utilizadorNome: FABEF.userData?.nome || FABEF.user.email,
+            ramo: FABEF.ramo || null,
             data: new Date().toISOString(),
             criadoEm: serverTimestamp()
         });
@@ -980,9 +981,21 @@ async function iniciarSessaoFABEF(user) {
         if (loginStatus) loginStatus.textContent = "â³ A carregar a empresa...";
 
         // Não existe fallback para perfil inexistente.
-        await carregarPerfil(user);
-        await carregarEmpresa();
-        await carregarDados();
+        try {
+            await carregarPerfil(user);
+        } catch (e) {
+            throw new Error("Autenticação aceite, mas o perfil do utilizador não pôde ser carregado: " + (e?.message || e));
+        }
+        try {
+            await carregarEmpresa();
+        } catch (e) {
+            throw new Error("Autenticação aceite, mas os dados da empresa não puderam ser carregados: " + (e?.message || e));
+        }
+        try {
+            await carregarDados();
+        } catch (e) {
+            throw new Error("Autenticação aceite, mas os dados do sistema não puderam ser carregados: " + (e?.message || e));
+        }
 
         abrirAplicacao();
         FABEF.carregado = true;
@@ -1251,7 +1264,7 @@ document.getElementById("btn-pin-entrar")?.addEventListener("click", validarEEnt
 
 document.getElementById("pin-input")?.addEventListener("input", e => {
     e.target.value = e.target.value.replace(/\D/g, "");
-    if (e.target.value.length === 4) {
+    if (e.target.value.length === 6) {
         validarEEntrarPin();
     }
 });
@@ -8282,7 +8295,7 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
         return;
     }
 
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
+    if (FABEF.userData?.perfil !== "gerente" && FABEF.userData?.role !== "gerente") {
         alert("Apenas o Gerente pode registar adiantamentos salariais, vales e outros gastos na conta dos funcionários.");
         return;
     }
