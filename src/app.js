@@ -652,6 +652,19 @@ function dataHoje() {
     return d;
 }
 
+function dataHojeStr() {
+    try {
+        const d = new Date();
+        const ano = d.getFullYear();
+        const mes = String(d.getMonth() + 1).padStart(2, "0");
+        const dia = String(d.getDate()).padStart(2, "0");
+        return `${ano}-${mes}-${dia}`;
+    } catch (e) {
+        return new Date().toISOString().split("T")[0];
+    }
+}
+window.dataHojeStr = dataHojeStr;
+
 
 function diasAtras(n) {
     const d = new Date();
@@ -1831,6 +1844,14 @@ document.addEventListener("click", (e) => {
 });
 
 function mostrarSecao(nome) {
+    if (nome === "despesas") {
+        mostrarSecao("config");
+        if (typeof window.alternarAbaConfiguracoes === "function") {
+            window.alternarAbaConfiguracoes("despesas");
+        }
+        return;
+    }
+
     // Remove o estado ativo de todas as secções
     document.querySelectorAll(".secao").forEach(s => s.classList.remove("active"));
 
@@ -1865,9 +1886,41 @@ function mostrarSecao(nome) {
         if (typeof renderDispensas === "function") renderDispensas();
     } else if (nome === "config") {
         if (typeof renderConfiguracoes === "function") renderConfiguracoes();
+        if (typeof renderDespesas === "function") renderDespesas();
+    } else if (nome === "funcionarios") {
+        if (typeof renderFuncionarios === "function") renderFuncionarios();
+        if (typeof renderGastosFuncionarios === "function") renderGastosFuncionarios();
+    } else if (nome === "vendas") {
+        if (typeof renderVendas === "function") renderVendas();
     }
 }
 window.mostrarSecao = mostrarSecao;
+
+window.alternarAbaConfiguracoes = function(aba) {
+    const abas = ["geral", "despesas"];
+    abas.forEach(nome => {
+        const bloco = document.getElementById("tab-config-conteudo-" + nome);
+        if (bloco) bloco.style.display = nome === aba ? "block" : "none";
+    });
+
+    document.querySelectorAll(".tab-config-btn").forEach(btn => {
+        const ativada = btn.getAttribute("data-tab-config") === aba;
+        btn.classList.toggle("active", ativada);
+        if (ativada) {
+            btn.style.background = "#2563eb";
+            btn.style.color = "#ffffff";
+            btn.style.boxShadow = "0 2px 4px rgba(0,0,0,0.15)";
+        } else {
+            btn.style.background = "transparent";
+            btn.style.color = "#475569";
+            btn.style.boxShadow = "none";
+        }
+    });
+
+    if (aba === "despesas" && typeof renderDespesas === "function") {
+        renderDespesas();
+    }
+};
 
 
 /* =====================================================
@@ -4022,6 +4075,7 @@ function renderVendas() {
         </tr>`;
     }).join("") || `<tr><td colspan="8" style="text-align:center;color:#64748b;">Nenhuma operação de venda localizada nos critérios definidos.</td></tr>`;
 }
+window.renderVendas = renderVendas;
 
 window.imprimirReciboVenda = function(vendaId) {
     const v = FABEF.vendas.find(x => x.id === vendaId);
@@ -5451,6 +5505,8 @@ function renderDespesas() {
     </tr>
     `;
 }
+window.registarDespesa = registarDespesa;
+window.renderDespesas = renderDespesas;
 
 
 /* =====================================================
@@ -6172,6 +6228,7 @@ function renderFuncionarios(){
 
     tabela.innerHTML = gerente + funcionarios;
 }
+window.renderFuncionarios = renderFuncionarios;
 
 
 window.abrirEdicaoFuncionario = function(id) {
@@ -8256,56 +8313,72 @@ document.getElementById("gasto-func-select")?.addEventListener("change", (e) => 
 });
 
 window.abrirModalGastoFuncionario = function(funcionarioId) {
-    const modal = document.getElementById("modal-gasto-funcionario");
-    if (!modal) return;
+    try {
+        const modal = document.getElementById("modal-gasto-funcionario");
+        if (!modal) return;
 
-    popularSelectFuncionariosGasto(funcionarioId);
+        popularSelectFuncionariosGasto(funcionarioId);
 
-    const inputData = document.getElementById("gasto-func-data");
-    if (inputData) inputData.value = dataHojeStr();
+        const inputData = document.getElementById("gasto-func-data");
+        if (inputData) {
+            try { inputData.value = dataHojeStr(); } catch(e) { inputData.value = new Date().toISOString().split("T")[0]; }
+        }
 
-    const inputValor = document.getElementById("gasto-func-valor");
-    if (inputValor) inputValor.value = "";
+        const inputValor = document.getElementById("gasto-func-valor");
+        if (inputValor) inputValor.value = "";
 
-    const inputDesc = document.getElementById("gasto-func-descricao");
-    if (inputDesc) inputDesc.value = "";
+        const inputDesc = document.getElementById("gasto-func-descricao");
+        if (inputDesc) inputDesc.value = "";
 
-    const inputManual = document.getElementById("gasto-func-nome-manual");
-    if (inputManual) inputManual.value = "";
+        const inputManual = document.getElementById("gasto-func-nome-manual");
+        if (inputManual) inputManual.value = "";
 
-    modal.classList.add("show");
-    setTimeout(() => inputValor?.focus(), 150);
+        modal.classList.add("show");
+        setTimeout(() => inputValor?.focus(), 150);
+    } catch (err) {
+        console.error("Erro ao abrir modal de gasto:", err);
+        const modal = document.getElementById("modal-gasto-funcionario");
+        if (modal) modal.classList.add("show");
+    }
 };
 
 window.abrirModalAdiantamentoSalarial = function(funcionarioId) {
-    const modal = document.getElementById("modal-gasto-funcionario");
-    if (!modal) return;
+    try {
+        const modal = document.getElementById("modal-gasto-funcionario");
+        if (!modal) return;
 
-    popularSelectFuncionariosGasto(funcionarioId);
+        popularSelectFuncionariosGasto(funcionarioId);
 
-    const selectTipo = document.getElementById("gasto-func-tipo");
-    if (selectTipo) selectTipo.value = "Adiantamento de Salário (Vale)";
+        const selectTipo = document.getElementById("gasto-func-tipo");
+        if (selectTipo) selectTipo.value = "Adiantamento de Salário (Vale)";
 
-    const inputData = document.getElementById("gasto-func-data");
-    if (inputData) inputData.value = dataHojeStr();
+        const inputData = document.getElementById("gasto-func-data");
+        if (inputData) {
+            try { inputData.value = dataHojeStr(); } catch(e) { inputData.value = new Date().toISOString().split("T")[0]; }
+        }
 
-    const inputValor = document.getElementById("gasto-func-valor");
-    if (inputValor) inputValor.value = "";
+        const inputValor = document.getElementById("gasto-func-valor");
+        if (inputValor) inputValor.value = "";
 
-    const inputDesc = document.getElementById("gasto-func-descricao");
-    if (inputDesc) inputDesc.value = "Adiantamento salarial / vale a descontar no final do mês";
+        const inputDesc = document.getElementById("gasto-func-descricao");
+        if (inputDesc) inputDesc.value = "Adiantamento salarial / vale a descontar no final do mês";
 
-    const chkDespesa = document.getElementById("gasto-func-lancar-despesa");
-    if (chkDespesa) chkDespesa.checked = true;
+        const chkDespesa = document.getElementById("gasto-func-lancar-despesa");
+        if (chkDespesa) chkDespesa.checked = true;
 
-    const chkCaixa = document.getElementById("gasto-func-sair-caixa");
-    if (chkCaixa) chkCaixa.checked = true;
+        const chkCaixa = document.getElementById("gasto-func-sair-caixa");
+        if (chkCaixa) chkCaixa.checked = true;
 
-    const inputManual = document.getElementById("gasto-func-nome-manual");
-    if (inputManual) inputManual.value = "";
+        const inputManual = document.getElementById("gasto-func-nome-manual");
+        if (inputManual) inputManual.value = "";
 
-    modal.classList.add("show");
-    setTimeout(() => inputValor?.focus(), 150);
+        modal.classList.add("show");
+        setTimeout(() => inputValor?.focus(), 150);
+    } catch (err) {
+        console.error("Erro ao abrir modal de adiantamento:", err);
+        const modal = document.getElementById("modal-gasto-funcionario");
+        if (modal) modal.classList.add("show");
+    }
 };
 
 document.getElementById("btn-abrir-modal-gasto-func")?.addEventListener("click", () => {
@@ -8353,18 +8426,12 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
     const tipoGasto = document.getElementById("gasto-func-tipo")?.value || "Adiantamento de Salário (Vale)";
     const valor = numero(document.getElementById("gasto-func-valor")?.value);
     const dataGasto = document.getElementById("gasto-func-data")?.value || dataHojeStr();
-    const descricao = (document.getElementById("gasto-func-descricao")?.value || "").trim();
-    const lancarDespesa = Boolean(document.getElementById("gasto-func-lancar-despesa")?.checked);
+    const descricao = (document.getElementById("gasto-func-descricao")?.value || "").trim() || tipoGasto;
     const sairDoCaixa = Boolean(document.getElementById("gasto-func-sair-caixa")?.checked);
 
     if (isNaN(valor) || valor <= 0) {
-        alert("Indique um valor válido para o vale ou gasto.");
+        alert("Indique um valor válido para o vale ou adiantamento.");
         document.getElementById("gasto-func-valor")?.focus();
-        return;
-    }
-    if (!descricao) {
-        alert("Por favor, descreva o motivo do gasto ou adiantamento.");
-        document.getElementById("gasto-func-descricao")?.focus();
         return;
     }
 
@@ -8377,7 +8444,6 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
             valor,
             data: dataGasto,
             descricao,
-            lancarDespesa,
             ramo: FABEF.ramo,
             registadoPor: quemRegistou,
             criadoEm: serverTimestamp()
@@ -8421,35 +8487,14 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
             atualizarTelaCaixa();
         }
 
-        // Lança também como despesa operacional se solicitado
-        if (lancarDespesa) {
-            const payloadDesp = {
-                descricao: `Vale/Gasto Func.: ${funcionarioNome} (${tipoGasto} - ${descricao})`,
-                valor,
-                categoria: "👥 Salários e Vales de Funcionários",
-                data: dataGasto,
-                turnoId: FABEF.turnoId || null,
-                ramo: FABEF.ramo,
-                criadoPor: quemRegistou,
-                criadoEm: serverTimestamp()
-            };
-            if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
-                await addDoc(subRef("despesas"), payloadDesp).catch(e => console.warn("Aviso ao registar despesa reflexa:", e));
-            }
-            if (!FABEF.despesas) FABEF.despesas = [];
-            FABEF.despesas.push({ id: "desp_" + Date.now(), ...payloadDesp });
-            if (typeof renderDespesas === "function") renderDespesas();
-            if (typeof renderDespesasLojaFunc === "function") renderDespesasLojaFunc();
-        }
-
-        await gravarAuditoria(`💳 GASTO NA CONTA: Registado ${dinheiro(valor)} para ${funcionarioNome} (${tipoGasto} - "${descricao}") por ${quemRegistou}.`, "INFO");
+        await gravarAuditoria(`💳 VALE/ADIANTAMENTO: Registado ${dinheiro(valor)} para ${funcionarioNome} (${tipoGasto} - "${descricao}") por ${quemRegistou}.`, "INFO");
 
         fecharModal("modal-gasto-funcionario");
         renderGastosFuncionarios();
         renderFuncionarios();
         if (typeof renderDesempenho === "function") renderDesempenho();
 
-        alert(`✅ Registado com sucesso na conta de ${funcionarioNome}!\n\nTipo: ${tipoGasto}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado do Caixa de hoje)" : ""}`);
+        alert(`✅ Vale registado com sucesso para ${funcionarioNome}!\n\nTipo: ${tipoGasto}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado da gaveta do Caixa de hoje)" : ""}`);
     } catch(err) {
         console.error("Erro ao guardar gasto do funcionário:", err);
         alert("Erro ao guardar gasto:\n" + (err.message || err));
@@ -8469,16 +8514,17 @@ function renderGastosFuncionarios() {
         <tr>
             <td>${dataTexto(g.data)}</td>
             <td><strong>${escapeHTML(g.funcionarioNome || "Funcionário")}</strong></td>
-            <td><span class="badge badge-yellow">${escapeHTML(g.tipo || "Gasto")}</span></td>
+            <td><span class="badge badge-yellow">${escapeHTML(g.tipo || "Vale")}</span></td>
             <td><strong style="color:#b45309;">${dinheiro(g.valor)}</strong></td>
-            <td>${escapeHTML(g.descricao || "—")}${g.lancarDespesa ? ' <small style="color:#059669;font-weight:600;">(lançado em despesas)</small>' : ''}</td>
+            <td>${escapeHTML(g.descricao || "—")}</td>
             <td>${escapeHTML(g.registadoPor || "—")}</td>
             <td>${souGerente ? `
-                <button class="btn btn-danger btn-small" type="button" onclick="eliminarGastoFuncionario('${escapeHTML(g.id)}')" title="Eliminar registo de gasto">🗑️</button>
+                <button class="btn btn-danger btn-small" type="button" onclick="eliminarGastoFuncionario('${escapeHTML(g.id)}')" title="Eliminar registo de vale">🗑️</button>
             ` : "—"}</td>
         </tr>
-    `).join("") || `<tr><td colspan="7" style="text-align:center;color:#64748b;padding:14px;">Ainda não há gastos ou vales registados na conta dos funcionários.</td></tr>`;
+    `).join("") || `<tr><td colspan="7" style="text-align:center;color:#64748b;padding:14px;">Ainda não há vales ou adiantamentos registados na conta dos funcionários.</td></tr>`;
 }
+window.renderGastosFuncionarios = renderGastosFuncionarios;
 
 window.eliminarGastoFuncionario = async function(gastoId) {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
@@ -8505,10 +8551,10 @@ window.eliminarGastoFuncionario = async function(gastoId) {
 };
 
 /* =====================================================
-   MÓDULO LÓGICO: ABAS DE FUNCIONÁRIOS E GASTOS DA LOJA
+   MÓDULO LÓGICO: ABAS DE FUNCIONÁRIOS (EQUIPA & VALES)
 ===================================================== */
 window.alternarAbaFuncionarios = function(aba) {
-    const abas = ["equipa", "vales", "gastos-loja"];
+    const abas = ["equipa", "vales"];
     abas.forEach(nome => {
         const bloco = document.getElementById("tab-func-conteudo-" + nome);
         if (bloco) bloco.style.display = nome === aba ? "block" : "none";
@@ -8517,14 +8563,19 @@ window.alternarAbaFuncionarios = function(aba) {
     document.querySelectorAll(".tab-func-btn").forEach(btn => {
         const ativada = btn.getAttribute("data-tab-func") === aba;
         btn.classList.toggle("active", ativada);
-        btn.style.borderBottom = ativada ? "3px solid #2563eb" : "3px solid transparent";
-        btn.style.color = ativada ? "#2563eb" : "#64748b";
+        if (ativada) {
+            btn.style.background = "#2563eb";
+            btn.style.color = "#ffffff";
+            btn.style.boxShadow = "0 2px 4px rgba(0,0,0,0.15)";
+        } else {
+            btn.style.background = "transparent";
+            btn.style.color = "#475569";
+            btn.style.boxShadow = "none";
+        }
     });
 
     if (aba === "vales") {
         renderGastosFuncionarios();
-    } else if (aba === "gastos-loja") {
-        renderDespesasLojaFunc();
     } else {
         renderFuncionarios();
     }
@@ -8647,6 +8698,7 @@ async function registarDespesaLoja() {
     await gravarAuditoria(`Registou despesa/custo operacional (${payload.ramo}): ${descricao} [${categoria}] no valor de ${dinheiro(valor)}`, "INFO");
     alert(`✅ Gasto registado com sucesso!\n\n${categoria}: ${descricao}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado do Caixa de hoje)" : ""}`);
 }
+window.registarDespesaLoja = registarDespesaLoja;
 
 /* =====================================================
    MÓDULO LÓGICO: REGISTO RÁPIDO DE CLIENTE & DÍVIDAS NO POS
