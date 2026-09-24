@@ -348,11 +348,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <button data-sec="inicio" class="active">🏠 Início</button>
 
     <details open style="margin-top:6px;">
-      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Operações & Comercial</summary>
-      <button data-sec="pos">🛒 Vender (POS)</button>
+      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Comercial</summary>
+      <button data-sec="pos">🛒 Vender</button>
       <button data-sec="vendas">💵 Vendas</button>
-      <button data-sec="caixa">💰 Caixa / Turnos</button>
-      <button data-sec="despesas" style="background:#fee2e2;color:#991b1b;font-weight:700;border:1px solid #fecaca;">⚡ Gastos & Despesas (Credelec, Água)</button>
       <button data-sec="clientes">👥 Clientes</button>
       <button data-sec="dividas">🧾 Fiado / Dívidas</button>
       <button data-sec="encomendas">📋 Encomendas</button>
@@ -367,7 +365,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </details>
 
     <details style="margin-top:6px;">
-      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Gestão & Relatórios</summary>
+      <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Gestão</summary>
+      <button data-sec="caixa">💰 Caixa / Turnos</button>
+      <button data-sec="despesas">📉 Despesas</button>
       <button data-sec="relatorios">📈 Relatórios</button>
       <button data-sec="metas">🎯 Metas</button>
       <button data-sec="desempenho">👤 Desempenho</button>
@@ -378,7 +378,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <details style="margin-top:6px;border-left:3px solid #3b82f6;padding-left:4px;">
       <summary style="cursor:pointer;color:#93c5fd;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;letter-spacing:0.5px;">⚙️ Configurações & Sistema</summary>
       <button data-sec="config" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
-      <button data-sec="funcionarios">🧑‍💼 Funcionários & Gastos</button>
+      <button data-sec="funcionarios">🧑‍💼 Funcionários</button>
       <button data-sec="dispensas" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #fde68a;">🏖️ Dispensas Funcionários</button>
       <button data-sec="ramos">🏷️ Ramos</button>
       <button data-sec="auditoria">📝 Auditoria</button>
@@ -460,12 +460,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <!-- POS -->
     <section class="secao" id="sec-pos">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
-        <h2 style="margin:0;">Vender (POS)</h2>
-        <button type="button" onclick="mostrarSecao('despesas')" class="btn" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-weight:700;font-size:12px;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-          ⚡ Registar Gasto (Credelec, Água)
-        </button>
-      </div>
+      <h2>Vender</h2>
       <!-- AVISO DE RESTRIÇÃO PARA O GERENTE -->
       <div id="aviso-pos-gerente-bloqueado" class="alert alert-warn" style="display:none;background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;font-size:13px;font-weight:700;margin-bottom:12px;">
         🛡️ <strong>Modo Exclusivo de Supervisão:</strong> O perfil de Gerente é exclusivo para gestão estratégica, relatórios e auditoria. As vendas operacionais no caixa devem ser registradas pelo perfil de Funcionário.
@@ -844,35 +839,23 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- DESPESAS E CUSTOS OPERACIONAIS -->
     <section class="secao" id="sec-despesas">
       <h2>Custos e Despesas Operacionais</h2>
-      <div id="aviso-despesas-gerente" class="alert alert-info" style="display:none;background:#eff6ff;border:1.5px solid #3b82f6;color:#1e40af;font-size:13px;font-weight:600;margin-bottom:12px;">
-        🛡️ <strong>Modo de Supervisão:</strong> O registo diário de despesas operacionais (Credelec, água, sacos, etc.) é responsabilidade do Funcionário no caixa/balcão. O Gerente audita e visualiza todo o histórico e totais abaixo.
-      </div>
       <div class="card">
         <div class="grid">
-          <div class="form-group"><label for="despesa-descricao">Descrição do Custo / Despesa *</label><input type="text" id="despesa-descricao" placeholder="Ex: Credelec 500 MT, Água FIPAG, Sacos plásticos, Transporte..."></div>
+          <div class="form-group"><label for="despesa-descricao">Descrição do Custo / Despesa</label><input type="text" id="despesa-descricao" placeholder="Ex: Champô e coloração, Renda do salão, Eletricidade, Transporte..."></div>
           <div class="form-group">
-            <label for="despesa-categoria">Categoria do Custo *</label>
-            <select id="despesa-categoria" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;font-weight:600;">
-              <option value="⚡ Energia Elétrica (Credelec / Luz)">⚡ Energia Elétrica (Credelec / Luz)</option>
-              <option value="💧 Água (FIPAG / Abastecimento)">💧 Água (FIPAG / Abastecimento)</option>
-              <option value="🏠 Renda / Aluguer da Banca / Loja">🏠 Renda / Aluguer da Banca / Loja</option>
-              <option value="🧹 Material de Limpeza & Sacos Plásticos">🧹 Material de Limpeza & Sacos Plásticos</option>
-              <option value="🚗 Transporte e Frete de Mercadoria">🚗 Transporte e Frete de Mercadoria</option>
-              <option value="🛠️ Manutenção (Frio, Balanças, Serras)">🛠️ Manutenção (Frio, Balanças, Serras)</option>
-              <option value="👥 Salários e Vales de Funcionários">👥 Salários e Vales de Funcionários</option>
-              <option value="🍲 Alimentação da Equipa">🍲 Alimentação da Equipa</option>
-              <option value="📦 Outros Gastos Operacionais">📦 Outros Gastos Operacionais</option>
+            <label for="despesa-categoria">Categoria do Custo</label>
+            <select id="despesa-categoria" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;">
+              <option value="Produtos e Materiais">Produtos e Materiais (Tintas, Champô, Químicos, Insumos)</option>
+              <option value="Renda e Instalações">Renda / Aluguer do Espaço</option>
+              <option value="Água, Luz e Telecom">Água, Eletricidade e Internet</option>
+              <option value="Salários e Comissões">Salários e Comissões</option>
+              <option value="Manutenção e Limpeza">Manutenção e Material de Limpeza</option>
+              <option value="Outros Custos">Outros Custos Gerais</option>
             </select>
           </div>
-          <div class="form-group"><label for="despesa-valor">Valor a Pagar (MT) *</label><input type="number" id="despesa-valor" min="0" step="0.01" placeholder="0,00" style="font-weight:800;font-size:16px;"></div>
+          <div class="form-group"><label for="despesa-valor">Valor (MT)</label><input type="number" id="despesa-valor" min="0" step="0.01" placeholder="0,00"></div>
         </div>
-        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-          <input type="checkbox" id="despesa-sair-caixa" checked style="width:auto;">
-          <label for="despesa-sair-caixa" style="margin:0;font-size:13px;font-weight:600;color:#b45309;">
-            💸 Retirar este dinheiro diretamente do Caixa / Turno de hoje (Sangria automática)
-          </label>
-        </div>
-        <button id="btn-registar-despesa" class="btn btn-entrar" style="width:auto;padding:10px 22px;font-weight:700;">Registar Custo / Despesa</button>
+        <button id="btn-registar-despesa" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar Custo / Despesa</button>
       </div>
       <div class="card">
         <div class="table-wrap"><table>
@@ -1021,141 +1004,55 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <!-- FUNCIONÁRIOS -->
     <section class="secao" id="sec-funcionarios">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
-        <div>
-          <h2>🧑‍💼 Funcionários & Controlo de Gastos</h2>
-          <p style="font-size:13px;color:#64748b;margin-top:2px;">
-            Gestão da equipa, adiantamentos salariais (vales) e lançamento de gastos operacionais (energia, água, etc.).
-          </p>
+      <h2>Funcionários</h2>
+      <div class="card">
+        <div class="grid">
+          <div class="form-group"><label for="func-nome">Nome</label><input type="text" id="func-nome"></div>
+          <div class="form-group"><label for="func-email">E-mail</label><input type="email" id="func-email"></div>
+          <div class="form-group"><label for="func-telefone">Telefone</label><input type="text" id="func-telefone"></div>
+          <div class="form-group"><label for="func-ramo">Ramo de Atuação / Filial</label><select id="func-ramo"></select></div>
+          <div class="form-group"><label for="func-senha">Senha</label><input type="password" id="func-senha" placeholder="Mínimo 6 caracteres"></div>
+          <div class="form-group"><label for="func-foto">Foto (link/URL, opcional)</label><input type="text" id="func-foto" placeholder="https://..."></div>
         </div>
+        <button id="btn-cadastrar-funcionario" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Cadastrar funcionário</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Ramo / Filial</th><th>Função</th><th>Gastos na Conta</th><th>Estado</th><th>Ações</th></tr></thead>
+          <tbody id="tabela-funcionarios"></tbody>
+        </table></div>
       </div>
 
-      <!-- ABAS DE NAVEGAÇÃO INTERNA EM FUNCIONÁRIOS -->
-      <div class="tabs-bar" style="display:flex;gap:6px;border-bottom:2px solid #e2e8f0;margin-bottom:16px;overflow-x:auto;">
-        <button type="button" class="tab-func-btn active" data-tab-func="equipa" onclick="alternarAbaFuncionarios('equipa')" style="padding:10px 16px;font-weight:700;font-size:13px;border:none;background:none;cursor:pointer;border-bottom:3px solid #2563eb;color:#2563eb;white-space:nowrap;">
-          👥 Equipa de Funcionários
-        </button>
-        <button type="button" class="tab-func-btn" data-tab-func="vales" onclick="alternarAbaFuncionarios('vales')" style="padding:10px 16px;font-weight:700;font-size:13px;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;color:#64748b;white-space:nowrap;">
-          💸 Vales & Adiantamentos Salariais
-        </button>
-        <button type="button" class="tab-func-btn" data-tab-func="gastos-loja" onclick="alternarAbaFuncionarios('gastos-loja')" style="padding:10px 16px;font-weight:700;font-size:13px;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;color:#64748b;white-space:nowrap;">
-          ⚡ Gastos do Negócio (Energia, Água, etc.)
-        </button>
-      </div>
-
-      <!-- ABA 1: EQUIPA E CADASTRO -->
-      <div id="tab-func-conteudo-equipa">
-        <div class="card">
-          <div class="grid">
-            <div class="form-group"><label for="func-nome">Nome</label><input type="text" id="func-nome"></div>
-            <div class="form-group"><label for="func-email">E-mail</label><input type="email" id="func-email"></div>
-            <div class="form-group"><label for="func-telefone">Telefone</label><input type="text" id="func-telefone"></div>
-            <div class="form-group"><label for="func-ramo">Ramo de Atuação / Filial</label><select id="func-ramo"></select></div>
-            <div class="form-group"><label for="func-senha">Senha</label><input type="password" id="func-senha" placeholder="Mínimo 6 caracteres"></div>
-            <div class="form-group"><label for="func-foto">Foto (link/URL, opcional)</label><input type="text" id="func-foto" placeholder="https://..."></div>
+      <!-- GASTOS NA CONTA DO FUNCIONÁRIO (VALES, ADIANTAMENTOS, REFEIÇÕES) -->
+      <div class="card" id="card-gastos-funcionarios" style="border-top:3px solid #f59e0b;margin-top:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div>
+            <h3 style="margin:0;color:#b45309;font-size:16px;">💳 Gastos e Vales na Conta do Funcionário</h3>
+            <p style="margin:3px 0 0;font-size:13px;color:#64748b;">
+              Registe adiantamentos salariais (vales), refeições, transportes, quebras ou produtos consumidos pelo funcionário.
+            </p>
           </div>
-          <button id="btn-cadastrar-funcionario" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Cadastrar funcionário</button>
-        </div>
-        <div class="card">
-          <div class="table-wrap"><table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Ramo / Filial</th><th>Função</th><th>Gastos na Conta</th><th>Estado</th><th>Ações</th></tr></thead>
-            <tbody id="tabela-funcionarios"></tbody>
-          </table></div>
-        </div>
-      </div>
-
-      <!-- ABA 2: VALES E ADIANTAMENTOS SALARIAIS -->
-      <div id="tab-func-conteudo-vales" style="display:none;">
-        <div class="card" id="card-gastos-funcionarios" style="border-top:3px solid #f59e0b;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-            <div>
-              <h3 style="margin:0;color:#b45309;font-size:16px;">💳 Gastos e Vales na Conta do Funcionário</h3>
-              <p style="margin:3px 0 0;font-size:13px;color:#64748b;">
-                Registe adiantamentos salariais (vales), refeições, transportes, quebras ou produtos consumidos pelo funcionário.
-              </p>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button id="btn-adiantamento-salarial" class="btn" type="button" onclick="abrirModalAdiantamentoSalarial()" style="background:#059669;color:#fff;font-weight:700;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-                💸 Adiantamento Salarial (Vale)
-              </button>
-              <button id="btn-abrir-modal-gasto-func" class="btn btn-warning" type="button" style="background:#f59e0b;color:#fff;font-weight:700;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;">
-                ➕ Registar Outro Gasto
-              </button>
-            </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="btn-adiantamento-salarial" class="btn" type="button" onclick="abrirModalAdiantamentoSalarial()" style="background:#059669;color:#fff;font-weight:700;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              💸 Adiantamento Salarial (Vale)
+            </button>
+            <button id="btn-abrir-modal-gasto-func" class="btn btn-warning" type="button" style="background:#f59e0b;color:#fff;font-weight:700;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;">
+              ➕ Registar Outro Gasto
+            </button>
           </div>
-          <div class="table-wrap"><table>
-            <thead><tr>
-              <th>Data</th>
-              <th>Funcionário</th>
-              <th>Tipo de Gasto</th>
-              <th>Valor</th>
-              <th>Descrição / Motivo</th>
-              <th>Registado Por</th>
-              <th>Ações</th>
-            </tr></thead>
-            <tbody id="tabela-gastos-funcionarios"></tbody>
-          </table></div>
         </div>
-      </div>
-
-      <!-- ABA 3: GASTOS DO NEGÓCIO (ENERGIA, ÁGUA, RENDA, ETC.) -->
-      <div id="tab-func-conteudo-gastos-loja" style="display:none;">
-        <div class="card" style="border-top:3px solid #2563eb;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-            <div>
-              <h3 style="margin:0;color:#1e40af;font-size:16px;">⚡ Gastos & Custos Operacionais da Loja</h3>
-              <p style="margin:3px 0 0;font-size:13px;color:#64748b;">
-                Registe saídas financeiras para energia elétrica (Credelec), água, renda, sacos, transporte ou manutenção.
-              </p>
-            </div>
-          </div>
-          <div class="grid">
-            <div class="form-group">
-              <label for="despesa-loja-descricao">Descrição do Gasto *</label>
-              <input type="text" id="despesa-loja-descricao" placeholder="Ex: Credelec 500 MT, Água FIPAG, Compra de sacos plásticos...">
-            </div>
-            <div class="form-group">
-              <label for="despesa-loja-categoria">Tipo / Categoria *</label>
-              <select id="despesa-loja-categoria" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;font-weight:600;">
-                <option value="⚡ Energia Elétrica (Credelec / Luz)">⚡ Energia Elétrica (Credelec / Luz)</option>
-                <option value="💧 Água (FIPAG / Abastecimento)">💧 Água (FIPAG / Abastecimento)</option>
-                <option value="🏠 Renda / Aluguer da Banca / Loja">🏠 Renda / Aluguer da Banca / Loja</option>
-                <option value="🧹 Material de Limpeza & Sacos Plásticos">🧹 Material de Limpeza & Sacos Plásticos</option>
-                <option value="🚗 Transporte e Frete de Mercadoria">🚗 Transporte e Frete de Mercadoria</option>
-                <option value="🛠️ Manutenção (Frio, Balanças, Serras)">🛠️ Manutenção (Frio, Balanças, Serras)</option>
-                <option value="🍲 Alimentação da Equipa">🍲 Alimentação da Equipa</option>
-                <option value="📦 Outros Gastos Operacionais">📦 Outros Gastos Operacionais</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="despesa-loja-valor">Valor a Pagar (MT) *</label>
-              <input type="number" id="despesa-loja-valor" min="1" step="0.01" placeholder="0,00" style="font-weight:800;font-size:16px;">
-            </div>
-          </div>
-          <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-            <input type="checkbox" id="despesa-loja-sair-caixa" checked style="width:auto;">
-            <label for="despesa-loja-sair-caixa" style="margin:0;font-size:13px;font-weight:600;color:#b45309;">
-              💸 Retirar este dinheiro diretamente do Caixa / Turno de hoje (Sangria automática)
-            </label>
-          </div>
-          <button id="btn-registar-despesa-loja" class="btn btn-primary" type="button" style="width:auto;padding:10px 22px;font-weight:700;">
-            💾 Gravar Despesa da Loja
-          </button>
-        </div>
-
-        <div class="card">
-          <h4 style="margin:0 0 10px;color:#334155;">📋 Histórico de Gastos do Ramo Ativo</h4>
-          <div class="table-wrap"><table>
-            <thead><tr>
-              <th>Data</th>
-              <th>Descrição & Categoria</th>
-              <th>Valor</th>
-              <th>Registado Por</th>
-              <th>Ramo</th>
-            </tr></thead>
-            <tbody id="tabela-despesas-loja-func"></tbody>
-          </table></div>
-        </div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Data</th>
+            <th>Funcionário</th>
+            <th>Tipo de Gasto</th>
+            <th>Valor</th>
+            <th>Descrição / Motivo</th>
+            <th>Registado Por</th>
+            <th>Ações</th>
+          </tr></thead>
+          <tbody id="tabela-gastos-funcionarios"></tbody>
+        </table></div>
       </div>
     </section>
 
@@ -1927,26 +1824,16 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <select id="gasto-func-select" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;"></select>
       </div>
 
-      <div class="form-group" id="grupo-gasto-func-manual" style="display:none;background:#fef3c7;padding:12px;border-radius:8px;border:1.5px dashed #f59e0b;">
-        <label for="gasto-func-nome-manual" style="color:#92400e;font-weight:700;">Nome do Funcionário *</label>
-        <input type="text" id="gasto-func-nome-manual" placeholder="Ex: Alberto Silva, Carlos, Marta...">
-        <small style="color:#b45309;font-size:12px;display:block;margin-top:4px;">
-          ✍️ O sistema regista o vale e aceita qualquer colaborador imediatamente, mesmo que ainda não tenha conta de e-mail criada.
-        </small>
-      </div>
-
       <div class="grid">
         <div class="form-group">
           <label for="gasto-func-tipo">Tipo de Gasto *</label>
           <select id="gasto-func-tipo" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-            <option value="Adiantamento de Salário (Vale)">💸 Adiantamento de Salário (Vale)</option>
-            <option value="Alimentação / Refeição">🍲 Alimentação / Refeição</option>
-            <option value="Transporte">🚗 Transporte / Chapa</option>
-            <option value="⚡ Pagamento de Energia (Credelec)">⚡ Pagamento de Energia (Credelec / Luz)</option>
-            <option value="💧 Pagamento de Água">💧 Pagamento de Água</option>
-            <option value="Consumo de Artigos da Loja">🛒 Consumo de Artigos da Loja</option>
-            <option value="Quebra / Dano / Falta">⚠️ Quebra / Dano / Falta de Caixa</option>
-            <option value="Outro Gasto">📦 Outro Gasto / Desconto</option>
+            <option value="Adiantamento de Salário (Vale)">Adiantamento de Salário (Vale)</option>
+            <option value="Alimentação / Refeição">Alimentação / Refeição</option>
+            <option value="Transporte">Transporte</option>
+            <option value="Consumo de Artigos da Loja">Consumo de Artigos da Loja</option>
+            <option value="Quebra / Dano / Falta">Quebra / Dano / Falta de Caixa</option>
+            <option value="Outro Gasto">Outro Gasto / Desconto</option>
           </select>
         </div>
         <div class="form-group">
@@ -1962,14 +1849,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
       <div class="form-group">
         <label for="gasto-func-descricao">Descrição / Motivo *</label>
-        <input type="text" id="gasto-func-descricao" placeholder="Ex: Vale pedido para despesa médica, almoço, adiantamento, etc.">
-      </div>
-
-      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="gasto-func-sair-caixa" checked style="width:auto;">
-        <label for="gasto-func-sair-caixa" style="margin:0;font-size:13px;font-weight:600;color:#b45309;">
-          💸 Retirar o dinheiro deste vale diretamente da gaveta do Caixa de hoje (Sangria automática)
-        </label>
+        <input type="text" id="gasto-func-descricao" placeholder="Ex: Vale pedido para despesa médica, almoço, etc.">
       </div>
 
       <div class="form-group" style="display:flex;align-items:center;gap:8px;">
