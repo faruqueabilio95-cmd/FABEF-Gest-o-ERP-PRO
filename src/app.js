@@ -9208,14 +9208,8 @@ document.getElementById("btn-sidebar-instalar")?.addEventListener("click", windo
 document.getElementById("btn-instalar-app-login")?.addEventListener("click", window.acionarInstalacaoPWA);
 document.getElementById("btn-instalar-app-pin")?.addEventListener("click", window.acionarInstalacaoPWA);
 
-// Registo automático do Service Worker para suporte PWA
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js").catch(err => {
-            console.warn("Aviso ao registar Service Worker PWA:", err);
-        });
-    });
-}
+// Ciclo de vida e auto-atualização do Service Worker PWA com limpeza de cache configurado em index.html
+
 
 
 async function abrirCaixaAutomatico(saldoInicial = 0) {
