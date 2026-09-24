@@ -4,7 +4,7 @@
    Garante que o PWA instalado recebe sempre a versão mais recente em tempo real
    quando online, e funciona 100% offline se não houver internet.
 ===================================================== */
-const NOME_CACHE = "fabef-erp-v10.0.0";
+const NOME_CACHE = "fabef-erp-v10.1.0";
 const FICHEIROS_ESSENCIAIS = [
     "./",
     "./index.html",
