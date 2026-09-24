@@ -1647,6 +1647,17 @@ function aplicarRestricoesDeAcessoPorPapel() {
         if (botao) botao.style.display = ehGerenteLogado ? "" : "none";
     });
 
+    // Botões de Caixa e Despesas (Operações) ficam sempre visíveis para o Funcionário
+    const botaoDespesas = document.querySelector('.sidebar button[data-sec="despesas"]');
+    if (botaoDespesas) botaoDespesas.style.display = "";
+
+    const botaoCaixa = document.querySelector('.sidebar button[data-sec="caixa"]');
+    if (botaoCaixa) botaoCaixa.style.display = "";
+
+    // Banner de supervisão na secção de despesas
+    const avisoDespGerente = document.getElementById("aviso-despesas-gerente");
+    if (avisoDespGerente) avisoDespGerente.style.display = ehGerenteLogado ? "block" : "none";
+
     // Configuração só existe dentro do menu dos 3 pontos e só para o Gerente.
     document.querySelectorAll('[data-sec="config"]').forEach(el => {
         el.style.display = ehGerenteLogado ? "" : "none";
@@ -5375,15 +5386,37 @@ async function registarDespesa() {
         }
     } catch(e) {}
 
+    // Se assinalado para retirar do caixa e houver turno ativo, desconta automaticamente
+    const sairDoCaixa = Boolean(document.getElementById("despesa-sair-caixa")?.checked);
+    if (sairDoCaixa && FABEF.turnoId) {
+        if (!FABEF.turno) FABEF.turno = {};
+        if (!FABEF.turno.sangrias) FABEF.turno.sangrias = [];
+        const sangriaItem = {
+            valor: valor,
+            motivo: `Despesa: ${descricao} (${categoria})`,
+            operadorNome: FABEF.userData?.nome || "Operador",
+            data: new Date().toISOString()
+        };
+        FABEF.turno.sangrias.push(sangriaItem);
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+                sangrias: FABEF.turno.sangrias,
+                atualizadoEm: serverTimestamp()
+            }).catch(e => console.warn("Aviso ao sincronizar sangria reflexa do caixa:", e));
+        }
+        atualizarTelaCaixa();
+    }
+
     // Limpa os campos do formulário para o próximo lançamento
     document.getElementById("despesa-descricao").value = "";
     document.getElementById("despesa-valor").value = "";
 
     renderDespesas();
+    if (typeof renderDespesasLojaFunc === "function") renderDespesasLojaFunc();
 
     // Regista a saída financeira nos logs inalteráveis de auditoria
     await gravarAuditoria(`Registou despesa/custo comercial (${payload.ramo}): ` + descricao + " no valor de " + dinheiro(valor), "INFO");
-    alert("✅ Despesa/Custo registado com sucesso para " + (FABEF.ramo || "o negócio") + ".");
+    alert("✅ Despesa/Custo registado com sucesso para " + (FABEF.ramo || "o negócio") + (sairDoCaixa ? "\n(Retirado do Caixa de hoje)" : "") + ".");
 }
 
 
@@ -8150,38 +8183,77 @@ window.salvarAvaliacaoFuncionario = async function(funcionarioId, avaliacao) {
 /* =====================================================
    MÓDULO LÓGICO: GASTOS NA CONTA DO FUNCIONÁRIO (VALES, ADIANTAMENTOS)
 ===================================================== */
+window.verificarOutroFuncionarioGasto = function(val) {
+    const grupoManual = document.getElementById("grupo-gasto-func-manual");
+    const inputManual = document.getElementById("gasto-func-nome-manual");
+    if (!grupoManual) return;
+    if (val === "__novo__" || val === "") {
+        grupoManual.style.display = "block";
+        if (inputManual) setTimeout(() => inputManual.focus(), 100);
+    } else {
+        grupoManual.style.display = "none";
+    }
+};
+
 function popularSelectFuncionariosGasto(funcionarioId) {
     const select = document.getElementById("gasto-func-select");
     if (!select) return;
 
     const options = [];
-    const gerenteId = "gerente_" + (FABEF.user?.uid || "admin");
-    const gerenteNome = FABEF.userData?.nome || "Gerente Principal";
-
-    // 1. Opção do Gerente Principal
-    options.push({
-        id: gerenteId,
-        nome: `${gerenteNome} (Gerente Principal - Todos os Ramos)`,
-        selected: funcionarioId === gerenteId || (!funcionarioId && !(FABEF.funcionarios || []).length)
-    });
-
-    // 2. Todos os funcionários da empresa
     const funcs = FABEF.funcionarios || [];
+
+    // 1. Funcionários registados na empresa
     funcs.forEach(f => {
         const ramoTxt = f.ramo ? ` [${f.ramo}]` : '';
-        const telTxt = f.telefone || f.email || 'Funcionário';
+        const telTxt = f.telefone || f.email || 'Colaborador';
         options.push({
             id: f.id,
-            nome: `${f.nome}${ramoTxt} (${telTxt})`,
+            nome: `🧑‍💼 ${f.nome}${ramoTxt} (${telTxt})`,
             selected: funcionarioId === f.id
         });
+    });
+
+    // 2. Funcionários que já tiveram vales ou lançamentos anteriores
+    const nomesExistentes = new Set(funcs.map(f => (f.nome || "").toLowerCase().trim()));
+    (FABEF.gastosFuncionarios || []).forEach(g => {
+        const nomeG = (g.funcionarioNome || "").trim();
+        if (nomeG && !nomeG.toLowerCase().includes("gerente") && !nomesExistentes.has(nomeG.toLowerCase())) {
+            nomesExistentes.add(nomeG.toLowerCase());
+            options.push({
+                id: g.funcionarioId || ("func_manual_" + encodeURIComponent(nomeG)),
+                nome: `🧑‍💼 ${nomeG} (Equipa)`,
+                selected: funcionarioId === g.funcionarioId
+            });
+        }
+    });
+
+    // 3. Opção direta para introduzir novo trabalhador
+    options.push({
+        id: "__novo__",
+        nome: "➕ Digitar Nome de Novo / Outro Funcionário...",
+        selected: (!funcionarioId && options.length === 0) || funcionarioId === "__novo__"
+    });
+
+    // 4. Opção do Gerente Principal
+    const gerenteId = "gerente_" + (FABEF.user?.uid || "admin");
+    const gerenteNome = FABEF.userData?.nome || "Gerente Principal";
+    options.push({
+        id: gerenteId,
+        nome: `👑 ${gerenteNome} (Gerente Principal)`,
+        selected: funcionarioId === gerenteId
     });
 
     select.innerHTML = options.map(opt => `<option value="${escapeHTML(opt.id)}" ${opt.selected ? 'selected' : ''}>${escapeHTML(opt.nome)}</option>`).join("");
     if (funcionarioId) {
         select.value = funcionarioId;
     }
+
+    window.verificarOutroFuncionarioGasto(select.value);
 }
+
+document.getElementById("gasto-func-select")?.addEventListener("change", (e) => {
+    window.verificarOutroFuncionarioGasto(e.target.value);
+});
 
 window.abrirModalGastoFuncionario = function(funcionarioId) {
     const modal = document.getElementById("modal-gasto-funcionario");
@@ -8197,6 +8269,9 @@ window.abrirModalGastoFuncionario = function(funcionarioId) {
 
     const inputDesc = document.getElementById("gasto-func-descricao");
     if (inputDesc) inputDesc.value = "";
+
+    const inputManual = document.getElementById("gasto-func-nome-manual");
+    if (inputManual) inputManual.value = "";
 
     modal.classList.add("show");
     setTimeout(() => inputValor?.focus(), 150);
@@ -8223,6 +8298,12 @@ window.abrirModalAdiantamentoSalarial = function(funcionarioId) {
     const chkDespesa = document.getElementById("gasto-func-lancar-despesa");
     if (chkDespesa) chkDespesa.checked = true;
 
+    const chkCaixa = document.getElementById("gasto-func-sair-caixa");
+    if (chkCaixa) chkCaixa.checked = true;
+
+    const inputManual = document.getElementById("gasto-func-nome-manual");
+    if (inputManual) inputManual.value = "";
+
     modal.classList.add("show");
     setTimeout(() => inputValor?.focus(), 150);
 };
@@ -8237,31 +8318,58 @@ document.getElementById("btn-adiantamento-salarial")?.addEventListener("click", 
 
 document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click", async () => {
     const selectFunc = document.getElementById("gasto-func-select");
-    const funcionarioId = selectFunc?.value;
-    const funcionarioNome = selectFunc?.options[selectFunc.selectedIndex]?.text?.split(" (")[0] || "Funcionário";
+    let funcionarioId = selectFunc?.value;
+    let funcionarioNome = "";
+
+    if (funcionarioId === "__novo__" || !funcionarioId) {
+        const inputNome = document.getElementById("gasto-func-nome-manual");
+        const nomeManual = (inputNome?.value || "").trim();
+        if (!nomeManual) {
+            alert("Por favor, introduza o nome do funcionário para registar o vale / adiantamento.");
+            inputNome?.focus();
+            return;
+        }
+        funcionarioNome = nomeManual;
+        funcionarioId = "func_avulso_" + Date.now();
+        // Guarda na lista de funcionários para aparecer em seleções futuras
+        if (!FABEF.funcionarios) FABEF.funcionarios = [];
+        const novoFunc = {
+            id: funcionarioId,
+            nome: funcionarioNome,
+            ramo: FABEF.ramo || "Geral",
+            perfil: "funcionario",
+            role: "operador",
+            estado: "ATIVO"
+        };
+        FABEF.funcionarios.push(novoFunc);
+        try {
+            localStorage.setItem("fabef_local_funcionarios_" + FABEF.empresaId, JSON.stringify(FABEF.funcionarios));
+        } catch(e) {}
+    } else {
+        const optText = selectFunc?.options[selectFunc.selectedIndex]?.text || "";
+        funcionarioNome = optText.replace(/^[^\w\s]+/, '').split(" (")[0].trim() || "Funcionário";
+    }
+
     const tipoGasto = document.getElementById("gasto-func-tipo")?.value || "Adiantamento de Salário (Vale)";
     const valor = numero(document.getElementById("gasto-func-valor")?.value);
     const dataGasto = document.getElementById("gasto-func-data")?.value || dataHojeStr();
     const descricao = (document.getElementById("gasto-func-descricao")?.value || "").trim();
     const lancarDespesa = Boolean(document.getElementById("gasto-func-lancar-despesa")?.checked);
+    const sairDoCaixa = Boolean(document.getElementById("gasto-func-sair-caixa")?.checked);
 
-    if (!funcionarioId) {
-        alert("Selecione o funcionário para registar o gasto na conta.");
-        return;
-    }
     if (isNaN(valor) || valor <= 0) {
-        alert("Indique um valor válido para o gasto.");
+        alert("Indique um valor válido para o vale ou gasto.");
         document.getElementById("gasto-func-valor")?.focus();
         return;
     }
     if (!descricao) {
-        alert("Por favor, descreva o motivo do gasto na conta do funcionário.");
+        alert("Por favor, descreva o motivo do gasto ou adiantamento.");
         document.getElementById("gasto-func-descricao")?.focus();
         return;
     }
 
     try {
-        const quemRegistou = FABEF.userData?.nome || auth.currentUser?.email || "Gerente";
+        const quemRegistou = FABEF.userData?.nome || auth.currentUser?.email || "Funcionário / Gerente";
         const payloadGasto = {
             funcionarioId,
             funcionarioNome,
@@ -8293,12 +8401,32 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
             localStorage.setItem("fabef_local_gastos_" + FABEF.empresaId, JSON.stringify(FABEF.gastosFuncionarios || []));
         } catch(e) {}
 
+        // Se marcado para retirar do caixa, executa sangria no turno ativo
+        if (sairDoCaixa && FABEF.turnoId) {
+            if (!FABEF.turno) FABEF.turno = {};
+            if (!FABEF.turno.sangrias) FABEF.turno.sangrias = [];
+            const sangriaItem = {
+                valor: valor,
+                motivo: `Vale: ${funcionarioNome} (${tipoGasto} - "${descricao}")`,
+                operadorNome: quemRegistou,
+                data: new Date().toISOString()
+            };
+            FABEF.turno.sangrias.push(sangriaItem);
+            if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+                updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+                    sangrias: FABEF.turno.sangrias,
+                    atualizadoEm: serverTimestamp()
+                }).catch(e => console.warn("Aviso ao sincronizar sangria reflexa:", e));
+            }
+            atualizarTelaCaixa();
+        }
+
         // Lança também como despesa operacional se solicitado
         if (lancarDespesa) {
             const payloadDesp = {
-                descricao: `Gasto Func.: ${funcionarioNome} (${tipoGasto} - ${descricao})`,
+                descricao: `Vale/Gasto Func.: ${funcionarioNome} (${tipoGasto} - ${descricao})`,
                 valor,
-                categoria: "Pessoal / Salários",
+                categoria: "👥 Salários e Vales de Funcionários",
                 data: dataGasto,
                 turnoId: FABEF.turnoId || null,
                 ramo: FABEF.ramo,
@@ -8311,16 +8439,17 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
             if (!FABEF.despesas) FABEF.despesas = [];
             FABEF.despesas.push({ id: "desp_" + Date.now(), ...payloadDesp });
             if (typeof renderDespesas === "function") renderDespesas();
+            if (typeof renderDespesasLojaFunc === "function") renderDespesasLojaFunc();
         }
 
-        await gravarAuditoria(`💳 GASTO NA CONTA: Registado ${dinheiro(valor)} para o funcionário ${funcionarioNome} (${tipoGasto} - "${descricao}") por ${quemRegistou}.`, "INFO");
+        await gravarAuditoria(`💳 GASTO NA CONTA: Registado ${dinheiro(valor)} para ${funcionarioNome} (${tipoGasto} - "${descricao}") por ${quemRegistou}.`, "INFO");
 
         fecharModal("modal-gasto-funcionario");
         renderGastosFuncionarios();
         renderFuncionarios();
         if (typeof renderDesempenho === "function") renderDesempenho();
 
-        alert(`✅ Registado com sucesso na conta de ${funcionarioNome}!\n\nTipo: ${tipoGasto}\nValor: ${dinheiro(valor)}`);
+        alert(`✅ Registado com sucesso na conta de ${funcionarioNome}!\n\nTipo: ${tipoGasto}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado do Caixa de hoje)" : ""}`);
     } catch(err) {
         console.error("Erro ao guardar gasto do funcionário:", err);
         alert("Erro ao guardar gasto:\n" + (err.message || err));
@@ -8374,6 +8503,150 @@ window.eliminarGastoFuncionario = async function(gastoId) {
         alert("Erro ao eliminar gasto:\n" + mensagemFirebase(err));
     }
 };
+
+/* =====================================================
+   MÓDULO LÓGICO: ABAS DE FUNCIONÁRIOS E GASTOS DA LOJA
+===================================================== */
+window.alternarAbaFuncionarios = function(aba) {
+    const abas = ["equipa", "vales", "gastos-loja"];
+    abas.forEach(nome => {
+        const bloco = document.getElementById("tab-func-conteudo-" + nome);
+        if (bloco) bloco.style.display = nome === aba ? "block" : "none";
+    });
+
+    document.querySelectorAll(".tab-func-btn").forEach(btn => {
+        const ativada = btn.getAttribute("data-tab-func") === aba;
+        btn.classList.toggle("active", ativada);
+        btn.style.borderBottom = ativada ? "3px solid #2563eb" : "3px solid transparent";
+        btn.style.color = ativada ? "#2563eb" : "#64748b";
+    });
+
+    if (aba === "vales") {
+        renderGastosFuncionarios();
+    } else if (aba === "gastos-loja") {
+        renderDespesasLojaFunc();
+    } else {
+        renderFuncionarios();
+    }
+};
+
+// Vincula cliques nas abas de funcionários de forma segura
+document.querySelectorAll(".tab-func-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const aba = btn.getAttribute("data-tab-func");
+        if (aba && typeof window.alternarAbaFuncionarios === "function") {
+            window.alternarAbaFuncionarios(aba);
+        }
+    });
+});
+
+function renderDespesasLojaFunc() {
+    const corpo = document.getElementById("tabela-despesas-loja-func");
+    if (!corpo) return;
+
+    const listaDoRamo = (FABEF.despesas || []).filter(d => !d.ramo || d.ramo === FABEF.ramo);
+    const listaOrdenada = listaDoRamo
+        .slice()
+        .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+
+    corpo.innerHTML = listaOrdenada.map(d => `
+    <tr>
+        <td>${dataTexto(d.data)}</td>
+        <td>
+            <strong>${escapeHTML(d.descricao)}</strong>
+            ${d.categoria ? `<br><small style="color:#0284c7;font-size:11px;font-weight:600;">${escapeHTML(d.categoria)}</small>` : ""}
+        </td>
+        <td style="color: #dc2626; font-weight: 700;">${dinheiro(d.valor)}</td>
+        <td>${escapeHTML(d.utilizadorNome || "—")}</td>
+        <td><span class="badge badge-blue">${escapeHTML(d.ramo || FABEF.ramo || "—")}</span></td>
+    </tr>
+    `).join("") || `
+    <tr>
+        <td colspan="5" style="text-align: center; color: #64748b; padding: 14px;">
+            Nenhum custo operacional registado para ${escapeHTML(FABEF.ramo || "este ramo")}.
+        </td>
+    </tr>
+    `;
+}
+
+document.getElementById("btn-registar-despesa-loja")?.addEventListener("click", registarDespesaLoja);
+
+async function registarDespesaLoja() {
+    const descricao = document.getElementById("despesa-loja-descricao")?.value.trim();
+    const valor = numero(document.getElementById("despesa-loja-valor")?.value);
+    const categoria = document.getElementById("despesa-loja-categoria")?.value || "⚡ Energia Elétrica (Credelec / Luz)";
+    const sairDoCaixa = Boolean(document.getElementById("despesa-loja-sair-caixa")?.checked);
+
+    if (!descricao || valor <= 0) {
+        alert("Por favor, introduza a descrição do gasto (ex: Credelec, Água) e um valor válido superior a zero.");
+        return;
+    }
+
+    const payload = {
+        descricao: descricao,
+        valor: valor,
+        categoria: categoria,
+        ramo: FABEF.ramo || "Geral",
+        utilizadorId: FABEF.user?.uid || "admin",
+        utilizadorNome: FABEF.userData?.nome || FABEF.user?.email || "Funcionário",
+        data: new Date().toISOString(),
+        criadoEm: serverTimestamp()
+    };
+
+    let docId = "desp_" + Date.now();
+    try {
+        const ref = await addDoc(subRef("despesas"), payload);
+        docId = ref.id;
+    } catch (error) {
+        console.warn("Aviso ao guardar despesa no Firestore, mantendo offline:", error);
+    }
+
+    FABEF.despesas.push({
+        id: docId,
+        descricao: payload.descricao,
+        valor: payload.valor,
+        categoria: payload.categoria,
+        ramo: payload.ramo,
+        utilizadorNome: payload.utilizadorNome,
+        data: payload.data
+    });
+
+    try {
+        if (FABEF.empresaId) {
+            localStorage.setItem("fabef_local_despesas_" + FABEF.empresaId, JSON.stringify(FABEF.despesas));
+        }
+    } catch(e) {}
+
+    // Se marcado para retirar do caixa e houver turno aberto, cria uma sangria correspondente
+    if (sairDoCaixa && FABEF.turnoId) {
+        if (!FABEF.turno) FABEF.turno = {};
+        if (!FABEF.turno.sangrias) FABEF.turno.sangrias = [];
+        const sangriaItem = {
+            valor: valor,
+            motivo: `Despesa: ${descricao} (${categoria})`,
+            operadorNome: FABEF.userData?.nome || "Operador",
+            data: new Date().toISOString()
+        };
+        FABEF.turno.sangrias.push(sangriaItem);
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+                sangrias: FABEF.turno.sangrias,
+                atualizadoEm: serverTimestamp()
+            }).catch(e => console.warn("Aviso ao sincronizar sangria reflexa do caixa:", e));
+        }
+        atualizarTelaCaixa();
+    }
+
+    // Limpa formulário
+    if (document.getElementById("despesa-loja-descricao")) document.getElementById("despesa-loja-descricao").value = "";
+    if (document.getElementById("despesa-loja-valor")) document.getElementById("despesa-loja-valor").value = "";
+
+    renderDespesas();
+    renderDespesasLojaFunc();
+
+    await gravarAuditoria(`Registou despesa/custo operacional (${payload.ramo}): ${descricao} [${categoria}] no valor de ${dinheiro(valor)}`, "INFO");
+    alert(`✅ Gasto registado com sucesso!\n\n${categoria}: ${descricao}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado do Caixa de hoje)" : ""}`);
+}
 
 /* =====================================================
    MÓDULO LÓGICO: REGISTO RÁPIDO DE CLIENTE & DÍVIDAS NO POS
