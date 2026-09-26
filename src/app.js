@@ -1,5 +1,49 @@
 import confetti from "canvas-confetti";
-if (typeof window !== "undefined") { window.confetti = confetti; }
+if (typeof window !== "undefined") {
+    window.confetti = confetti;
+    window.FABEF_CARREGADO = true;
+    if (!window.forcarAtualizacaoSistema) {
+        window.forcarAtualizacaoSistema = async function() {
+            const btns = [
+                document.getElementById("btn-atualizar-app"),
+                document.getElementById("btn-atualizar-login")
+            ];
+            btns.forEach(b => {
+                if (b) {
+                    b.innerText = "⏳ A atualizar e limpar cache...";
+                    b.disabled = true;
+                }
+            });
+            try {
+                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage("LIMPAR_CACHE");
+                    navigator.serviceWorker.controller.postMessage("SKIP_WAITING");
+                }
+                if ("serviceWorker" in navigator) {
+                    const registros = await navigator.serviceWorker.getRegistrations();
+                    for (const reg of registros) {
+                        await reg.unregister();
+                    }
+                }
+                if ("caches" in window) {
+                    const chaves = await caches.keys();
+                    for (const chave of chaves) {
+                        await caches.delete(chave);
+                    }
+                }
+                if ("sessionStorage" in window) {
+                    sessionStorage.clear();
+                }
+            } catch (e) {
+                console.warn("Aviso ao limpar caches locais:", e);
+            }
+            setTimeout(() => {
+                const urlBase = window.location.origin + window.location.pathname;
+                window.location.href = urlBase + (urlBase.includes("?") ? "&" : "?") + "atualizado=" + Date.now();
+            }, 300);
+        };
+    }
+}
 import { initializeApp, deleteApp } from "firebase/app";
 import {
     getAuth,
@@ -1037,8 +1081,14 @@ async function calcularHashPin(pin) {
 }
 
 async function configurarNovoPin(uid) {
-    mostrarModalConfigurarPin(auth.currentUser || { uid }, false);
+    mostrarModalConfigurarPin(auth.currentUser || FABEF.user || { uid }, false);
 }
+
+function abrirModalDefinirPin() {
+    const user = auth.currentUser || FABEF.user || (window.FABEF?.isDemoMode ? { uid: "demo" } : null);
+    mostrarModalConfigurarPin(user, false);
+}
+window.abrirModalDefinirPin = abrirModalDefinirPin;
 
 function mostrarModalConfigurarPin(user, obrigatorio = false) {
     const modal = document.getElementById("modal-configurar-pin");
@@ -1061,21 +1111,26 @@ function mostrarModalConfigurarPin(user, obrigatorio = false) {
             btnCancelar.textContent = "Sair da Conta";
             btnCancelar.onclick = async () => {
                 modal.classList.remove("active");
+                modal.classList.remove("show");
                 sessionStorage.removeItem("fabef_sessao_desbloqueada");
                 sessionStorage.setItem("fabef_saiu_manual", "true");
                 await signOut(auth);
             };
         }
     } else {
-        if (titulo) titulo.textContent = "🔑 Definir / Alterar PIN";
-        if (desc) desc.textContent = "Introduza o novo código PIN de 4 a 6 dígitos para este dispositivo.";
+        if (titulo) titulo.textContent = "🔢 Definir / Alterar Código PIN";
+        if (desc) desc.textContent = "Introduza o código PIN numérico de 4 a 6 dígitos para o seu acesso pessoal ou bloqueio de caixa rápido.";
         if (btnCancelar) {
             btnCancelar.textContent = "Cancelar";
-            btnCancelar.onclick = () => modal.classList.remove("active");
+            btnCancelar.onclick = () => {
+                modal.classList.remove("active");
+                modal.classList.remove("show");
+            };
         }
     }
 
     modal.classList.add("active");
+    modal.classList.add("show");
     setTimeout(() => inpNovo?.focus(), 200);
 }
 
@@ -1273,9 +1328,16 @@ document.getElementById("btn-salvar-pin")?.addEventListener("click", async () =>
                 await updateDoc(doc(db, "utilizadores", user.uid), { pinHash: hash });
             } catch(e){}
         }
+        if (window.FABEF?.isDemoMode) {
+            localStorage.setItem("fabef_pin_hash_demo", hash);
+            localStorage.setItem(chavePinLocal("demo"), hash);
+        }
 
         sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
-        if (modal) modal.classList.remove("active");
+        if (modal) {
+            modal.classList.remove("active");
+            modal.classList.remove("show");
+        }
         esconderEcraPin();
         document.getElementById("app")?.classList.remove("hidden");
 
@@ -3394,6 +3456,7 @@ async function adicionarCarrinho(id) {
     }
 
     renderCarrinho();
+    if (typeof emitirBeepSucesso === "function") emitirBeepSucesso();
 }
 
 /* =====================================================
@@ -3593,6 +3656,7 @@ function renderCarrinho() {
         corpo.innerHTML = `<div class="alert alert-info">Carrinho vazio.</div>`;
         totalSpan.textContent = "MT 0,00";
         atualizarRestantePagamentoMisto();
+        if (typeof atualizarCalculoTrocoPOS === "function") atualizarCalculoTrocoPOS();
         return;
     }
 
@@ -3649,6 +3713,7 @@ function renderCarrinho() {
 
     totalSpan.textContent = dinheiro(totalAcumulado);
     atualizarRestantePagamentoMisto();
+    if (typeof atualizarCalculoTrocoPOS === "function") atualizarCalculoTrocoPOS();
 }
 
 
@@ -3662,6 +3727,8 @@ window.removerItemCarrinho = function(index) {
 
 document.getElementById("btn-limpar-carrinho")?.addEventListener("click", () => {
     FABEF.carrinho = [];
+    if (document.getElementById("pos-valor-entregue")) document.getElementById("pos-valor-entregue").value = "";
+    if (document.getElementById("pos-ref-mobile")) document.getElementById("pos-ref-mobile").value = "";
     renderCarrinho();
 });
 
@@ -3807,6 +3874,13 @@ async function finalizarVenda() {
     const desconto = Math.min(numero(document.getElementById("pos-desconto")?.value), total);
     const totalComDesconto = total - desconto;
 
+    const valorEntregueInput = numero(document.getElementById("pos-valor-entregue")?.value);
+    const refMobileInput = document.getElementById("pos-ref-mobile")?.value.trim() || "";
+    let trocoCalculado = 0;
+    if (pagamento === "Numerário" && valorEntregueInput > totalComDesconto) {
+        trocoCalculado = valorEntregueInput - totalComDesconto;
+    }
+
     // ---- Pagamento misto: soma das parcelas tem de bater certo com o total ----
     let detalhePagamento = null;
     let valorDinheiroVenda = pagamento === "Numerário" ? totalComDesconto : 0;
@@ -3883,6 +3957,9 @@ async function finalizarVenda() {
             desconto: desconto,
             pagamento: pagamento,
             pagamentoDetalhe: detalhePagamento,
+            valorEntregue: valorEntregueInput || null,
+            troco: trocoCalculado || 0,
+            referenciaMobile: refMobileInput || null,
             ramo: FABEF.ramo,
             turnoId: FABEF.turnoId || null,
             diaOperacional: FABEF.dataAtiva,
@@ -3922,6 +3999,9 @@ async function finalizarVenda() {
         if (inputNuit) inputNuit.value = "";
         const inputClientePos = document.getElementById("pos-cliente-nome");
         if (inputClientePos) inputClientePos.value = "";
+        if (document.getElementById("pos-valor-entregue")) document.getElementById("pos-valor-entregue").value = "";
+        if (document.getElementById("pos-ref-mobile")) document.getElementById("pos-ref-mobile").value = "";
+        if (typeof atualizarCalculoTrocoPOS === "function") atualizarCalculoTrocoPOS();
         ["pos-valor-dinheiro", "pos-valor-mpesa", "pos-valor-emola", "pos-valor-cartao", "pos-valor-credito", "pos-desconto"].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = "0";
@@ -3940,10 +4020,20 @@ async function finalizarVenda() {
         window.FABEF_ultimaVendaId = novaVendaId;
         const resumoModal = document.getElementById("recibo-sucesso-resumo");
         if (resumoModal) {
+            let trocoHtml = "";
+            if (trocoCalculado > 0) {
+                trocoHtml = `
+                    <div style="margin: 8px 0; background: #ecfdf5; border: 1.5px solid #6ee7b7; border-radius: 8px; padding: 6px 12px; display: inline-block;">
+                        <span style="font-size: 0.85rem; color: #047857; font-weight: 700;">Troco a Devolver:</span>
+                        <strong style="font-size: 1.2rem; color: #059669; margin-left: 6px;">${dinheiro(trocoCalculado)}</strong>
+                    </div>
+                `;
+            }
             resumoModal.innerHTML = `
                 <div style="font-size: 1.4rem; font-weight: 800; color: #065f46; margin-bottom: 4px;">
                     ${dinheiro(totalComDesconto)}
                 </div>
+                ${trocoHtml}
                 <div style="font-size: 0.85rem; color: #475569;">
                     Recibo: <strong>${escapeHTML(novaVendaId)}</strong> • ${linhas.length} artigo(s) • Pagamento: <strong>${escapeHTML(pagamento)}</strong>
                 </div>
@@ -4211,6 +4301,21 @@ window.imprimirReciboVenda = function(vendaId) {
         <div class="info-row">
             <span>Forma Pagamento:</span><strong>${escapeHTML(v.pagamento || "Dinheiro")}</strong>
         </div>
+        ${v.referenciaMobile ? `
+        <div class="info-row" style="color: #1e40af;">
+            <span>Ref. Transação:</span><span>${escapeHTML(v.referenciaMobile)}</span>
+        </div>
+        ` : ""}
+        ${v.valorEntregue ? `
+        <div class="info-row">
+            <span>Valor Recebido:</span><span>${dinheiro(v.valorEntregue)}</span>
+        </div>
+        ` : ""}
+        ${v.troco && v.troco > 0 ? `
+        <div class="info-row" style="font-weight: 700; color: #15803d;">
+            <span>Troco Devolvido:</span><span>${dinheiro(v.troco)}</span>
+        </div>
+        ` : ""}
         ${v.pagamentoDetalhe ? `<div style="font-size: 10px; color: #475569;">${escapeHTML(v.pagamentoDetalhe)}</div>` : ""}
 
         <div class="divider" style="margin-top: 14px;"></div>
@@ -6010,7 +6115,7 @@ document.getElementById("btn-copiar-dados-empresa")?.addEventListener("click", (
 
 document.getElementById("btn-guardar-config").addEventListener("click", guardarConfiguracoes);
 document.getElementById("btn-alterar-pin")?.addEventListener("click", () => {
-    if (FABEF.user?.uid) configurarNovoPin(FABEF.user.uid);
+    abrirModalDefinirPin();
 });
 
 async function guardarConfiguracoes() {
@@ -6141,22 +6246,44 @@ async function cadastrarNovoFuncionario() {
     const telefone=document.getElementById("func-telefone")?.value.trim();
     const ramoFunc=document.getElementById("func-ramo")?.value || FABEF.ramo || "";
     const senha=document.getElementById("func-senha")?.value || "";
+    const pinFunc=document.getElementById("func-pin")?.value.trim() || "";
     const foto=document.getElementById("func-foto")?.value.trim() || "";
     if(!nome || !email || !senha){ alert("Por favor, preencha os campos obrigatórios (Nome, E-mail e Senha)."); return; }
     if(senha.length<6){ alert("A senha do funcionário deve conter pelo menos 6 caracteres."); return; }
+    if(pinFunc && !/^\d{4,6}$/.test(pinFunc)){ alert("O código PIN do funcionário deve conter entre 4 e 6 números."); return; }
     let secondaryApp=null;
     try {
         secondaryApp=initializeApp(firebaseConfig, "funcionario-"+Date.now());
         const secondaryAuth=getAuth(secondaryApp);
         const cred=await createUserWithEmailAndPassword(secondaryAuth,email,senha);
         const uidFuncionario=cred.user.uid;
-        const perfil={uid:uidFuncionario,nome,email,telefone,foto,ramo:ramoFunc,empresaId:FABEF.empresaId,perfil:"funcionario",role:"operador",estado:"ATIVO",criadoPor:FABEF.user.uid,criadoEm:serverTimestamp()};
+        let pinHashFunc = "";
+        if (pinFunc) {
+            pinHashFunc = await calcularHashPin(pinFunc);
+            localStorage.setItem(chavePinLocal(uidFuncionario), pinHashFunc);
+        }
+        const perfil={
+            uid: uidFuncionario,
+            nome,
+            email,
+            telefone,
+            foto,
+            ramo: ramoFunc,
+            empresaId: FABEF.empresaId,
+            perfil: "funcionario",
+            role: "operador",
+            estado: "ATIVO",
+            pinHash: pinHashFunc,
+            pinConfigurado: Boolean(pinHashFunc),
+            criadoPor: FABEF.user.uid,
+            criadoEm: serverTimestamp()
+        };
         await setDoc(doc(db,"utilizadores",uidFuncionario),perfil);
         await setDoc(doc(db,"empresas",FABEF.empresaId,"funcionarios",uidFuncionario),perfil);
         if (ramoFunc === FABEF.ramo) {
             FABEF.funcionarios.push({id:uidFuncionario,...perfil});
         }
-        ["func-nome","func-email","func-telefone","func-senha","func-foto"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+        ["func-nome","func-email","func-telefone","func-senha","func-pin","func-foto"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
         renderFuncionarios();
         await gravarAuditoria(`Cadastrou um novo funcionário na equipa: ${nome} (${email}) no ramo ${ramoFunc}`,"INFO");
         alert("Funcionário cadastrado com sucesso para o ramo: " + ramoFunc);
@@ -6237,6 +6364,8 @@ window.abrirEdicaoFuncionario = function(id) {
     document.getElementById("edit-func-id").value = f.id;
     document.getElementById("edit-func-nome").value = f.nome || "";
     document.getElementById("edit-func-telefone").value = f.telefone || "";
+    const inputPin = document.getElementById("edit-func-pin");
+    if (inputPin) inputPin.value = "";
     const selectRamo = document.getElementById("edit-func-ramo");
     if (selectRamo) {
         selectRamo.value = f.ramo || FABEF.ramo;
@@ -6249,10 +6378,22 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
     const nome = document.getElementById("edit-func-nome").value.trim();
     const telefone = document.getElementById("edit-func-telefone").value.trim();
     const ramo = document.getElementById("edit-func-ramo")?.value || FABEF.ramo;
+    const novoPin = document.getElementById("edit-func-pin")?.value.trim() || "";
     if (!id || !nome) { alert("O nome do funcionário é obrigatório."); return; }
+
+    if (novoPin && !/^\d{4,6}$/.test(novoPin)) {
+        alert("O código PIN do funcionário deve conter entre 4 e 6 números.");
+        return;
+    }
 
     try {
         const dadosAtualizados = { nome, telefone, ramo, atualizadoEm: serverTimestamp() };
+        if (novoPin) {
+            const hash = await calcularHashPin(novoPin);
+            dadosAtualizados.pinHash = hash;
+            dadosAtualizados.pinConfigurado = true;
+            localStorage.setItem(chavePinLocal(id), hash);
+        }
         await updateDoc(doc(db, "utilizadores", id), dadosAtualizados);
         await updateDoc(doc(db, "empresas", FABEF.empresaId, "funcionarios", id), dadosAtualizados);
 
@@ -6261,11 +6402,15 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
             f.nome = nome; 
             f.telefone = telefone;
             f.ramo = ramo;
+            if (novoPin) {
+                f.pinHash = dadosAtualizados.pinHash;
+                f.pinConfigurado = true;
+            }
         }
 
         fecharModal("modal-editar-funcionario");
         renderFuncionarios();
-        await gravarAuditoria("Editou os dados do funcionário: " + nome + (ramo ? ` (Ramo: ${ramo})` : ""), "INFO");
+        await gravarAuditoria("Editou os dados do funcionário: " + nome + (novoPin ? " (PIN atualizado)" : "") + (ramo ? ` (Ramo: ${ramo})` : ""), "INFO");
         alert("Dados do funcionário atualizados com sucesso.");
     } catch (error) {
         console.error(error);
@@ -8015,10 +8160,31 @@ function renderDashboard() {
         painelKg.textContent = partes.length ? partes.join(" + ") : "0 kg";
     }
 
-    const baixos = FABEF.produtos.filter(p => p.ramo === FABEF.ramo && numero(p.stock) <= numero(p.stockMinimo)).length;
+    const listaBaixos = FABEF.produtos.filter(p => p.ramo === FABEF.ramo && numero(p.stock) <= numero(p.stockMinimo || 5));
+    const baixos = listaBaixos.length;
     
     const painelStockBaixo = document.getElementById("inicio-stock-baixo");
     if (painelStockBaixo) painelStockBaixo.textContent = baixos;
+
+    const cardAlertaStock = document.getElementById("inicio-alerta-stock-card");
+    const tabelaStockBaixo = document.getElementById("tabela-inicio-stock-baixo");
+    if (cardAlertaStock && tabelaStockBaixo) {
+        if (listaBaixos.length > 0) {
+            cardAlertaStock.style.display = "block";
+            tabelaStockBaixo.innerHTML = listaBaixos.slice(0, 10).map(p => `
+                <tr>
+                    <td style="font-weight:700;">${escapeHTML(p.nome)}</td>
+                    <td>${dinheiro(p.preco)}</td>
+                    <td style="font-weight:800;color:#dc2626;">${p.stock} ${escapeHTML(p.unidade || "un")}</td>
+                    <td>${p.stockMinimo || 5} ${escapeHTML(p.unidade || "un")}</td>
+                    <td><span class="badge" style="background:#fee2e2;color:#991b1b;font-weight:700;">${numero(p.stock) <= 0 ? 'ESGOTADO' : 'STOCK CRÍTICO'}</span></td>
+                </tr>
+            `).join("");
+        } else {
+            cardAlertaStock.style.display = "none";
+            tabelaStockBaixo.innerHTML = "";
+        }
+    }
 
     renderGraficoVendas(window.FABEF_GRAFICO_DIAS || 7);
 }
@@ -9160,8 +9326,19 @@ document.getElementById("btn-recibo-fechar")?.addEventListener("click", () => {
     fecharModal("modal-recibo-sucesso");
 });
 
-// Suporte para abrir o modal de alteração de senha a partir da barra lateral
+// Suporte para o funcionário ou gerente definir/alterar o PIN a partir da barra lateral (menu 3 pontos)
+document.getElementById("btn-sidebar-definir-pin")?.addEventListener("click", () => {
+    fecharMenuLateral();
+    abrirModalDefinirPin();
+});
+document.getElementById("btn-sidebar-menu-pin")?.addEventListener("click", () => {
+    fecharMenuLateral();
+    abrirModalDefinirPin();
+});
+
+// Suporte para abrir o modal de alteração de senha a partir da barra lateral (MANTIDO RIGOROSAMENTE)
 document.getElementById("btn-sidebar-alterar-senha")?.addEventListener("click", () => {
+    fecharMenuLateral();
     document.getElementById("senha-status").textContent = "";
     document.getElementById("senha-atual").value = "";
     document.getElementById("senha-nova").value = "";
@@ -9248,5 +9425,309 @@ document.getElementById("btn-pagar-licenca")?.addEventListener("click", () => {
         bloqueio.style.display = "none";
     }
     mostrarSecao("subscricao");
+});
+
+/* =====================================================
+   MÓDULO: MELHORIAS AVANÇADAS DO FABEF ERP PRO
+   1. Feedbacks auditivos (Beep POS)
+   2. Atalhos de teclado no balcão (F2, F4, ESC)
+   3. Calculadora de Troco Automática com botões de notas
+   4. Registo e validação de código M-Pesa / E-Mola
+   5. Exportação inteligente em Excel (CSV)
+   6. Diagnóstico comercial em tempo real
+===================================================== */
+
+function emitirBeepSucesso() {
+    try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const ctx = new AudioContextClass();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1);
+    } catch (e) {}
+}
+window.emitirBeepSucesso = emitirBeepSucesso;
+
+// Atalhos Rápidos de Teclado no POS
+window.addEventListener("keydown", (e) => {
+    const secPos = document.getElementById("sec-pos");
+    const posAtivo = secPos && secPos.classList.contains("active");
+
+    if (e.key === "F2") {
+        e.preventDefault();
+        if (posAtivo) {
+            const inputBusca = document.getElementById("pos-pesquisa");
+            if (inputBusca) {
+                inputBusca.focus();
+                inputBusca.select();
+            }
+        }
+    } else if (e.key === "F4") {
+        e.preventDefault();
+        if (posAtivo) {
+            document.getElementById("btn-finalizar-venda")?.click();
+        }
+    } else if (e.key === "Escape") {
+        const modalAberto = document.querySelector(".modal-overlay.show, .modal-overlay.active");
+        if (modalAberto) {
+            e.preventDefault();
+            modalAberto.classList.remove("show");
+            modalAberto.classList.remove("active");
+            return;
+        }
+        if (posAtivo && FABEF.carrinho && FABEF.carrinho.length > 0) {
+            e.preventDefault();
+            if (confirm("Deseja esvaziar o carrinho de compras do POS?")) {
+                FABEF.carrinho = [];
+                if (document.getElementById("pos-valor-entregue")) document.getElementById("pos-valor-entregue").value = "";
+                if (document.getElementById("pos-ref-mobile")) document.getElementById("pos-ref-mobile").value = "";
+                renderCarrinho();
+            }
+        }
+    }
+});
+
+// Calculadora de Troco Automática no POS
+function obterTotalLiquidoCarrinho() {
+    const total = (FABEF.carrinho || []).reduce((s, x) => s + (numero(x.preco) * numero(x.quantidade)), 0);
+    const desconto = Math.min(numero(document.getElementById("pos-desconto")?.value), total);
+    return Math.max(0, total - desconto);
+}
+
+function atualizarCalculoTrocoPOS() {
+    const totalComDesconto = obterTotalLiquidoCarrinho();
+    const inputEntregue = document.getElementById("pos-valor-entregue");
+    const displayTroco = document.getElementById("pos-troco-display");
+    if (!displayTroco) return;
+
+    const valorEntregue = numero(inputEntregue?.value);
+
+    if (!valorEntregue || valorEntregue <= 0) {
+        displayTroco.textContent = "MT 0,00";
+        displayTroco.style.color = "#15803d";
+        return;
+    }
+
+    const troco = valorEntregue - totalComDesconto;
+    if (troco >= 0) {
+        displayTroco.textContent = dinheiro(troco);
+        displayTroco.style.color = "#15803d";
+    } else {
+        displayTroco.textContent = `Falta: ${dinheiro(Math.abs(troco))}`;
+        displayTroco.style.color = "#dc2626";
+    }
+}
+window.atualizarCalculoTrocoPOS = atualizarCalculoTrocoPOS;
+
+// Binds dos botões de notas rápidas
+document.querySelectorAll(".btn-nota-rapida").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const inputEntregue = document.getElementById("pos-valor-entregue");
+        if (!inputEntregue) return;
+        const nota = btn.dataset.nota;
+        if (nota === "limpar") {
+            inputEntregue.value = "";
+        } else {
+            const atual = numero(inputEntregue.value);
+            inputEntregue.value = atual + Number(nota);
+        }
+        atualizarCalculoTrocoPOS();
+    });
+});
+
+document.getElementById("btn-troco-exato")?.addEventListener("click", () => {
+    const totalComDesconto = obterTotalLiquidoCarrinho();
+    const inputEntregue = document.getElementById("pos-valor-entregue");
+    if (inputEntregue) {
+        inputEntregue.value = totalComDesconto > 0 ? totalComDesconto.toFixed(2) : "";
+        atualizarCalculoTrocoPOS();
+    }
+});
+
+document.getElementById("pos-valor-entregue")?.addEventListener("input", atualizarCalculoTrocoPOS);
+document.getElementById("pos-desconto")?.addEventListener("input", atualizarCalculoTrocoPOS);
+
+// Alternância inteligente de campos de pagamento (Troco vs M-Pesa / E-Mola)
+document.getElementById("forma-pagamento")?.addEventListener("change", (e) => {
+    const forma = e.target.value;
+    const secaoTroco = document.getElementById("pos-secao-troco");
+    const secaoMobile = document.getElementById("pos-secao-mobile");
+    const misto = document.getElementById("pos-pagamento-misto")?.checked;
+
+    if (misto) {
+        if (secaoTroco) secaoTroco.classList.add("hidden");
+        if (secaoMobile) secaoMobile.classList.add("hidden");
+        return;
+    }
+
+    if (forma === "Numerário") {
+        if (secaoTroco) secaoTroco.classList.remove("hidden");
+        if (secaoMobile) secaoMobile.classList.add("hidden");
+        atualizarCalculoTrocoPOS();
+    } else if (forma === "M-Pesa" || forma === "E-Mola") {
+        if (secaoTroco) secaoTroco.classList.add("hidden");
+        if (secaoMobile) secaoMobile.classList.remove("hidden");
+    } else {
+        if (secaoTroco) secaoTroco.classList.add("hidden");
+        if (secaoMobile) secaoMobile.classList.add("hidden");
+    }
+});
+
+// Helper universal de exportação CSV com suporte a UTF-8 BOM para Excel
+function baixarCSV(nomeFicheiro, colunas, linhas) {
+    const cabecalho = colunas.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";");
+    const corpo = linhas.map(linha => 
+        linha.map(v => `"${String(v !== undefined && v !== null ? v : "").replace(/"/g, '""')}"`).join(";")
+    ).join("\r\n");
+    const conteudoCompleto = "\uFEFF" + cabecalho + "\r\n" + corpo;
+    const blob = new Blob([conteudoCompleto], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = nomeFicheiro;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+window.baixarCSV = baixarCSV;
+
+// Exportação de Vendas para Excel
+window.exportarVendasExcel = function() {
+    if (!FABEF.vendas || FABEF.vendas.length === 0) {
+        alert("Não existem vendas registadas no histórico para exportar.");
+        return;
+    }
+    const vendasRamo = FABEF.vendas.filter(v => v.ramo === FABEF.ramo);
+    if (vendasRamo.length === 0) {
+        alert("Não existem vendas registadas para o ramo ativo (" + FABEF.ramo + ").");
+        return;
+    }
+    const colunas = ["ID Recibo", "Data/Hora", "Dia Operacional", "Operador", "Cliente", "NUIT Cliente", "Total (MT)", "Subtotal (MT)", "Desconto (MT)", "Forma Pagamento", "Referência Móvel", "Ramo", "Itens"];
+    const linhas = vendasRamo.map(v => {
+        const resumoItens = (v.itens || []).map(i => `${i.nome} (${i.quantidade}x ${dinheiro(i.preco)})`).join(" | ");
+        return [
+            v.id,
+            v.data ? dataTexto(v.data) : "",
+            v.diaOperacional || "",
+            v.operadorNome || "",
+            v.cliente || "Consumidor Final",
+            v.nuitCliente || "",
+            numero(v.total).toFixed(2),
+            numero(v.subtotal || v.total).toFixed(2),
+            numero(v.desconto || 0).toFixed(2),
+            v.pagamento || "",
+            v.referenciaMobile || "",
+            v.ramo || "",
+            resumoItens
+        ];
+    });
+    baixarCSV(`vendas_${FABEF.ramo || "geral"}_${dataHojeStr()}.csv`, colunas, linhas);
+};
+
+// Exportação de Fiado / Dívidas para Excel
+window.exportarDividasExcel = function() {
+    if (!FABEF.dividas || FABEF.dividas.length === 0) {
+        alert("Não existem dívidas ou fiados registados para exportar.");
+        return;
+    }
+    const dividasRamo = FABEF.dividas.filter(d => d.ramo === FABEF.ramo);
+    const colunas = ["Cliente", "Telefone", "Saldo Devedor (MT)", "Limite de Crédito (MT)", "Ramo", "Última Atualização"];
+    const linhas = dividasRamo.map(d => [
+        d.cliente || "",
+        d.telefone || "",
+        numero(d.valor).toFixed(2),
+        numero(d.limite || 0).toFixed(2),
+        d.ramo || "",
+        d.atualizadoEm ? dataTexto(d.atualizadoEm) : ""
+    ]);
+    baixarCSV(`fiado_dividas_${FABEF.ramo || "geral"}_${dataHojeStr()}.csv`, colunas, linhas);
+};
+
+// Exportação de Relatórios para Excel
+window.exportarRelatorioExcel = function() {
+    const periodo = document.getElementById("relatorio-periodo")?.value || "todos";
+    let vendasFiltradas = FABEF.vendas.filter(v => v.ramo === FABEF.ramo);
+    if (periodo === "hoje") vendasFiltradas = vendasFiltradas.filter(v => v.diaOperacional === FABEF.dataAtiva);
+    else if (periodo === "7") {
+        const lim = diasAtras(7);
+        vendasFiltradas = vendasFiltradas.filter(v => new Date(v.data || 0) >= lim);
+    } else if (periodo === "30") {
+        const lim = diasAtras(30);
+        vendasFiltradas = vendasFiltradas.filter(v => new Date(v.data || 0) >= lim);
+    }
+    const colunas = ["ID Recibo", "Data/Hora", "Cliente", "Forma Pagamento", "Subtotal (MT)", "Desconto (MT)", "Total Pago (MT)", "Operador", "Ramo"];
+    const linhas = vendasFiltradas.map(v => [
+        v.id,
+        v.data ? dataTexto(v.data) : "",
+        v.cliente || "Consumidor Final",
+        v.pagamento || "",
+        numero(v.subtotal || v.total).toFixed(2),
+        numero(v.desconto || 0).toFixed(2),
+        numero(v.total).toFixed(2),
+        v.operadorNome || "",
+        v.ramo || ""
+    ]);
+    baixarCSV(`relatorio_vendas_${periodo}_${dataHojeStr()}.csv`, colunas, linhas);
+};
+
+// Diagnóstico Comercial em Tempo Real
+window.atualizarDiagnosticoEmpresa = function() {
+    const vendasRamo = (FABEF.vendas || []).filter(v => v.ramo === FABEF.ramo);
+    const produtosRamo = (FABEF.produtos || []).filter(p => p.ramo === FABEF.ramo);
+
+    const totalVendas = vendasRamo.length;
+    const somaFaturamento = vendasRamo.reduce((acc, v) => acc + numero(v.total), 0);
+    const ticketMedio = totalVendas > 0 ? somaFaturamento / totalVendas : 0;
+
+    const contagemProdutos = {};
+    vendasRamo.forEach(v => {
+        (v.itens || []).forEach(item => {
+            contagemProdutos[item.nome] = (contagemProdutos[item.nome] || 0) + numero(item.quantidade);
+        });
+    });
+    let topProduto = "Nenhum ainda";
+    let maxQtd = 0;
+    for (const [nome, qtd] of Object.entries(contagemProdutos)) {
+        if (qtd > maxQtd) {
+            maxQtd = qtd;
+            topProduto = `${nome} (${qtd} un)`;
+        }
+    }
+
+    const baixos = produtosRamo.filter(p => numero(p.stock) <= numero(p.stockMinimo || 5)).length;
+
+    const elTotal = document.getElementById("diag-total-vendas");
+    const elTicket = document.getElementById("diag-ticket-medio");
+    const elTop = document.getElementById("diag-top-produto");
+    const elBaixos = document.getElementById("diag-artigos-baixo");
+    const elRecomendacao = document.getElementById("diag-recomendacao");
+
+    if (elTotal) elTotal.textContent = totalVendas;
+    if (elTicket) elTicket.textContent = dinheiro(ticketMedio);
+    if (elTop) elTop.textContent = topProduto;
+    if (elBaixos) elBaixos.textContent = baixos;
+
+    if (elRecomendacao) {
+        if (baixos > 0) {
+            elRecomendacao.innerHTML = `⚠️ <strong>Atenção ao Stock:</strong> Tem <strong>${baixos}</strong> artigo(s) com stock crítico ou esgotado. Faça compras com fornecedores para não perder vendas!`;
+        } else if (ticketMedio > 0) {
+            elRecomendacao.innerHTML = `✅ <strong>Negócio Saudável:</strong> O seu ticket médio é de <strong>${dinheiro(ticketMedio)}</strong>. Ofereça combos ou produtos de conveniência no balcão para subir o valor por cliente.`;
+        } else {
+            elRecomendacao.innerHTML = `💡 <strong>Primeiros Passos:</strong> Registe produtos e comece a faturar no POS para gerar indicadores preditivos de lucro.`;
+        }
+    }
+};
+
+// Atualiza diagnóstico ao abrir modal de sugestões
+document.getElementById("btn-abrir-sugestoes")?.addEventListener("click", () => {
+    window.atualizarDiagnosticoEmpresa();
 });
 
