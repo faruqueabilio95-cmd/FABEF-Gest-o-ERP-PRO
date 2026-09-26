@@ -13,6 +13,50 @@
   }
 }
 </script>
+<script>
+// Função global de sincronização e atualização imediata (disponível logo no arranque)
+window.forcarAtualizacaoSistema = async function() {
+    const btns = [
+        document.getElementById("btn-atualizar-app"),
+        document.getElementById("btn-atualizar-login")
+    ];
+    btns.forEach(b => {
+        if (b) {
+            b.innerText = "⏳ A atualizar e limpar cache...";
+            b.disabled = true;
+        }
+    });
+
+    try {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage("LIMPAR_CACHE");
+            navigator.serviceWorker.controller.postMessage("SKIP_WAITING");
+        }
+        if ("serviceWorker" in navigator) {
+            const registros = await navigator.serviceWorker.getRegistrations();
+            for (const reg of registros) {
+                await reg.unregister();
+            }
+        }
+        if ("caches" in window) {
+            const chaves = await caches.keys();
+            for (const chave of chaves) {
+                await caches.delete(chave);
+            }
+        }
+        if ("sessionStorage" in window) {
+            sessionStorage.clear();
+        }
+    } catch (e) {
+        console.warn("Aviso ao limpar caches locais:", e);
+    }
+
+    setTimeout(() => {
+        const urlBase = window.location.origin + window.location.pathname;
+        window.location.href = urlBase + (urlBase.includes("?") ? "&" : "?") + "atualizado=" + Date.now();
+    }, 300);
+};
+</script>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#10b981">
 <meta name="mobile-web-app-capable" content="yes">
@@ -114,7 +158,7 @@ table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
 
 /* Modais */
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.6); display: none; align-items: center; justify-content: center; z-index: 700; padding: 15px; }
-.modal-overlay.show { display: flex; }
+.modal-overlay.show, .modal-overlay.active { display: flex; }
 .modal-box { background: #fff; border-radius: 12px; padding: 20px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
 .modal-box h3 { margin-bottom: 14px; }
 .modal-acoes { display: flex; gap: 8px; margin-top: 10px; }
@@ -162,15 +206,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 </head>
 <body>
 
-<!-- Notificação de Atualização do Aplicativo -->
-<div id="barra-atualizacao-app" style="display:none;position:fixed;top:0;left:0;right:0;background:#1e40af;color:#ffffff;padding:10px 16px;z-index:9999999;box-shadow:0 4px 12px rgba(0,0,0,0.3);text-align:center;font-size:13px;font-weight:600;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;">
-  <span>✨ Nova versão do FABEF ERP disponível com as últimas alterações!</span>
-  <button type="button" onclick="forcarAtualizacaoSistema()" style="background:#10b981;color:#ffffff;border:none;padding:6px 14px;border-radius:6px;font-weight:800;cursor:pointer;font-size:13px;box-shadow:0 2px 4px rgba(0,0,0,0.2);">
-    🔄 Atualizar Agora
-  </button>
-  <button type="button" onclick="document.getElementById('barra-atualizacao-app').style.display='none'" style="background:transparent;border:1px solid rgba(255,255,255,0.4);color:#ffffff;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:12px;">✕</button>
-</div>
-
 <!-- ================= LOGIN / REGISTO ================= -->
 <div id="tela-login">
   <div class="card-login">
@@ -201,11 +236,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
       <p class="rodape-criar-conta">Ainda não tem conta? <a id="btn-mostrar-registo">Criar conta</a></p>
       <p class="rodape-criar-conta"><a id="btn-esqueci-senha">Esqueci a senha</a></p>
-      <div style="margin-top:14px;text-align:center;">
-        <button type="button" onclick="forcarAtualizacaoSistema()" style="background:none;border:none;color:#0284c7;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;">
-          🔄 Aplicativo desatualizado? Toque para atualizar o sistema
-        </button>
-      </div>
     </form>
 
     <form id="registo-form" class="hidden" onsubmit="return false;">
@@ -288,6 +318,14 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </form>
 
     <div id="login-status" class="status-msg">Aguardando autenticação...</div>
+
+    <!-- SINCRONIZAÇÃO / ATUALIZAÇÃO NO ECRÃ INICIAL DE ENTRADA -->
+    <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid #e2e8f0; text-align: center;">
+      <button id="btn-atualizar-login" type="button" class="btn btn-small" onclick="forcarAtualizacaoSistema()" style="background:#0284c7;color:#fff;font-weight:700;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:12px;box-shadow:0 2px 4px rgba(2,132,199,0.25);width:100%;display:flex;justify-content:center;align-items:center;gap:6px;">
+        🔄 Sincronizar / Atualizar Aplicativo
+      </button>
+      <div style="font-size:11px;color:#64748b;margin-top:6px;">Toque para carregar a versão mais recente e limpar cache local</div>
+    </div>
   </div>
 </div>
 
@@ -327,7 +365,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <div style="margin-top:12px;border-top:1px solid #f1f5f9;padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:12px;">
       <a id="btn-pin-esqueceu" style="color:#2563eb;cursor:pointer;font-weight:600;">🔑 Esqueci meu PIN / Entrar com senha</a>
-      <a onclick="forcarAtualizacaoSistema()" style="color:#0284c7;cursor:pointer;font-weight:600;">🔄 Atualizar versão do aplicativo</a>
       <a id="btn-pin-sair" style="color:#64748b;cursor:pointer;">🚪 Sair e trocar de conta</a>
     </div>
   </div>
@@ -346,9 +383,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
     <div class="lado">
       <span id="indicador-ligacao" style="font-size:11px;font-weight:700;"></span>
-      <button id="btn-atualizar-app" class="btn btn-small" onclick="forcarAtualizacaoSistema()" style="background:#0284c7;color:#fff;font-weight:700;padding:6px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:4px;border:none;cursor:pointer;" title="Sincronizar e carregar a versão mais recente do aplicativo">
-        🔄 Atualizar
-      </button>
       <button id="btn-abrir-sugestoes" class="btn btn-small" style="background:#f59e0b;color:#0f172a;font-weight:700;padding:6px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:5px;border:none;cursor:pointer;" title="Ver Diagnóstico & Sugestões de Melhoria">
         💡 Sugestões
       </button>
@@ -395,6 +429,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <details style="margin-top:6px;border-left:3px solid #3b82f6;padding-left:4px;" open>
       <summary style="cursor:pointer;color:#93c5fd;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;letter-spacing:0.5px;">⚙️ Configurações & Sistema</summary>
       <button data-sec="config" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
+      <button type="button" id="btn-sidebar-menu-pin" onclick="abrirModalDefinirPin()" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;display:flex;align-items:center;gap:6px;">🔢 Definir PIN de Segurança</button>
       <button data-sec="despesas" style="background:#fff1f2;color:#991b1b;font-weight:700;border:1px solid #fecdd3;">⚡ Despesas do Negócio (Luz, Água, Renda)</button>
       <button data-sec="funcionarios">🧑‍💼 Equipa & Vales Salariais</button>
       <button data-sec="dispensas" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #fde68a;">🏖️ Dispensas Funcionários</button>
@@ -404,9 +439,11 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </details>
 
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:6px;">
-      <button id="btn-sidebar-atualizar" onclick="forcarAtualizacaoSistema()" style="background:#0f766e;border:1px solid #14b8a6;color:#ccfbf1;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
-        🔄 <span>Atualizar App / Limpar Cache</span>
+      <!-- ESPAÇO PARA O FUNCIONÁRIO / GERENTE DEFINIR O SEU PIN -->
+      <button id="btn-sidebar-definir-pin" style="background:#1e293b;border:1.5px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
+        🔢 <span>Definir / Alterar Meu PIN</span>
       </button>
+      <!-- PARTE DE DEFINIR / ALTERAR SENHA (MANTIDA NO MESMO LUGAR) -->
       <button id="btn-sidebar-alterar-senha" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;font-size:12px;font-weight:600;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
         🔑 <span>Alterar Minha Senha</span>
       </button>
@@ -432,6 +469,21 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div id="aviso-licenca"></div>
       <div id="aviso-reconciliacao-stock"></div>
       <div id="aviso-plano-gratis"></div>
+
+      <!-- ATUALIZAÇÃO DO APLICATIVO (EXCLUSIVO DA PÁGINA INICIAL) -->
+      <div class="card" style="margin:12px 0;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">🔄</span>
+          <div>
+            <div style="font-weight:700;font-size:13px;color:#0369a1;">Sincronização & Atualização do Aplicativo</div>
+            <div style="font-size:12px;color:#0284c7;">Toque para sincronizar e carregar as últimas atualizações do sistema no seu dispositivo.</div>
+          </div>
+        </div>
+        <button id="btn-atualizar-app" type="button" class="btn btn-small" onclick="forcarAtualizacaoSistema()" style="background:#0284c7;color:#fff;font-weight:700;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:12px;box-shadow:0 2px 4px rgba(2,132,199,0.25);">
+          🔄 Atualizar Aplicativo
+        </button>
+      </div>
+
       <div class="card" style="margin:12px 0;padding:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <strong>📅 Dia de trabalho:</strong>
         <input type="date" id="fabef-dia-ativo" style="padding:8px;border:1px solid #cbd5e1;border-radius:7px;">
@@ -476,6 +528,21 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         </div>
       </div>
 
+      <!-- ALERTA DE REPOSIÇÃO & RUPTURA DE STOCK NA PÁGINA INICIAL -->
+      <div id="inicio-alerta-stock-card" class="card" style="margin-top:14px;border:1.5px solid #fecaca;background:#fff5f5;display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+          <h3 style="margin:0;font-size:15px;color:#991b1b;display:flex;align-items:center;gap:6px;">
+            <span>⚠️</span> Artigos com Stock Baixo / Necessidade de Reposição
+          </h3>
+          <button type="button" class="btn btn-small" onclick="mostrarSecao('produtos')" style="background:#dc2626;color:#fff;border:none;font-weight:700;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;">Ver no Inventário ➔</button>
+        </div>
+        <p style="font-size:12px;color:#7f1d1d;margin:0 0 10px 0;">Os seguintes artigos atingiram a quantidade mínima ou estão próximos de esgotar no ramo ativo. Reponha com fornecedores para manter as vendas.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Artigo</th><th>Preço</th><th>Stock Atual</th><th>Mínimo</th><th>Estado</th></tr></thead>
+          <tbody id="tabela-inicio-stock-baixo"></tbody>
+        </table></div>
+      </div>
+
       <div class="hidden"><span id="inicio-empresa"></span></div>
     </section>
 
@@ -495,8 +562,13 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div id="aviso-pos-offline"></div>
       <div class="pos-layout">
         <div class="card">
+          <!-- ATALHOS RÁPIDOS DE TECLADO E FEEDBACK AUDITIVO NO BALCÃO -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:#64748b;margin-bottom:8px;background:#f8fafc;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;flex-wrap:wrap;">
+            <span>⌨️ <strong>Atalhos de Balcão:</strong> <kbd style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-weight:700;color:#1e293b;">F2</kbd> Buscar Artigo &nbsp;|&nbsp; <kbd style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-weight:700;color:#1e293b;">F4</kbd> Finalizar &nbsp;|&nbsp; <kbd style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-weight:700;color:#1e293b;">ESC</kbd> Limpar</span>
+            <span id="pos-leitor-beep-status" style="color:#059669;font-weight:700;display:inline-flex;align-items:center;gap:4px;">🔊 Som activo</span>
+          </div>
           <div style="display:flex;gap:8px;margin-bottom:12px;">
-            <input type="text" id="pos-pesquisa" placeholder="🔍 Pesquisar produto..." style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
+            <input type="text" id="pos-pesquisa" placeholder="🔍 Pesquisar produto... (ou prima F2)" style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
             <button id="btn-ler-codigo-barras" class="btn btn-primary" type="button" style="width:auto;white-space:nowrap;">📷 Ler código</button>
           </div>
           <div id="pos-sugestoes-rapidas"></div>
@@ -536,6 +608,34 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
               <option value="Cartão">Cartão</option>
               <option value="Transferência">Transferência</option>
             </select>
+          </div>
+
+          <!-- CALCULADORA RÁPIDA DE TROCO & NOTAS (PARA PAGAMENTO EM NUMERÁRIO) -->
+          <div id="pos-secao-troco" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label for="pos-valor-entregue" style="font-weight:700;color:#166534;font-size:12px;margin:0;">💵 Valor Recebido do Cliente (MT)</label>
+              <button type="button" id="btn-troco-exato" class="btn btn-small" style="background:#dcfce7;color:#15803d;font-weight:700;border:1px solid #86efac;font-size:11px;padding:2px 8px;cursor:pointer;">Valor Exato</button>
+            </div>
+            <input type="number" id="pos-valor-entregue" min="0" step="1" placeholder="Ex: 500" style="font-size:16px;font-weight:700;height:40px;border:1px solid #86efac;background:#fff;border-radius:6px;width:100%;margin-bottom:8px;padding:6px 10px;">
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="50" style="padding:3px 8px;font-size:11px;font-weight:700;">+50 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="100" style="padding:3px 8px;font-size:11px;font-weight:700;">+100 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="200" style="padding:3px 8px;font-size:11px;font-weight:700;">+200 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="500" style="padding:3px 8px;font-size:11px;font-weight:700;">+500 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="1000" style="padding:3px 8px;font-size:11px;font-weight:700;">+1000 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="limpar" style="padding:3px 8px;font-size:11px;color:#dc2626;font-weight:700;" title="Limpar valor recebido">✕</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;padding:8px 12px;border-radius:6px;border:1px solid #bbf7d0;">
+              <span style="font-size:13px;font-weight:700;color:#166534;">Troco a Devolver:</span>
+              <strong id="pos-troco-display" style="font-size:17px;font-weight:900;color:#15803d;">MT 0,00</strong>
+            </div>
+          </div>
+
+          <!-- REGISTO & VALIDAÇÃO DE TRANSAÇÃO M-PESA & E-MOLA -->
+          <div id="pos-secao-mobile" class="hidden" style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <label for="pos-ref-mobile" style="font-weight:700;color:#1e40af;font-size:12px;display:block;margin-bottom:4px;">📱 Código de Transação M-Pesa / E-Mola (Opcional)</label>
+            <input type="text" id="pos-ref-mobile" placeholder="Ex: CI260926.1234.A01234 ou 84xxxxxxx" style="font-family:monospace;font-size:13px;height:38px;border:1px solid #93c5fd;background:#fff;border-radius:6px;width:100%;padding:6px 10px;">
+            <div style="font-size:11px;color:#2563eb;margin-top:4px;">✓ Validação de pagamento móvel — registado no recibo e na auditoria.</div>
           </div>
           <div class="form-group" style="display:flex;align-items:center;gap:8px;">
             <input type="checkbox" id="pos-pagamento-misto" style="width:auto;">
@@ -598,6 +698,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             <option value="ano">Este Ano (Anual)</option>
           </select>
           <button type="button" class="btn btn-light" onclick="renderVendas()" style="padding:10px 14px;">🔄 Atualizar</button>
+          <button type="button" class="btn btn-light" onclick="exportarVendasExcel()" style="padding:10px 14px;border:1px solid #10b981;color:#047857;font-weight:700;">📊 Exportar Excel (CSV)</button>
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Data</th><th>Operador</th><th>Itens & Quantidade</th><th>Total</th><th>Pagamento</th><th>NUIT</th><th>Ramo</th><th>Ações</th></tr></thead>
@@ -663,6 +764,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <option value="Outro">Outro</option>
         </select>
           <button id="btn-novo-produto" class="btn btn-primary">+ Novo produto</button>
+          <button type="button" class="btn btn-light" onclick="exportarInventarioCSV()" style="border:1px solid #10b981;color:#047857;font-weight:700;padding:10px 16px;">📊 Exportar Excel (CSV)</button>
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Nome</th><th>Código</th><th>Custo</th><th>Preço</th><th>Stock</th><th>Mínimo</th><th>Ramo</th><th>Estado</th><th>Ações</th></tr></thead>
@@ -806,7 +908,10 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <div class="form-group"><label for="divida-valor">Valor</label><input type="number" id="divida-valor" min="0" step="0.01"></div>
           <div class="form-group"><label for="divida-limite">Limite de crédito</label><input type="number" id="divida-limite" min="0" step="0.01"></div>
         </div>
-        <button id="btn-registar-divida" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar dívida</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button id="btn-registar-divida" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Registar dívida</button>
+          <button type="button" class="btn btn-light" onclick="exportarDividasExcel()" style="width:auto;padding:10px 18px;border:1px solid #10b981;color:#047857;font-weight:700;">📊 Exportar Dívidas Excel (CSV)</button>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrap"><table>
@@ -880,6 +985,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <button class="btn btn-success" type="button" style="background-color:#25d366;" onclick="enviarRelatorioWhatsApp()">📱 WhatsApp</button>
           <button class="btn btn-light" type="button" onclick="exportarRelatorioPDF()">🖨️ PDF</button>
           <button class="btn btn-light" type="button" onclick="exportarRelatorioWord()">📄 Word</button>
+          <button class="btn btn-light" type="button" onclick="exportarRelatorioExcel()" style="border:1px solid #10b981;color:#047857;font-weight:700;">📊 Excel (CSV)</button>
         </div>
       </div>
       <div id="aviso-relatorios-avancados"></div>
@@ -1031,7 +1137,8 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             <div class="form-group"><label for="func-email">E-mail</label><input type="email" id="func-email"></div>
             <div class="form-group"><label for="func-telefone">Telefone</label><input type="text" id="func-telefone"></div>
             <div class="form-group"><label for="func-ramo">Ramo de Atuação / Filial</label><select id="func-ramo"></select></div>
-            <div class="form-group"><label for="func-senha">Senha</label><input type="password" id="func-senha" placeholder="Mínimo 6 caracteres"></div>
+            <div class="form-group"><label for="func-senha">Senha de Acesso (Mínimo 6 caracteres) *</label><input type="password" id="func-senha" placeholder="Mínimo 6 caracteres"></div>
+            <div class="form-group"><label for="func-pin">Código PIN de Bloqueio Rápido (4 a 6 números, opcional)</label><input type="password" id="func-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234"></div>
             <div class="form-group"><label for="func-foto">Foto (link/URL, opcional)</label><input type="text" id="func-foto" placeholder="https://..."></div>
           </div>
           <button id="btn-cadastrar-funcionario" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Cadastrar funcionário</button>
@@ -1451,21 +1558,22 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <input type="text" id="config-rodape" placeholder="Ex: Obrigado por cuidar da sua beleza no Salão Aurora! Volte sempre.">
         </div>
         <button id="btn-guardar-config" class="btn btn-entrar" style="width:auto;padding:12px 26px;font-weight:700;">💾 Guardar Configurações deste Ramo</button>
-      </div><div class="card">
+      <div class="card">
         <h3 style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
-          <span>🛡️</span> Segurança, Proteção de Caixa & Bloqueio por PIN
+          <span>🛡️</span> Segurança: Código PIN de Bloqueio & Senha da Conta
         </h3>
         <p style="font-size:13px;color:#64748b;margin-bottom:12px;">
-          Para garantir total segurança e sigilo dos seus dados de vendas e stock, a aplicação exige autenticação através do código PIN de 4 a 6 dígitos sempre que for reaberta no celular ou quando for minimizada.
+          Defina ou altere o seu código PIN de 4 a 6 dígitos para proteger o caixa e bloquear o aplicativo com facilidade. Pode também atualizar a sua senha de login sem sair do sistema.
         </p>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div>
             <div style="font-size:12px;color:#64748b;">Estado da Proteção por PIN neste aparelho:</div>
             <strong id="config-pin-estado" style="font-size:14px;color:#16a34a;">🟢 PIN ATIVO E PROTEGIDO</strong>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button id="btn-alterar-pin" class="btn btn-primary" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;">🔑 Alterar PIN</button>
-            <button id="btn-testar-bloqueio" class="btn btn-light" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:600;">🔒 Testar Bloqueio Agora</button>
+            <button id="btn-alterar-pin" class="btn btn-primary" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;">🔢 Definir / Alterar PIN</button>
+            <button id="btn-config-alterar-senha" class="btn" type="button" onclick="document.getElementById('modal-alterar-senha')?.classList.add('show')" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;background:#0f172a;color:#fff;">🔑 Alterar Senha</button>
+            <button id="btn-testar-bloqueio" class="btn btn-light" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:600;">🔒 Testar Bloqueio</button>
           </div>
         </div>
       </div>
@@ -1483,18 +1591,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         </ul>
         <button id="btn-instalar-app" class="btn" style="background:#2563eb; color:#fff; font-weight:700; padding:10px 20px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
           📲 Instalar no Ecrã Principal do Celular
-        </button>
-      </div>
-
-      <div class="card" style="border: 1.5px solid #0284c7; background: #f0f9ff; border-radius: 12px; padding: 16px; margin-top: 14px;">
-        <h4 style="margin:0 0 6px;color:#0369a1;display:flex;align-items:center;gap:6px;">
-          <span>🔄</span> Sincronização & Atualização do Aplicativo (PWA)
-        </h4>
-        <p style="font-size:13px;color:#334155;margin:0 0 12px;">
-          Se instalou o aplicativo no celular ou no computador e notar diferenças em relação ao preview ou às últimas modificações feitas, toque no botão abaixo para descarregar a versão mais recente do sistema e limpar ficheiros em cache com segurança (os seus dados de vendas e produtos no Firebase não são apagados).
-        </p>
-        <button type="button" class="btn" onclick="forcarAtualizacaoSistema()" style="background:#0284c7;color:#fff;font-weight:800;padding:10px 18px;border-radius:8px;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 4px rgba(2,132,199,0.25);">
-          🔄 Atualizar Aplicativo & Limpar Cache Agora
         </button>
       </div>
       </div> <!-- /#tab-config-conteudo-geral -->
@@ -1733,7 +1829,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div id="status-config-pin" class="status-msg"></div>
 
       <div class="modal-acoes" style="margin-top:16px;">
-        <button type="button" class="btn btn-light" id="btn-cancelar-pin" style="flex:1;">Cancelar</button>
+        <button type="button" class="btn btn-light" id="btn-cancelar-pin" onclick="fecharModal('modal-configurar-pin')" style="flex:1;">Cancelar</button>
         <button type="button" class="btn btn-entrar" id="btn-salvar-pin" style="flex:1;background:#2563eb;">🔒 Ativar PIN</button>
       </div>
     </div>
@@ -1746,6 +1842,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="form-group"><label for="edit-func-nome">Nome</label><input type="text" id="edit-func-nome"></div>
       <div class="form-group"><label for="edit-func-telefone">Telefone</label><input type="text" id="edit-func-telefone"></div>
       <div class="form-group"><label for="edit-func-ramo">Ramo de Atuação / Filial</label><select id="edit-func-ramo"></select></div>
+      <div class="form-group"><label for="edit-func-pin">Definir Novo PIN do Funcionário (4 a 6 números, opcional)</label><input type="password" id="edit-func-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Deixe em branco para manter o atual"></div>
       <p style="font-size:12px;color:#64748b;">O e-mail de acesso não pode ser alterado aqui. Para desativar o acesso, use o botão "Desativar" na lista.</p>
       <div class="modal-acoes">
         <button class="btn btn-light" type="button" onclick="fecharModal('modal-editar-funcionario')" style="flex:1;">Cancelar</button>
@@ -2097,45 +2194,22 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
 <!-- Biblioteca de leitura de código de barras/QR por câmara — funciona em Chrome, Safari (iOS) e Firefox, porque faz a descodificação em JavaScript puro, sem depender de nenhuma função nativa do navegador -->
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script type="module" charset="UTF-8" src="./src/app.js"></script>
+<script>
+window.FABEF_CARREGADO = false;
+</script>
+<script type="module" charset="UTF-8" src="./src/app.js" onload="window.FABEF_CARREGADO=true;" onerror="
+  if (!window.FABEF_CARREGADO) {
+    console.warn('Ficheiro ./src/app.js não encontrado. A carregar ./app.js da mesma pasta...');
+    const s = document.createElement('script');
+    s.type = 'module';
+    s.charset = 'UTF-8';
+    s.src = './app.js';
+    document.body.appendChild(s);
+  }
+"></script>
 
 <!-- Regista o Service Worker: é isto que permite abrir a aplicação sem internet e manter o PWA sempre atualizado -->
 <script>
-    window.forcarAtualizacaoSistema = async function() {
-        const btnTopo = document.getElementById("btn-atualizar-app");
-        if (btnTopo) btnTopo.innerText = "⏳ Atualizando...";
-
-        try {
-            // Notifica o service worker atual para limpar a cache
-            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage("LIMPAR_CACHE");
-                navigator.serviceWorker.controller.postMessage("SKIP_WAITING");
-            }
-
-            // Desregista todos os service workers instalados
-            if ("serviceWorker" in navigator) {
-                const registros = await navigator.serviceWorker.getRegistrations();
-                for (const reg of registros) {
-                    await reg.unregister();
-                }
-            }
-
-            // Apaga todas as instâncias de CacheStorage
-            if ("caches" in window) {
-                const chaves = await caches.keys();
-                for (const chave of chaves) {
-                    await caches.delete(chave);
-                }
-            }
-        } catch (e) {
-            console.warn("Aviso ao limpar caches locais:", e);
-        }
-
-        // Força recarregar a partir do servidor com timestamp único anti-cache
-        const urlBase = window.location.origin + window.location.pathname;
-        window.location.replace(urlBase + "?atualizado=" + Date.now());
-    };
-
     if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
             navigator.serviceWorker.register("./service-worker.js")
@@ -2143,7 +2217,7 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
                     // Força verificação imediata de atualizações no servidor
                     reg.update();
 
-                    // Se houver um novo worker pronto, exibe o aviso
+                    // Se houver um novo worker pronto, sinaliza no botão da página inicial
                     if (reg.waiting) {
                         mostrarBarraAtualizacao(reg.waiting);
                     }
@@ -2182,10 +2256,16 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
     }
 
     function mostrarBarraAtualizacao(worker) {
-        const barra = document.getElementById("barra-atualizacao-app");
-        if (barra) {
-            barra.style.display = "flex";
-        }
+        const btns = [
+            document.getElementById("btn-atualizar-app"),
+            document.getElementById("btn-atualizar-login")
+        ];
+        btns.forEach(btn => {
+            if (btn) {
+                btn.innerHTML = "✨ Nova Versão Disponível — Atualizar";
+                btn.style.background = "#10b981";
+            }
+        });
         if (worker) {
             worker.postMessage("SKIP_WAITING");
         }
@@ -2205,6 +2285,39 @@ document.getElementById('btn-toggle-dark')?.addEventListener('click', () => docu
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 16px; font-size: 13px; line-height: 1.6; color: #334155;">
+      
+      <!-- DIAGNÓSTICO EM TEMPO REAL DA EMPRESA -->
+      <div style="background: linear-gradient(135deg, #1e3a8a, #0f172a); border-radius: 12px; padding: 16px; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+          <h4 style="margin:0; font-size:15px; font-weight:800; color:#93c5fd; display:flex; align-items:center; gap:6px;">
+            📊 Raio-X & Saúde do Negócio em Tempo Real
+          </h4>
+          <button type="button" class="btn btn-small" onclick="atualizarDiagnosticoEmpresa()" style="background:#3b82f6; color:#fff; font-weight:700; font-size:11px; padding:4px 12px; border:none; border-radius:6px; cursor:pointer;">
+            🔄 Atualizar Indicadores
+          </button>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:12px;">
+          <div style="background:rgba(255,255,255,0.08); padding:10px; border-radius:8px; text-align:center;">
+            <span style="font-size:11px; color:#cbd5e1; display:block;">Total Vendas</span>
+            <strong id="diag-total-vendas" style="font-size:16px; color:#fff;">0</strong>
+          </div>
+          <div style="background:rgba(255,255,255,0.08); padding:10px; border-radius:8px; text-align:center;">
+            <span style="font-size:11px; color:#cbd5e1; display:block;">Ticket Médio</span>
+            <strong id="diag-ticket-medio" style="font-size:16px; color:#6ee7b7;">MT 0,00</strong>
+          </div>
+          <div style="background:rgba(255,255,255,0.08); padding:10px; border-radius:8px; text-align:center;">
+            <span style="font-size:11px; color:#cbd5e1; display:block;">Top Produto</span>
+            <strong id="diag-top-produto" style="font-size:12px; color:#fde047; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">—</strong>
+          </div>
+          <div style="background:rgba(255,255,255,0.08); padding:10px; border-radius:8px; text-align:center;">
+            <span style="font-size:11px; color:#cbd5e1; display:block;">Stock Crítico</span>
+            <strong id="diag-artigos-baixo" style="font-size:16px; color:#fca5a5;">0</strong>
+          </div>
+        </div>
+        <div id="diag-recomendacao" style="background:rgba(255,255,255,0.12); padding:10px 14px; border-radius:8px; font-size:12px; line-height:1.4; border-left:3px solid #6ee7b7;">
+          💡 <strong>Recomendação Comercial:</strong> Mantenha o caixa do turno sempre conciliado e consulte o relatório diário para antecipar compras com fornecedores.
+        </div>
+      </div>
       
       <!-- Bloco 1 -->
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px;">
