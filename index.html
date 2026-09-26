@@ -429,7 +429,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <details style="margin-top:6px;border-left:3px solid #3b82f6;padding-left:4px;" open>
       <summary style="cursor:pointer;color:#93c5fd;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;letter-spacing:0.5px;">⚙️ Configurações & Sistema</summary>
       <button data-sec="config" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
-      <button type="button" id="btn-sidebar-menu-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;display:flex;align-items:center;gap:6px;">🔢 Definir PIN de Segurança</button>
+      <button type="button" id="btn-sidebar-menu-pin" onclick="abrirModalDefinirPin()" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;display:flex;align-items:center;gap:6px;">🔢 Definir PIN de Segurança</button>
       <button data-sec="despesas" style="background:#fff1f2;color:#991b1b;font-weight:700;border:1px solid #fecdd3;">⚡ Despesas do Negócio (Luz, Água, Renda)</button>
       <button data-sec="funcionarios">🧑‍💼 Equipa & Vales Salariais</button>
       <button data-sec="dispensas" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #fde68a;">🏖️ Dispensas Funcionários</button>
@@ -440,7 +440,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:6px;">
       <!-- ESPAÇO PARA O FUNCIONÁRIO / GERENTE DEFINIR O SEU PIN -->
-      <button id="btn-sidebar-definir-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#1e293b;border:1.5px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
+      <button id="btn-sidebar-definir-pin" style="background:#1e293b;border:1.5px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
         🔢 <span>Definir / Alterar Meu PIN</span>
       </button>
       <!-- PARTE DE DEFINIR / ALTERAR SENHA (MANTIDA NO MESMO LUGAR) -->
@@ -614,22 +614,20 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <div id="pos-secao-troco" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px;margin-bottom:12px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
               <label for="pos-valor-entregue" style="font-weight:700;color:#166534;font-size:12px;margin:0;">💵 Valor Recebido do Cliente (MT)</label>
-              <button type="button" id="btn-troco-exato" onclick="window.definirTrocoExato()" class="btn btn-small" style="background:#dcfce7;color:#15803d;font-weight:700;border:1px solid #86efac;font-size:11px;padding:3px 10px;cursor:pointer;">Valor Exato</button>
+              <button type="button" id="btn-troco-exato" class="btn btn-small" style="background:#dcfce7;color:#15803d;font-weight:700;border:1px solid #86efac;font-size:11px;padding:2px 8px;cursor:pointer;">Valor Exato</button>
             </div>
-            <input type="number" id="pos-valor-entregue" min="0" step="1" placeholder="Ex: 500" oninput="window.atualizarCalculoTrocoPOS()" onkeyup="window.atualizarCalculoTrocoPOS()" onchange="window.atualizarCalculoTrocoPOS()" style="font-size:18px;font-weight:800;height:42px;border:1.5px solid #86efac;background:#fff;border-radius:6px;width:100%;margin-bottom:8px;padding:6px 12px;color:#0f172a;">
+            <input type="number" id="pos-valor-entregue" min="0" step="1" placeholder="Ex: 500" style="font-size:16px;font-weight:700;height:40px;border:1px solid #86efac;background:#fff;border-radius:6px;width:100%;margin-bottom:8px;padding:6px 10px;">
             <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">
-              <button type="button" onclick="window.definirNotaTroco(50)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">50 MT</button>
-              <button type="button" onclick="window.definirNotaTroco(100)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">100 MT</button>
-              <button type="button" onclick="window.definirNotaTroco(200)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">200 MT</button>
-              <button type="button" onclick="window.definirNotaTroco(500)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">500 MT</button>
-              <button type="button" onclick="window.definirNotaTroco(1000)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">1000 MT</button>
-              <button type="button" onclick="window.somarNotaTroco(50)" class="btn btn-small btn-light" style="padding:4px 8px;font-size:11px;font-weight:700;color:#0369a1;background:#e0f2fe;border:1px solid #bae6fd;cursor:pointer;" title="Adicionar 50 MT">+50</button>
-              <button type="button" onclick="window.somarNotaTroco(100)" class="btn btn-small btn-light" style="padding:4px 8px;font-size:11px;font-weight:700;color:#0369a1;background:#e0f2fe;border:1px solid #bae6fd;cursor:pointer;" title="Adicionar 100 MT">+100</button>
-              <button type="button" onclick="window.limparNotaTroco()" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;color:#dc2626;font-weight:800;background:#fee2e2;border:1px solid #fca5a5;cursor:pointer;" title="Limpar valor recebido">✕ Limpar</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="50" style="padding:3px 8px;font-size:11px;font-weight:700;">+50 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="100" style="padding:3px 8px;font-size:11px;font-weight:700;">+100 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="200" style="padding:3px 8px;font-size:11px;font-weight:700;">+200 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="500" style="padding:3px 8px;font-size:11px;font-weight:700;">+500 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="1000" style="padding:3px 8px;font-size:11px;font-weight:700;">+1000 MT</button>
+              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="limpar" style="padding:3px 8px;font-size:11px;color:#dc2626;font-weight:700;" title="Limpar valor recebido">✕</button>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;padding:10px 14px;border-radius:8px;border:1.5px solid #bbf7d0;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;padding:8px 12px;border-radius:6px;border:1px solid #bbf7d0;">
               <span style="font-size:13px;font-weight:700;color:#166534;">Troco a Devolver:</span>
-              <strong id="pos-troco-display" style="font-size:20px;font-weight:900;color:#15803d;">MT 0,00</strong>
+              <strong id="pos-troco-display" style="font-size:17px;font-weight:900;color:#15803d;">MT 0,00</strong>
             </div>
           </div>
 
@@ -1573,7 +1571,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             <strong id="config-pin-estado" style="font-size:14px;color:#16a34a;">🟢 PIN ATIVO E PROTEGIDO</strong>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button id="btn-alterar-pin" class="btn btn-primary" type="button" onclick="window.abrirModalDefinirPin()" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">🔢 Definir / Alterar PIN</button>
+            <button id="btn-alterar-pin" class="btn btn-primary" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;">🔢 Definir / Alterar PIN</button>
             <button id="btn-config-alterar-senha" class="btn" type="button" onclick="document.getElementById('modal-alterar-senha')?.classList.add('show')" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;background:#0f172a;color:#fff;">🔑 Alterar Senha</button>
             <button id="btn-testar-bloqueio" class="btn btn-light" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:600;">🔒 Testar Bloqueio</button>
           </div>
@@ -1820,25 +1818,19 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
       <div class="form-group" style="text-align:left;">
         <label for="input-novo-pin" style="font-weight:700;">Novo Código PIN (4 a 6 números)</label>
-        <div style="position:relative;">
-          <input type="password" id="input-novo-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;width:100%;height:46px;padding-right:40px;">
-          <button type="button" onclick="const i=document.getElementById('input-novo-pin'); i.type = i.type==='password'?'text':'password'; this.textContent = i.type==='password'?'👁️':'🔒';" style="position:absolute;right:8px;top:8px;background:none;border:none;cursor:pointer;font-size:18px;" title="Ver/Ocultar PIN">👁️</button>
-        </div>
+        <input type="password" id="input-novo-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:22px;letter-spacing:6px;font-weight:bold;">
       </div>
 
       <div class="form-group" style="text-align:left;">
         <label for="input-confirmar-pin" style="font-weight:700;">Confirmar Novo PIN</label>
-        <div style="position:relative;">
-          <input type="password" id="input-confirmar-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;width:100%;height:46px;padding-right:40px;">
-          <button type="button" onclick="const i=document.getElementById('input-confirmar-pin'); i.type = i.type==='password'?'text':'password'; this.textContent = i.type==='password'?'👁️':'🔒';" style="position:absolute;right:8px;top:8px;background:none;border:none;cursor:pointer;font-size:18px;" title="Ver/Ocultar PIN">👁️</button>
-        </div>
+        <input type="password" id="input-confirmar-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:22px;letter-spacing:6px;font-weight:bold;">
       </div>
 
       <div id="status-config-pin" class="status-msg"></div>
 
       <div class="modal-acoes" style="margin-top:16px;">
         <button type="button" class="btn btn-light" id="btn-cancelar-pin" onclick="fecharModal('modal-configurar-pin')" style="flex:1;">Cancelar</button>
-        <button type="button" class="btn btn-entrar" id="btn-salvar-pin" onclick="window.salvarNovoPin()" style="flex:1.2;background:#2563eb;font-weight:700;font-size:14px;">🔒 Guardar Novo PIN</button>
+        <button type="button" class="btn btn-entrar" id="btn-salvar-pin" style="flex:1;background:#2563eb;">🔒 Ativar PIN</button>
       </div>
     </div>
   </div>
