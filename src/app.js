@@ -1290,7 +1290,7 @@ document.getElementById("btn-pin-sair")?.addEventListener("click", async () => {
 });
 
 // Gravação de PIN no Modal
-document.getElementById("btn-salvar-pin")?.addEventListener("click", async () => {
+async function salvarNovoPin() {
     const inpNovo = document.getElementById("input-novo-pin");
     const inpConf = document.getElementById("input-confirmar-pin");
     const status = document.getElementById("status-config-pin");
@@ -1301,36 +1301,47 @@ document.getElementById("btn-salvar-pin")?.addEventListener("click", async () =>
 
     if (!/^\d{4,6}$/.test(p1)) {
         if (status) {
-            status.textContent = "⚠️ O PIN deve ter entre 4 e 6 números.";
+            status.textContent = "⚠️ O PIN deve conter entre 4 e 6 números (ex: 1234).";
             status.style.color = "#dc2626";
         }
+        inpNovo?.focus();
         return;
     }
     if (p1 !== p2) {
         if (status) {
-            status.textContent = "⚠️ Os PINs introduzidos não são iguais.";
+            status.textContent = "⚠️ Os dois PINs digitados não são iguais. Verifique e tente novamente.";
             status.style.color = "#dc2626";
         }
-        return;
-    }
-
-    const user = auth.currentUser || FABEF.user;
-    if (!user && !window.FABEF?.isDemoMode) {
-        alert("Sessão não detetada. Inicie sessão novamente.");
+        inpConf?.focus();
         return;
     }
 
     try {
         const hash = await calcularHashPin(p1);
-        if (user?.uid) {
-            localStorage.setItem(chavePinLocal(user.uid), hash);
-            try {
-                await updateDoc(doc(db, "utilizadores", user.uid), { pinHash: hash });
-            } catch(e){}
+        const user = auth.currentUser || FABEF.user;
+        const uid = user?.uid || (window.FABEF?.isDemoMode ? "demo" : "padrao");
+
+        // Guarda localmente com garantia offline imediata
+        localStorage.setItem(chavePinLocal(uid), hash);
+        localStorage.setItem(chavePinLocal("demo"), hash);
+        localStorage.setItem("fabef_pin_hash_demo", hash);
+
+        if (FABEF.userData) {
+            FABEF.userData.pinHash = hash;
+            FABEF.userData.pinConfigurado = true;
         }
-        if (window.FABEF?.isDemoMode) {
-            localStorage.setItem("fabef_pin_hash_demo", hash);
-            localStorage.setItem(chavePinLocal("demo"), hash);
+
+        // Tenta sincronizar com o Firestore se for conta online
+        if (user?.uid && !window.FABEF?.isDemoMode) {
+            try {
+                await updateDoc(doc(db, "utilizadores", user.uid), {
+                    pinHash: hash,
+                    pinConfigurado: true,
+                    atualizadoEm: serverTimestamp()
+                });
+            } catch (errDb) {
+                console.warn("Aviso ao sincronizar PIN na nuvem:", errDb);
+            }
         }
 
         sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
@@ -1343,23 +1354,22 @@ document.getElementById("btn-salvar-pin")?.addEventListener("click", async () =>
 
         const configPinEstado = document.getElementById("config-pin-estado");
         if (configPinEstado) {
-            configPinEstado.textContent = "🟢 PIN ATIVO E PROTEGIDO";
+            configPinEstado.textContent = `🟢 PIN ATIVO E PROTEGIDO (${p1.length} DÍGITOS)`;
             configPinEstado.style.color = "#16a34a";
         }
 
-        if (user) {
-            await iniciarSessaoFABEF(user);
-        }
-
-        alert("✅ PIN de segurança definido com sucesso!\nO seu aplicativo agora está 100% protegido. Sempre que for aberto no celular ou minimizado, o PIN será exigido.");
-    } catch(err) {
+        await gravarAuditoria("Definiu/atualizou o seu código PIN de segurança pessoal.", "INFO");
+        alert("✅ Código PIN configurado com sucesso!\nO seu aplicativo agora está 100% protegido. O novo PIN será solicitado ao suspender ou reabrir.");
+    } catch (err) {
         console.error("Erro ao guardar PIN:", err);
         if (status) {
             status.textContent = "Erro ao guardar PIN: " + err.message;
             status.style.color = "#dc2626";
         }
     }
-});
+}
+window.salvarNovoPin = salvarNovoPin;
+document.getElementById("btn-salvar-pin")?.addEventListener("click", window.salvarNovoPin);
 
 // Bloqueio por PIN ao minimizar a aplicação ou suspender o telemóvel
 let appFoiMinimizada = false;
@@ -3874,11 +3884,25 @@ async function finalizarVenda() {
     const desconto = Math.min(numero(document.getElementById("pos-desconto")?.value), total);
     const totalComDesconto = total - desconto;
 
-    const valorEntregueInput = numero(document.getElementById("pos-valor-entregue")?.value);
+    let valorEntregueInput = numero(document.getElementById("pos-valor-entregue")?.value);
     const refMobileInput = document.getElementById("pos-ref-mobile")?.value.trim() || "";
     let trocoCalculado = 0;
-    if (pagamento === "Numerário" && valorEntregueInput > totalComDesconto) {
-        trocoCalculado = valorEntregueInput - totalComDesconto;
+
+    if (pagamento === "Numerário") {
+        if (valorEntregueInput > totalComDesconto) {
+            trocoCalculado = valorEntregueInput - totalComDesconto;
+        } else if (valorEntregueInput <= 0) {
+            const promptTroco = prompt(`💵 Venda em Dinheiro / Numerário\nTotal a Pagar: ${dinheiro(totalComDesconto)}\n\nIndique quanto o cliente entregou para o sistema calcular o troco\n(ou clique OK se entregou o valor exato):`, totalComDesconto.toString());
+            if (promptTroco !== null) {
+                const numPrompt = numero(promptTroco);
+                if (numPrompt > totalComDesconto) {
+                    valorEntregueInput = numPrompt;
+                    trocoCalculado = numPrompt - totalComDesconto;
+                } else if (numPrompt > 0) {
+                    valorEntregueInput = numPrompt;
+                }
+            }
+        }
     }
 
     // ---- Pagamento misto: soma das parcelas tem de bater certo com o total ----
@@ -4023,9 +4047,10 @@ async function finalizarVenda() {
             let trocoHtml = "";
             if (trocoCalculado > 0) {
                 trocoHtml = `
-                    <div style="margin: 8px 0; background: #ecfdf5; border: 1.5px solid #6ee7b7; border-radius: 8px; padding: 6px 12px; display: inline-block;">
-                        <span style="font-size: 0.85rem; color: #047857; font-weight: 700;">Troco a Devolver:</span>
-                        <strong style="font-size: 1.2rem; color: #059669; margin-left: 6px;">${dinheiro(trocoCalculado)}</strong>
+                    <div style="margin: 14px 0; background: #ecfdf5; border: 2px solid #10b981; border-radius: 12px; padding: 12px 16px; box-shadow: 0 4px 12px rgba(16,185,129,0.18);">
+                        <div style="font-size: 13px; color: #047857; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">💵 Entregar Troco ao Cliente:</div>
+                        <div style="font-size: 30px; color: #059669; font-weight: 900; margin-top: 4px;">${dinheiro(trocoCalculado)}</div>
+                        <div style="font-size: 12px; color: #065f46; margin-top: 4px; font-weight: 600;">Recebido: ${dinheiro(valorEntregueInput)} &nbsp;•&nbsp; Total da Venda: ${dinheiro(totalComDesconto)}</div>
                     </div>
                 `;
             }
@@ -9501,6 +9526,7 @@ function obterTotalLiquidoCarrinho() {
     const desconto = Math.min(numero(document.getElementById("pos-desconto")?.value), total);
     return Math.max(0, total - desconto);
 }
+window.obterTotalLiquidoCarrinho = obterTotalLiquidoCarrinho;
 
 function atualizarCalculoTrocoPOS() {
     const totalComDesconto = obterTotalLiquidoCarrinho();
@@ -9511,49 +9537,60 @@ function atualizarCalculoTrocoPOS() {
     const valorEntregue = numero(inputEntregue?.value);
 
     if (!valorEntregue || valorEntregue <= 0) {
-        displayTroco.textContent = "MT 0,00";
+        displayTroco.innerHTML = "MT 0,00";
         displayTroco.style.color = "#15803d";
         return;
     }
 
     const troco = valorEntregue - totalComDesconto;
     if (troco >= 0) {
-        displayTroco.textContent = dinheiro(troco);
+        displayTroco.innerHTML = `MT ${troco.toFixed(2).replace(".", ",")}`;
         displayTroco.style.color = "#15803d";
     } else {
-        displayTroco.textContent = `Falta: ${dinheiro(Math.abs(troco))}`;
+        const falta = Math.abs(troco);
+        displayTroco.innerHTML = `<span style="font-size:13px;font-weight:700;">Falta:</span> MT ${falta.toFixed(2).replace(".", ",")}`;
         displayTroco.style.color = "#dc2626";
     }
 }
 window.atualizarCalculoTrocoPOS = atualizarCalculoTrocoPOS;
 
-// Binds dos botões de notas rápidas
-document.querySelectorAll(".btn-nota-rapida").forEach(btn => {
-    btn.addEventListener("click", () => {
-        const inputEntregue = document.getElementById("pos-valor-entregue");
-        if (!inputEntregue) return;
-        const nota = btn.dataset.nota;
-        if (nota === "limpar") {
-            inputEntregue.value = "";
-        } else {
-            const atual = numero(inputEntregue.value);
-            inputEntregue.value = atual + Number(nota);
-        }
-        atualizarCalculoTrocoPOS();
-    });
-});
+window.definirNotaTroco = function(valor) {
+    const input = document.getElementById("pos-valor-entregue");
+    if (!input) return;
+    input.value = Number(valor);
+    atualizarCalculoTrocoPOS();
+};
 
-document.getElementById("btn-troco-exato")?.addEventListener("click", () => {
+window.somarNotaTroco = function(valor) {
+    const input = document.getElementById("pos-valor-entregue");
+    if (!input) return;
+    const atual = numero(input.value);
+    input.value = atual + Number(valor);
+    atualizarCalculoTrocoPOS();
+};
+
+window.definirTrocoExato = function() {
     const totalComDesconto = obterTotalLiquidoCarrinho();
-    const inputEntregue = document.getElementById("pos-valor-entregue");
-    if (inputEntregue) {
-        inputEntregue.value = totalComDesconto > 0 ? totalComDesconto.toFixed(2) : "";
+    const input = document.getElementById("pos-valor-entregue");
+    if (input) {
+        input.value = totalComDesconto > 0 ? totalComDesconto.toFixed(2) : "";
         atualizarCalculoTrocoPOS();
     }
-});
+};
+
+window.limparNotaTroco = function() {
+    const input = document.getElementById("pos-valor-entregue");
+    if (input) {
+        input.value = "";
+        atualizarCalculoTrocoPOS();
+    }
+};
 
 document.getElementById("pos-valor-entregue")?.addEventListener("input", atualizarCalculoTrocoPOS);
+document.getElementById("pos-valor-entregue")?.addEventListener("keyup", atualizarCalculoTrocoPOS);
+document.getElementById("pos-valor-entregue")?.addEventListener("change", atualizarCalculoTrocoPOS);
 document.getElementById("pos-desconto")?.addEventListener("input", atualizarCalculoTrocoPOS);
+document.getElementById("pos-desconto")?.addEventListener("keyup", atualizarCalculoTrocoPOS);
 
 // Alternância inteligente de campos de pagamento (Troco vs M-Pesa / E-Mola)
 document.getElementById("forma-pagamento")?.addEventListener("change", (e) => {
