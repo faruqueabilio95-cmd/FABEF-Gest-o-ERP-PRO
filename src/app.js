@@ -1916,14 +1916,6 @@ document.addEventListener("click", (e) => {
 });
 
 function mostrarSecao(nome) {
-    if (nome === "despesas") {
-        mostrarSecao("config");
-        if (typeof window.alternarAbaConfiguracoes === "function") {
-            window.alternarAbaConfiguracoes("despesas");
-        }
-        return;
-    }
-
     // Remove o estado ativo de todas as secções
     document.querySelectorAll(".secao").forEach(s => s.classList.remove("active"));
 
@@ -1941,8 +1933,8 @@ function mostrarSecao(nome) {
     const grupo = botaoAtivo?.closest("details");
     if (grupo) grupo.open = true;
 
-    // AO CLICAR NA OPÇão, OS DIZERES DOS 3 PONTOS (SIDEBAR) DESAPARECEM IMEDIATAMENTE
-    // E A TELA PRINCIPAL EXIBE LIMPA A OPÇão SELECIONADA
+    // AO CLICAR NA OPÇÃO, OS DIZERES DOS 3 PONTOS (SIDEBAR) DESAPARECEM IMEDIATAMENTE
+    // E A TELA PRINCIPAL EXIBE LIMPA A OPÇÃO SELECIONADA
     fecharMenuLateral();
 
     // Disparadores contextuais de atualização de tela
@@ -1951,11 +1943,14 @@ function mostrarSecao(nome) {
     } else if (nome === "ramos") {
         renderPastaRamos();
     } else if (nome === "subscricao") {
+        verificarSubscricao();
         atualizarCalculadoraSubscricao();
     } else if (nome === "pos") {
         verificarAcessoPosGerente();
     } else if (nome === "dispensas") {
         if (typeof renderDispensas === "function") renderDispensas();
+    } else if (nome === "despesas") {
+        if (typeof renderDespesas === "function") renderDespesas();
     } else if (nome === "config") {
         if (typeof renderConfiguracoes === "function") renderConfiguracoes();
         if (typeof renderDespesas === "function") renderDespesas();
@@ -5518,51 +5513,86 @@ function atualizarTelaCaixa() {
     }
 }
 /* =====================================================
-   MÓDULO LÓGICO: REGISTO E LANÇAMENTO DE DESPESAS
+   MÓDULO LÓGICO: REGISTO E LANÇAMENTO DE DESPESAS DO ESTABELECIMENTO
 ===================================================== */
 
-document.getElementById("btn-registar-despesa").addEventListener("click", registarDespesa);
+document.getElementById("btn-registar-despesa")?.addEventListener("click", registarDespesa);
 
+window.preencherDespesaRapida = function(descricao, categoria) {
+    const inpDesc = document.getElementById("despesa-descricao");
+    const selCat = document.getElementById("despesa-categoria");
+    if (inpDesc) {
+        inpDesc.value = descricao;
+        inpDesc.focus();
+    }
+    if (selCat && categoria) {
+        selCat.value = categoria;
+    }
+};
+
+window.adicionarValorDespesa = function(valor) {
+    const inpValor = document.getElementById("despesa-valor");
+    if (!inpValor) return;
+    const atual = numero(inpValor.value);
+    inpValor.value = (atual + valor).toFixed(2);
+};
 
 async function registarDespesa() {
-    const descricao = document.getElementById("despesa-descricao").value.trim();
-    const valor = numero(document.getElementById("despesa-valor").value);
-    const categoria = document.getElementById("despesa-categoria")?.value || "Operacional";
+    const inpDesc = document.getElementById("despesa-descricao");
+    const inpValor = document.getElementById("despesa-valor");
+    const selCat = document.getElementById("despesa-categoria");
+    const selRamo = document.getElementById("despesa-ramo");
+    const chkCaixa = document.getElementById("despesa-sair-caixa");
 
-    if (!descricao || valor <= 0) {
-        alert("Introduza uma descrição válida e um valor superior a zero.");
+    const descricao = (inpDesc?.value || "").trim();
+    const valor = numero(inpValor?.value);
+    const categoria = selCat?.value || "⚡ Energia Elétrica (Credelec / Luz)";
+    const ramo = selRamo?.value || FABEF.ramo || "Geral";
+    const sairDoCaixa = Boolean(chkCaixa?.checked);
+
+    if (!descricao) {
+        alert("Por favor, introduza a descrição da despesa (ex: Credelec, Água FIPAG, Renda, Sacos plásticos).");
+        inpDesc?.focus();
+        return;
+    }
+    if (valor <= 0) {
+        alert("Por favor, introduza um valor válido e superior a zero.");
+        inpValor?.focus();
         return;
     }
 
+    const usuarioAtualNome = FABEF.userData?.nome || auth.currentUser?.email || (window.FABEF?.isDemoMode ? "Operador" : "Administrador");
     const payload = {
         descricao: descricao,
         valor: valor,
         categoria: categoria,
-        ramo: FABEF.ramo || "Geral",
+        ramo: ramo,
+        sairDoCaixa: sairDoCaixa,
         utilizadorId: FABEF.user?.uid || "admin",
-        utilizadorNome: FABEF.userData?.nome || FABEF.user?.email || "Administrador",
+        utilizadorNome: usuarioAtualNome,
         data: new Date().toISOString(),
-        criadoEm: serverTimestamp()
+        criadoEm: new Date().toISOString()
     };
 
     let docId = "desp_" + Date.now();
     try {
-        const ref = await addDoc(subRef("despesas"), payload);
-        docId = ref.id;
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            const ref = await addDoc(collection(db, "empresas", FABEF.empresaId, "despesas"), {
+                ...payload,
+                criadoEm: serverTimestamp()
+            });
+            docId = ref.id;
+        }
     } catch (error) {
         console.warn("Aviso Firebase ao registar despesa, mantendo em memória e offline:", error);
     }
 
-    // Alimenta de forma síncrona a cache local na memória do navegador
-    FABEF.despesas.push({
+    if (!Array.isArray(FABEF.despesas)) FABEF.despesas = [];
+    const novoItem = {
         id: docId,
-        descricao: payload.descricao,
-        valor: payload.valor,
-        categoria: payload.categoria,
-        ramo: payload.ramo,
-        utilizadorNome: payload.utilizadorNome,
-        data: payload.data
-    });
+        ...payload
+    };
+    FABEF.despesas.unshift(novoItem);
 
     try {
         if (FABEF.empresaId) {
@@ -5571,14 +5601,15 @@ async function registarDespesa() {
     } catch(e) {}
 
     // Se assinalado para retirar do caixa e houver turno ativo, desconta automaticamente
-    const sairDoCaixa = Boolean(document.getElementById("despesa-sair-caixa")?.checked);
     if (sairDoCaixa && FABEF.turnoId) {
         if (!FABEF.turno) FABEF.turno = {};
         if (!FABEF.turno.sangrias) FABEF.turno.sangrias = [];
         const sangriaItem = {
+            id: "sang_" + Date.now(),
+            despesaId: docId,
             valor: valor,
             motivo: `Despesa: ${descricao} (${categoria})`,
-            operadorNome: FABEF.userData?.nome || "Operador",
+            operadorNome: usuarioAtualNome,
             data: new Date().toISOString()
         };
         FABEF.turno.sangrias.push(sangriaItem);
@@ -5591,50 +5622,290 @@ async function registarDespesa() {
         atualizarTelaCaixa();
     }
 
-    // Limpa os campos do formulário para o próximo lançamento
-    document.getElementById("despesa-descricao").value = "";
-    document.getElementById("despesa-valor").value = "";
+    if (inpDesc) inpDesc.value = "";
+    if (inpValor) inpValor.value = "";
 
     renderDespesas();
-    if (typeof renderDespesasLojaFunc === "function") renderDespesasLojaFunc();
+    if (typeof emitirBeepSucesso === "function") emitirBeepSucesso();
+    await gravarAuditoria(`⚡ REGISTO DE DESPESA: "${descricao}" (${categoria}) no valor de ${dinheiro(valor)} para ${ramo}. ` + (sairDoCaixa ? "[Retirado do Caixa]" : "[Fundo Geral]"), "INFO");
 
-    // Regista a saída financeira nos logs inalteráveis de auditoria
-    await gravarAuditoria(`Registou despesa/custo comercial (${payload.ramo}): ` + descricao + " no valor de " + dinheiro(valor), "INFO");
-    alert("✅ Despesa/Custo registado com sucesso para " + (FABEF.ramo || "o negócio") + (sairDoCaixa ? "\n(Retirado do Caixa de hoje)" : "") + ".");
+    if (confirm(`✅ Despesa registada com sucesso!\n• Descrição: ${descricao}\n• Valor: ${dinheiro(valor)}\n• Ramo: ${ramo}${sairDoCaixa ? "\n• Retirado do Caixa de hoje" : ""}\n\nDeseja imprimir o Comprovativo de Saída / Despesa agora?`)) {
+        imprimirComprovativoDespesa(docId);
+    }
 }
-
 
 function renderDespesas() {
     const tabelaCorpo = document.getElementById("tabela-despesas");
     if (!tabelaCorpo) return;
 
-    // Filtra pelo ramo de atividade ativo
-    const listaDoRamo = (FABEF.despesas || []).filter(d => !d.ramo || d.ramo === FABEF.ramo);
+    // Atualiza opções de ramo no formulário
+    const selRamo = document.getElementById("despesa-ramo");
+    if (selRamo) {
+        const ramos = typeof obterConfigRamos === "function" ? obterConfigRamos() : [];
+        const valAtual = selRamo.value;
+        selRamo.innerHTML = ramos.map(r => `<option value="${escapeHTML(r.nome)}">${escapeHTML(r.nome)}</option>`).join("") || `<option value="${escapeHTML(FABEF.ramo || 'Geral')}">${escapeHTML(FABEF.ramo || 'Geral')}</option>`;
+        if (valAtual && ramos.some(r => r.nome === valAtual)) {
+            selRamo.value = valAtual;
+        } else {
+            selRamo.value = FABEF.ramo || (ramos[0] ? ramos[0].nome : "Geral");
+        }
+    }
 
-    // Ordena as despesas de forma decrescente pela data de lançamento
-    const listaOrdenada = listaDoRamo
-        .slice()
-        .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+    const termo = (document.getElementById("despesas-pesquisa")?.value || "").toLowerCase().trim();
+    const filtroCat = document.getElementById("despesas-filtro-categoria")?.value || "TODAS";
+    const filtroPeriodo = document.getElementById("despesas-filtro-periodo")?.value || "todos";
 
-    tabelaCorpo.innerHTML = listaOrdenada.map(d => `
+    const hoje = dataHoje();
+    const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+    const todasDespesas = Array.isArray(FABEF.despesas) ? FABEF.despesas : [];
+
+    // KPIs Globais
+    let totalHoje = 0;
+    let totalMes = 0;
+    let totalRamo = 0;
+    let totalCaixaHoje = 0;
+
+    todasDespesas.forEach(d => {
+        const dData = new Date(d.data || 0);
+        const v = numero(d.valor);
+        if (dData >= hoje) {
+            totalHoje += v;
+            if (d.sairDoCaixa) totalCaixaHoje += v;
+        }
+        if (dData >= inicioMes) {
+            totalMes += v;
+        }
+        if (!d.ramo || d.ramo === FABEF.ramo) {
+            totalRamo += v;
+        }
+    });
+
+    const kpiHoje = document.getElementById("kpi-despesas-hoje");
+    const kpiMes = document.getElementById("kpi-despesas-mes");
+    const kpiRamo = document.getElementById("kpi-despesas-ramo");
+    const kpiRamoNome = document.getElementById("kpi-despesas-ramo-nome");
+    const kpiCaixa = document.getElementById("kpi-despesas-caixa");
+
+    if (kpiHoje) kpiHoje.textContent = dinheiro(totalHoje);
+    if (kpiMes) kpiMes.textContent = dinheiro(totalMes);
+    if (kpiRamo) kpiRamo.textContent = dinheiro(totalRamo);
+    if (kpiRamoNome) kpiRamoNome.textContent = `Filtrado para: ${escapeHTML(FABEF.ramo || "Geral")}`;
+    if (kpiCaixa) kpiCaixa.textContent = dinheiro(totalCaixaHoje);
+
+    // Filtragem da tabela
+    const listaFiltrada = todasDespesas.filter(d => {
+        const dData = new Date(d.data || 0);
+        if (filtroPeriodo === "hoje" && dData < hoje) return false;
+        if (filtroPeriodo === "mes" && dData < inicioMes) return false;
+        if (filtroCat !== "TODAS" && (d.categoria || "") !== filtroCat) return false;
+        if (termo) {
+            const strBusca = `${d.descricao || ""} ${d.categoria || ""} ${d.ramo || ""} ${d.utilizadorNome || ""}`.toLowerCase();
+            if (!strBusca.includes(termo)) return false;
+        }
+        return true;
+    });
+
+    listaFiltrada.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+
+    tabelaCorpo.innerHTML = listaFiltrada.map(d => `
     <tr>
-        <td>${dataTexto(d.data)}</td>
+        <td style="white-space:nowrap;font-size:12px;">${dataTexto(d.data)}</td>
         <td>
-            <strong>${escapeHTML(d.descricao)}</strong>
-            ${d.categoria ? `<br><small style="color:#0284c7;font-size:11px;">${escapeHTML(d.categoria)}</small>` : ""}
+            <strong style="color:#0f172a;">${escapeHTML(d.descricao)}</strong>
+            ${d.categoria ? `<br><small style="color:#0284c7;font-size:11px;font-weight:600;">${escapeHTML(d.categoria)}</small>` : ""}
         </td>
-        <td style="color: #dc2626; font-weight: 700;">${dinheiro(d.valor)}</td>
-        <td>${escapeHTML(d.utilizadorNome || "—")}</td>
-        <td><span class="badge badge-blue">${escapeHTML(d.ramo || FABEF.ramo || "—")}</span></td>
+        <td><span class="badge badge-blue">${escapeHTML(d.ramo || FABEF.ramo || "Geral")}</span></td>
+        <td style="color:#dc2626; font-weight:800; font-size:14px; white-space:nowrap;">${dinheiro(d.valor)}</td>
+        <td>${d.sairDoCaixa ? '<span class="badge badge-yellow" style="font-size:11px;">💸 Caixa</span>' : '<span class="badge badge-gray" style="font-size:11px;">💳 Fundo Fixo</span>'}</td>
+        <td style="font-size:12px;color:#475569;">${escapeHTML(d.utilizadorNome || "—")}</td>
+        <td>
+            <div style="display:flex;gap:4px;align-items:center;">
+                <button type="button" class="btn btn-light btn-small" onclick="imprimirComprovativoDespesa('${escapeHTML(d.id)}')" style="padding:4px 8px;font-size:11px;font-weight:700;" title="Imprimir Comprovativo / Recibo de Despesa">🖨️ Recibo</button>
+                <button type="button" class="btn btn-small" onclick="eliminarDespesa('${escapeHTML(d.id)}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;font-size:11px;font-weight:700;" title="Eliminar despesa">🗑️</button>
+            </div>
+        </td>
     </tr>
     `).join("") || `
     <tr>
-        <td colspan="5" style="text-align: center; color: #64748b;">
-            Nenhuma despesa ou custo registado para o ramo: ${escapeHTML(FABEF.ramo || "Geral")}.
+        <td colspan="7" style="text-align: center; color: #64748b; padding: 20px;">
+            Nenhuma despesa encontrada para os filtros selecionados.
         </td>
     </tr>
     `;
 }
+
+window.imprimirComprovativoDespesa = function(id) {
+    const d = (FABEF.despesas || []).find(x => x.id === id);
+    if (!d) {
+        alert("Despesa não localizada.");
+        return;
+    }
+
+    const emp = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(d.ramo) : (FABEF.empresa || {});
+    const nomeEmp = emp.nome || d.ramo || "ESTABELECIMENTO COMERCIAL";
+    const nuitEmp = emp.nuit || "Isento";
+    const telEmp = emp.telefone || "—";
+    const endEmp = emp.endereco || "Moçambique";
+
+    const w = window.open("", "_blank");
+    const comprovativoHtml = `
+    <!DOCTYPE html>
+    <html lang="pt">
+    <head>
+        <meta charset="UTF-8">
+        <title>Comprovativo de Despesa - ${escapeHTML(d.descricao)}</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 25px; color: #0f172a; line-height: 1.5; font-size: 13px; }
+            .cabecalho { border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-bottom: 16px; }
+            .titulo { font-size: 18px; font-weight: 800; color: #991b1b; text-transform: uppercase; }
+            .subtitulo { font-size: 12px; color: #64748b; }
+            .box { background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+            .linha { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 4px; }
+            .rotulo { font-weight: 700; color: #475569; }
+            .valor { font-weight: 800; color: #0f172a; }
+            .destaque { font-size: 20px; font-weight: 900; color: #dc2626; }
+            .assinaturas { display: flex; justify-content: space-between; margin-top: 50px; text-align: center; }
+            .campo-assinatura { width: 45%; border-top: 1px solid #334155; padding-top: 6px; font-size: 11px; }
+            @media print { body { margin: 10mm; } }
+        </style>
+    </head>
+    <body>
+        <div class="cabecalho">
+            <div class="titulo">${escapeHTML(nomeEmp)}</div>
+            <div class="subtitulo">NUIT: ${escapeHTML(nuitEmp)} | Telefone: ${escapeHTML(telEmp)} | ${escapeHTML(endEmp)}</div>
+            <div style="margin-top: 6px; font-weight: 800; font-size: 14px; color: #b91c1c;">
+                🧾 COMPROVATIVO DE SAÍDA DE CAIXA / DESPESA OPERACIONAL
+            </div>
+        </div>
+
+        <div class="box">
+            <div class="linha">
+                <span class="rotulo">Descrição do Custo:</span>
+                <span class="valor" style="font-size:15px;color:#991b1b;">${escapeHTML(d.descricao)}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Categoria:</span>
+                <span class="valor">${escapeHTML(d.categoria || "Geral")}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Ramo / Estabelecimento:</span>
+                <span class="valor">${escapeHTML(d.ramo || "Geral")}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Data & Hora de Emissão:</span>
+                <span class="valor">${dataTexto(d.data)}</span>
+            </div>
+            <div class="linha">
+                <span class="rotulo">Origem dos Fundos:</span>
+                <span class="valor">${d.sairDoCaixa ? "💸 Retirado do Caixa / Turno (Sangria)" : "💳 Fundo de Caixa Geral / Externo"}</span>
+            </div>
+            <div class="linha" style="border-bottom:none; margin-top:10px;">
+                <span class="rotulo" style="font-size:16px;">VALOR PAGO:</span>
+                <span class="destaque">${dinheiro(d.valor)}</span>
+            </div>
+        </div>
+
+        <div style="font-size: 11px; color: #64748b; margin-top: 10px;">
+            Documento comprovativo de saída financeira emitido via FABEF Gestão ERP PRO.
+        </div>
+
+        <div class="assinaturas">
+            <div class="campo-assinatura">
+                <strong>${escapeHTML(d.utilizadorNome || "Operador de Caixa")}</strong><br>
+                Quem efetuou a saída
+            </div>
+            <div class="campo-assinatura">
+                <strong>Gerência / Responsável</strong><br>
+                Visto e Aprovado
+            </div>
+        </div>
+
+        <script>
+            window.addEventListener('load', () => { setTimeout(() => window.print(), 250); });
+        </script>
+    </body>
+    </html>
+    `;
+
+    if (w) {
+        w.document.write(comprovativoHtml);
+        w.document.close();
+    }
+};
+
+window.eliminarDespesa = async function(id) {
+    const d = (FABEF.despesas || []).find(x => x.id === id);
+    if (!d) return;
+
+    if (!confirm(`Tem a certeza que deseja eliminar o registo de despesa "${d.descricao}" (${dinheiro(d.valor)})?`)) {
+        return;
+    }
+
+    try {
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            await deleteDoc(doc(db, "empresas", FABEF.empresaId, "despesas", id));
+        }
+
+        FABEF.despesas = (FABEF.despesas || []).filter(x => x.id !== id);
+
+        // Se retirou do caixa, estorna a sangria
+        if (d.sairDoCaixa && FABEF.turno && Array.isArray(FABEF.turno.sangrias)) {
+            FABEF.turno.sangrias = FABEF.turno.sangrias.filter(s => s.despesaId !== id);
+            if (!window.FABEF?.isDemoMode && db && FABEF.empresaId && FABEF.turnoId) {
+                updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+                    sangrias: FABEF.turno.sangrias,
+                    atualizadoEm: serverTimestamp()
+                }).catch(e => console.warn("Aviso ao sincronizar estorno de sangria:", e));
+            }
+            atualizarTelaCaixa();
+        }
+
+        try {
+            if (FABEF.empresaId) {
+                localStorage.setItem("fabef_local_despesas_" + FABEF.empresaId, JSON.stringify(FABEF.despesas));
+            }
+        } catch(e) {}
+
+        await gravarAuditoria(`🗑️ DESPESA ELIMINADA: "${d.descricao}" (${dinheiro(d.valor)}) por ${FABEF.userData?.nome || 'Utilizador'}.`, "ALERTA");
+        renderDespesas();
+        alert("Despesa eliminada com sucesso.");
+    } catch(err) {
+        console.error("Erro ao eliminar despesa:", err);
+        alert("Erro ao eliminar despesa:\n" + (err.message || err));
+    }
+};
+
+window.exportarDespesasExcel = function() {
+    const despesas = Array.isArray(FABEF.despesas) ? FABEF.despesas : [];
+    if (despesas.length === 0) {
+        alert("Nenhuma despesa para exportar.");
+        return;
+    }
+
+    let csv = "\uFEFF"; // UTF-8 BOM
+    csv += "Data;Descrição;Categoria;Ramo;Valor (MT);Origem;Registado Por\r\n";
+
+    despesas.forEach(d => {
+        const linha = [
+            `"${(d.data || "").replace(/"/g, '""')}"`,
+            `"${(d.descricao || "").replace(/"/g, '""')}"`,
+            `"${(d.categoria || "").replace(/"/g, '""')}"`,
+            `"${(d.ramo || "").replace(/"/g, '""')}"`,
+            `${numero(d.valor).toFixed(2).replace(".", ",")}`,
+            `"${d.sairDoCaixa ? "Caixa" : "Fundo Geral"}"`,
+            `"${(d.utilizadorNome || "").replace(/"/g, '""')}"`
+        ];
+        csv += linha.join(";") + "\r\n";
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Despesas_FABEF_ERP_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+};
+
 window.registarDespesa = registarDespesa;
 window.renderDespesas = renderDespesas;
 
