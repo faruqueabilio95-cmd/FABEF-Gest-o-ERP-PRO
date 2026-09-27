@@ -404,6 +404,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <button data-sec="pos">🛒 Vender (POS)</button>
       <button data-sec="vendas">💵 Vendas</button>
       <button data-sec="caixa">💰 Caixa / Turnos</button>
+      <button data-sec="despesas" style="color:#ef4444;font-weight:700;">⚡ Despesas (Luz, Água, Renda)</button>
       <button data-sec="clientes">👥 Clientes</button>
       <button data-sec="dividas">🧾 Fiado / Dívidas</button>
       <button data-sec="encomendas">📋 Encomendas</button>
@@ -417,8 +418,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <button data-sec="fornecedores">🏭 Fornecedores</button>
     </details>
 
-    <details style="margin-top:6px;">
+    <details style="margin-top:6px;" open>
       <summary style="cursor:pointer;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 12px;text-transform:uppercase;">Gestão & Relatórios</summary>
+      <button data-sec="lucro" style="background:#ecfdf5;color:#047857;font-weight:800;border:1px solid #a7f3d0;box-shadow:0 1px 2px rgba(0,0,0,0.05);">📊 Lucro Real (Diário/Mensal/Anual)</button>
       <button data-sec="relatorios">📈 Relatórios</button>
       <button data-sec="metas">🎯 Metas</button>
       <button data-sec="desempenho">👤 Desempenho</button>
@@ -429,7 +431,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <details style="margin-top:6px;border-left:3px solid #3b82f6;padding-left:4px;" open>
       <summary style="cursor:pointer;color:#93c5fd;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;letter-spacing:0.5px;">⚙️ Configurações & Sistema</summary>
       <button data-sec="config" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
-      <button type="button" id="btn-sidebar-menu-pin" onclick="abrirModalDefinirPin()" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;display:flex;align-items:center;gap:6px;">🔢 Definir PIN de Segurança</button>
+      <button type="button" id="btn-sidebar-menu-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;display:flex;align-items:center;gap:6px;">🔢 Definir PIN de Segurança</button>
       <button data-sec="despesas" style="background:#fff1f2;color:#991b1b;font-weight:700;border:1px solid #fecdd3;">⚡ Despesas do Negócio (Luz, Água, Renda)</button>
       <button data-sec="funcionarios">🧑‍💼 Equipa & Vales Salariais</button>
       <button data-sec="dispensas" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #fde68a;">🏖️ Dispensas Funcionários</button>
@@ -440,7 +442,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:6px;">
       <!-- ESPAÇO PARA O FUNCIONÁRIO / GERENTE DEFINIR O SEU PIN -->
-      <button id="btn-sidebar-definir-pin" style="background:#1e293b;border:1.5px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
+      <button id="btn-sidebar-definir-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#1e293b;border:1.5px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
         🔢 <span>Definir / Alterar Meu PIN</span>
       </button>
       <!-- PARTE DE DEFINIR / ALTERAR SENHA (MANTIDA NO MESMO LUGAR) -->
@@ -614,20 +616,22 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <div id="pos-secao-troco" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px;margin-bottom:12px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
               <label for="pos-valor-entregue" style="font-weight:700;color:#166534;font-size:12px;margin:0;">💵 Valor Recebido do Cliente (MT)</label>
-              <button type="button" id="btn-troco-exato" class="btn btn-small" style="background:#dcfce7;color:#15803d;font-weight:700;border:1px solid #86efac;font-size:11px;padding:2px 8px;cursor:pointer;">Valor Exato</button>
+              <button type="button" id="btn-troco-exato" onclick="window.definirTrocoExato()" class="btn btn-small" style="background:#dcfce7;color:#15803d;font-weight:700;border:1px solid #86efac;font-size:11px;padding:3px 10px;cursor:pointer;">Valor Exato</button>
             </div>
-            <input type="number" id="pos-valor-entregue" min="0" step="1" placeholder="Ex: 500" style="font-size:16px;font-weight:700;height:40px;border:1px solid #86efac;background:#fff;border-radius:6px;width:100%;margin-bottom:8px;padding:6px 10px;">
+            <input type="number" id="pos-valor-entregue" min="0" step="1" placeholder="Ex: 500" oninput="window.atualizarCalculoTrocoPOS()" onkeyup="window.atualizarCalculoTrocoPOS()" onchange="window.atualizarCalculoTrocoPOS()" style="font-size:18px;font-weight:800;height:42px;border:1.5px solid #86efac;background:#fff;border-radius:6px;width:100%;margin-bottom:8px;padding:6px 12px;color:#0f172a;">
             <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">
-              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="50" style="padding:3px 8px;font-size:11px;font-weight:700;">+50 MT</button>
-              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="100" style="padding:3px 8px;font-size:11px;font-weight:700;">+100 MT</button>
-              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="200" style="padding:3px 8px;font-size:11px;font-weight:700;">+200 MT</button>
-              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="500" style="padding:3px 8px;font-size:11px;font-weight:700;">+500 MT</button>
-              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="1000" style="padding:3px 8px;font-size:11px;font-weight:700;">+1000 MT</button>
-              <button type="button" class="btn-nota-rapida btn btn-small btn-light" data-nota="limpar" style="padding:3px 8px;font-size:11px;color:#dc2626;font-weight:700;" title="Limpar valor recebido">✕</button>
+              <button type="button" onclick="window.definirNotaTroco(50)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">50 MT</button>
+              <button type="button" onclick="window.definirNotaTroco(100)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">100 MT</button>
+              <button type="button" onclick="window.definirNotaTroco(200)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">200 MT</button>
+              <button type="button" onclick="window.definirNotaTroco(500)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">500 MT</button>
+              <button type="button" onclick="window.definirNotaTroco(1000)" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;font-weight:800;background:#fff;border:1px solid #cbd5e1;cursor:pointer;">1000 MT</button>
+              <button type="button" onclick="window.somarNotaTroco(50)" class="btn btn-small btn-light" style="padding:4px 8px;font-size:11px;font-weight:700;color:#0369a1;background:#e0f2fe;border:1px solid #bae6fd;cursor:pointer;" title="Adicionar 50 MT">+50</button>
+              <button type="button" onclick="window.somarNotaTroco(100)" class="btn btn-small btn-light" style="padding:4px 8px;font-size:11px;font-weight:700;color:#0369a1;background:#e0f2fe;border:1px solid #bae6fd;cursor:pointer;" title="Adicionar 100 MT">+100</button>
+              <button type="button" onclick="window.limparNotaTroco()" class="btn btn-small btn-light" style="padding:4px 9px;font-size:11px;color:#dc2626;font-weight:800;background:#fee2e2;border:1px solid #fca5a5;cursor:pointer;" title="Limpar valor recebido">✕ Limpar</button>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;padding:8px 12px;border-radius:6px;border:1px solid #bbf7d0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;padding:10px 14px;border-radius:8px;border:1.5px solid #bbf7d0;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
               <span style="font-size:13px;font-weight:700;color:#166534;">Troco a Devolver:</span>
-              <strong id="pos-troco-display" style="font-size:17px;font-weight:900;color:#15803d;">MT 0,00</strong>
+              <strong id="pos-troco-display" style="font-size:20px;font-weight:900;color:#15803d;">MT 0,00</strong>
             </div>
           </div>
 
@@ -660,17 +664,53 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- VENDAS -->
     <section class="secao" id="sec-vendas">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-        <h2>Histórico de Vendas</h2>
-        <div style="font-size:13px;color:#64748b;font-weight:600;">
-          Acesso completo a todas as vendas da empresa e relatórios por período
+        <div>
+          <h2>Histórico & Registo de Vendas</h2>
+          <div style="font-size:13px;color:#64748b;font-weight:600;">
+            Acompanhe o faturamento diário sem misturar ontem com hoje, compare o progresso e veja qual dia vendeu melhor
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="btn btn-light" onclick="renderVendas()" style="padding:8px 14px;border:1px solid #cbd5e1;font-weight:700;">🔄 Atualizar Vendas</button>
+          <button type="button" class="btn btn-light" onclick="exportarVendasExcel()" style="padding:8px 14px;border:1px solid #10b981;color:#047857;font-weight:700;">📊 Exportar Excel (CSV)</button>
+        </div>
+      </div>
+
+      <!-- Abas Rápidas de Navegação Temporal (Separador Claro entre Ontem e Hoje) -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+        <button type="button" class="btn btn-aba-venda active" id="aba-venda-hoje" onclick="definirAbaVenda('hoje')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#10b981;color:#fff;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <span>🟢</span> Hoje (Novo Dia)
+        </button>
+        <button type="button" class="btn btn-aba-venda" id="aba-venda-ontem" onclick="definirAbaVenda('ontem')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <span>🗓️</span> Ontem
+        </button>
+        <button type="button" class="btn btn-aba-venda" id="aba-venda-agrupado" onclick="definirAbaVenda('agrupado')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <span>📅</span> Agrupado por Dias (com Subtotais)
+        </button>
+        <button type="button" class="btn btn-aba-venda" id="aba-venda-progressao" onclick="definirAbaVenda('progressao')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <span>🏆</span> Progressão dos Dias (Qual dia vendeu mais?)
+        </button>
+        <button type="button" class="btn btn-aba-venda" id="aba-venda-todos" onclick="definirAbaVenda('todos')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+          <span>🌐</span> Todo o Histórico
+        </button>
+      </div>
+
+      <!-- Banner de Status & Comparativo Ontem vs Hoje -->
+      <div id="vendas-banner-status" style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="font-size:13px;color:#1e40af;font-weight:700;" id="vendas-banner-texto">
+          🟢 A visualizar vendas de <strong>HOJE</strong>. As vendas anteriores permanecem guardadas no dia anterior.
+        </div>
+        <div style="font-size:13px;color:#1d4ed8;font-weight:700;background:#dbeafe;padding:5px 12px;border-radius:8px;" id="vendas-banner-comparativo">
+          Vs. Ontem: a calcular...
         </div>
       </div>
 
       <!-- Resumo KPI das Vendas no Período Selecionado -->
       <div class="grid" style="margin-bottom:16px;">
         <div class="kpi">
-          <div class="rotulo">Total Faturado</div>
+          <div class="rotulo" id="vendas-kpi-rotulo-fat">Total Faturado (Hoje)</div>
           <div class="valor" id="vendas-kpi-faturamento">MT 0,00</div>
+          <div id="vendas-kpi-comparativo-sub" style="font-size:11px;color:#64748b;margin-top:4px;"></div>
         </div>
         <div class="kpi">
           <div class="rotulo">Total KG / Unidades</div>
@@ -686,22 +726,63 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         </div>
       </div>
 
+      <!-- PAINEL DE PROGRESSÃO DIÁRIA (QUAL DIA VENDEU MELHOR) -->
+      <div id="painel-progressao-diaria" class="card hidden" style="margin-bottom:16px;background:#f8fafc;border:1.5px solid #cbd5e1;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div>
+            <h3 style="margin:0;font-size:16px;color:#0f172a;display:flex;align-items:center;gap:8px;">
+              🏆 Progressão dos Dias & Classificação de Vendas
+            </h3>
+            <p style="margin:4px 0 0 0;font-size:12px;color:#64748b;">
+              Compare o desempenho de cada dia (ontem vs hoje vs semana). Veja qual dia vendeu mais e clique para inspecionar os detalhes.
+            </p>
+          </div>
+          <div id="badge-melhor-dia" style="background:#fef3c7;border:1px solid #f59e0b;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;color:#92400e;">
+            ⭐ A apurar o melhor dia...
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr style="background:#e2e8f0;">
+                <th style="font-weight:700;">Data / Dia</th>
+                <th style="font-weight:700;">Desempenho</th>
+                <th style="font-weight:700;text-align:center;">Qtd. Vendas</th>
+                <th style="font-weight:700;text-align:right;">Total Faturado</th>
+                <th style="font-weight:700;text-align:right;">Em Dinheiro</th>
+                <th style="font-weight:700;text-align:right;">M-Pesa / Outros</th>
+                <th style="font-weight:700;text-align:right;">Ticket Médio</th>
+                <th style="font-weight:700;text-align:center;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-progressao-dias">
+              <tr><td colspan="8" style="text-align:center;color:#64748b;padding:14px;">A carregar a progressão dos dias...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card">
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
           <input type="text" id="vendas-pesquisa" placeholder="🔍 Pesquisar por cliente, produto, recibo (#) ou operador..." style="flex:1;min-width:200px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
-          <select id="vendas-periodo" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-weight:600;">
-            <option value="todos">Todo o período (Todas as Vendas Registadas)</option>
-            <option value="turno">Turno Atual do Caixa</option>
-            <option value="hoje">Hoje</option>
+          <select id="vendas-periodo" style="padding:10px;border:1.5px solid #0284c7;border-radius:8px;font-weight:700;background:#f0f9ff;color:#0369a1;">
+            <option value="hoje" selected>🟢 Hoje (Vendas do Dia Atual / Turno)</option>
+            <option value="ontem">🗓️ Ontem (Vendas do Dia Anterior)</option>
+            <option value="agrupado">📅 Agrupado por Dias (Hoje, Ontem e Anteriores com Subtotais)</option>
+            <option value="progressao">🏆 Progressão Diária (Qual dia vendeu mais?)</option>
+            <option value="turno">⏰ Turno Ativo do Caixa</option>
             <option value="7">Últimos 7 dias (Semanal)</option>
             <option value="30">Últimos 30 dias (Mensal)</option>
             <option value="ano">Este Ano (Anual)</option>
+            <option value="custom">📅 Escolher Data Específica...</option>
+            <option value="todos">🌐 Todo o Histórico (Sem filtro)</option>
           </select>
+          <input type="date" id="vendas-data-especifica" style="display:none;padding:9px;border:1.5px solid #0284c7;border-radius:8px;font-weight:700;" title="Escolha um dia específico no calendário">
           <button type="button" class="btn btn-light" onclick="renderVendas()" style="padding:10px 14px;">🔄 Atualizar</button>
           <button type="button" class="btn btn-light" onclick="exportarVendasExcel()" style="padding:10px 14px;border:1px solid #10b981;color:#047857;font-weight:700;">📊 Exportar Excel (CSV)</button>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Operador</th><th>Itens & Quantidade</th><th>Total</th><th>Pagamento</th><th>NUIT</th><th>Ramo</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Data / Dia</th><th>Operador</th><th>Itens & Quantidade</th><th>Total</th><th>Pagamento</th><th>NUIT</th><th>Ramo</th><th>Ações</th></tr></thead>
           <tbody id="tabela-vendas"></tbody>
         </table></div>
       </div>
@@ -955,20 +1036,204 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <button id="btn-abrir-caixa" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Abrir caixa</button>
         </div>
         <div id="caixa-fecho" class="hidden">
-          <p style="margin-bottom:6px;">Total vendido no turno (todas as formas): <strong id="caixa-total-vendas">MT 0,00</strong></p>
-          <p style="margin-bottom:10px;">Saldo esperado em dinheiro na gaveta: <strong id="caixa-saldo-esperado">MT 0,00</strong></p>
-          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-            <button id="btn-sangria" class="btn btn-light" type="button" style="width:auto;">💸 Sangria (retirar)</button>
-            <button id="btn-reforco" class="btn btn-light" type="button" style="width:auto;">💰 Reforço (adicionar)</button>
+          <div style="background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:12px;padding:14px;margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+              <span style="font-size:13px;color:#475569;">Total faturado no turno (todas as formas):</span>
+              <strong id="caixa-total-vendas" style="font-size:16px;color:#0f172a;">MT 0,00</strong>
+            </div>
+
+            <!-- CONFERÊNCIA CEGA: SALDO EM DINHEIRO FÍSICO OCULTO ATÉ AO FECHAMENTO -->
+            <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px;margin-top:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                  <div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;">
+                    🛡️ Dinheiro Físico na Gaveta (Conferência Cega Ativa)
+                  </div>
+                  <div id="caixa-saldo-cega-texto" style="font-size:17px;font-weight:800;color:#1e3a8a;margin-top:3px;">
+                    🔒 [ Oculto para Evitar Viciação de Contagem ]
+                  </div>
+                  <span id="caixa-saldo-esperado" class="hidden">MT 0,00</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <button type="button" id="btn-revelar-saldo-caixa" class="btn btn-small btn-light" onclick="window.toggleRevelarSaldoGerente()" style="font-size:11px;padding:5px 10px;font-weight:700;background:#fff;border:1px solid #93c5fd;color:#1d4ed8;display:none;">
+                    👁️ Ver Saldo (Supervisão)
+                  </button>
+                  <span class="badge badge-yellow" style="font-size:11px;padding:4px 8px;">Auditoria Rigorosa</span>
+                </div>
+              </div>
+              <p style="font-size:11px;color:#3b82f6;margin:8px 0 0 0;line-height:1.4;">
+                Para apurar com máxima fidelidade se houve <strong>desfalque (falta de dinheiro)</strong> ou <strong>sobra</strong>, o saldo esperado não é divulgado ao operador durante o trabalho. No final do turno, o operador/gerente deve contar as notas e moedas físicas e digitar o total.
+              </p>
+            </div>
           </div>
-          <div id="caixa-movimentos" style="margin-bottom:14px;"></div>
-          <button id="btn-fechar-caixa" class="btn btn-danger" style="width:auto;padding:10px 20px;">Fechar caixa (só gerente)</button>
+
+          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+            <button id="btn-sangria" class="btn btn-light" type="button" style="width:auto;font-weight:700;border:1px solid #cbd5e1;">💸 Sangria (retirar dinheiro)</button>
+            <button id="btn-reforco" class="btn btn-light" type="button" style="width:auto;font-weight:700;border:1px solid #cbd5e1;">💰 Reforço (adicionar troco)</button>
+            <button type="button" onclick="mostrarSecao('despesas')" class="btn btn-light" style="width:auto;font-weight:700;border:1px solid #fecaca;background:#fff1f2;color:#991b1b;">⚡ Despesas do Negócio</button>
+          </div>
+
+          <div id="caixa-movimentos" style="margin-bottom:16px;"></div>
+
+          <button id="btn-fechar-caixa" class="btn btn-danger" type="button" onclick="window.abrirModalFecharCaixaCego()" style="width:auto;padding:12px 26px;font-weight:800;font-size:14px;box-shadow:0 2px 6px rgba(239,68,68,0.3);display:inline-flex;align-items:center;gap:8px;">
+            🔒 Fechar Caixa (Conferência Cega)
+          </button>
         </div>
       </div>
     </section>
 
-    <!-- DESPESAS E CUSTOS OPERACIONAIS (REDIRECIONA PARA CONFIGURAÇÕES) -->
-    <section class="secao" id="sec-despesas"></section>
+    <!-- DESPESAS E CUSTOS OPERACIONAIS DO ESTABELECIMENTO -->
+    <section class="secao" id="sec-despesas">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <h2 style="margin:0;">⚡ Despesas & Custos do Estabelecimento</h2>
+          <p style="font-size:13px;color:#64748b;margin-top:2px;margin-bottom:0;">
+            Registo e controlo de saídas financeiras da empresa: Credelec (Luz), Água FIPAG, Renda da Banca/Loja, Sacos plásticos, Fretes de mercadoria, Manutenção de arcas/congeladores e outros custos operacionais.
+          </p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-light" onclick="renderDespesas()" style="padding:9px 14px;font-size:13px;font-weight:700;">🔄 Atualizar</button>
+          <button type="button" class="btn btn-light" onclick="exportarDespesasExcel()" style="padding:9px 14px;font-size:13px;font-weight:700;color:#15803d;border:1px solid #86efac;background:#f0fdf4;" title="Exportar despesas para folha de cálculo Excel">📥 Exportar Excel</button>
+        </div>
+      </div>
+
+      <!-- KPIS FINANCEIROS DE DESPESAS -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:16px;">
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #ef4444;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Despesas Hoje</div>
+          <div id="kpi-despesas-hoje" style="font-size:22px;font-weight:800;color:#dc2626;margin-top:4px;">MT 0,00</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Saídas registadas hoje</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #f97316;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Despesas Deste Mês</div>
+          <div id="kpi-despesas-mes" style="font-size:22px;font-weight:800;color:#ea580c;margin-top:4px;">MT 0,00</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Custos operacionais acumulados</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #3b82f6;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Despesas Ramo Ativo</div>
+          <div id="kpi-despesas-ramo" style="font-size:22px;font-weight:800;color:#2563eb;margin-top:4px;">MT 0,00</div>
+          <div id="kpi-despesas-ramo-nome" style="font-size:11px;color:#94a3b8;margin-top:2px;">Filtrado para o negócio atual</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #b45309;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Retirado do Caixa (Hoje)</div>
+          <div id="kpi-despesas-caixa" style="font-size:22px;font-weight:800;color:#b45309;margin-top:4px;">MT 0,00</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Sangrias diretas do turno</div>
+        </div>
+      </div>
+
+      <!-- FORMULÁRIO DE REGISTO DE DESPESA -->
+      <div class="card" style="border-top:3px solid #dc2626; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+          <h3 style="color:#991b1b;margin:0;">💸 Novo Registo de Custo / Despesa</h3>
+          <span style="font-size:11px; background:#fee2e2; color:#991b1b; padding:3px 8px; border-radius:12px; font-weight:700;">Gera comprovativo imediato</span>
+        </div>
+        <p style="font-size:12px; color:#64748b; margin-top:0; margin-bottom:10px;">
+          Selecione um atalho rápido ou preencha a descrição do gasto:
+        </p>
+
+        <!-- ATALHOS RÁPIDOS (CHIPS) DE DESPESAS FREQUENTES -->
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
+          <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('⚡ Credelec (Energia Elétrica)', '⚡ Energia Elétrica (Credelec / Luz)')" style="border:1px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:12px;font-weight:700;padding:5px 9px;">⚡ Credelec</button>
+          <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('💧 Água (FIPAG / Abastecimento)', '💧 Água (FIPAG / Abastecimento)')" style="border:1px solid #bae6fd;background:#f0f9ff;color:#0369a1;font-size:12px;font-weight:700;padding:5px 9px;">💧 Água FIPAG</button>
+          <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🏠 Renda / Aluguer da Banca / Loja', '🏠 Renda / Aluguer da Banca / Loja')" style="border:1px solid #ddd6fe;background:#f5f3ff;color:#6d28d9;font-size:12px;font-weight:700;padding:5px 9px;">🏠 Renda</button>
+          <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🛍️ Compra de Sacos Plásticos e Embalagens', '🧹 Material de Limpeza & Sacos Plásticos')" style="border:1px solid #bbf7d0;background:#f0fdf4;color:#15803d;font-size:12px;font-weight:700;padding:5px 9px;">🛍️ Sacos Plásticos</button>
+          <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🚗 Frete e Transporte de Mercadoria', '🚗 Transporte e Frete de Mercadoria')" style="border:1px solid #fecdd3;background:#fff1f2;color:#be123c;font-size:12px;font-weight:700;padding:5px 9px;">🚗 Frete / Transporte</button>
+          <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🧊 Compra de Gelo / Manutenção de Congelador', '🛠️ Manutenção (Frio, Balanças, Equipamento)')" style="border:1px solid #bae6fd;background:#e0f2fe;color:#0284c7;font-size:12px;font-weight:700;padding:5px 9px;">🧊 Gelo / Frio</button>
+          <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🧹 Sabão, OMO, Desinfetante e Panos', '🧹 Material de Limpeza & Sacos Plásticos')" style="border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:12px;font-weight:700;padding:5px 9px;">🧹 Limpeza</button>
+          <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🍲 Almoço / Alimentação de Serviço', '🍲 Alimentação e Café da Loja')" style="border:1px solid #fef08a;background:#fefce8;color:#a16207;font-size:12px;font-weight:700;padding:5px 9px;">🍲 Almoço / Lanche</button>
+        </div>
+
+        <div class="grid">
+          <div class="form-group">
+            <label for="despesa-descricao">Descrição do Custo / Despesa *</label>
+            <input type="text" id="despesa-descricao" placeholder="Ex: Credelec 500 MT, Água FIPAG, Sacos plásticos, Renda da banca..." style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;font-size:14px;">
+          </div>
+          <div class="form-group">
+            <label for="despesa-categoria">Categoria do Custo *</label>
+            <select id="despesa-categoria" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;font-weight:600;font-size:14px;">
+              <option value="⚡ Energia Elétrica (Credelec / Luz)">⚡ Energia Elétrica (Credelec / Luz)</option>
+              <option value="💧 Água (FIPAG / Abastecimento)">💧 Água (FIPAG / Abastecimento)</option>
+              <option value="🏠 Renda / Aluguer da Banca / Loja">🏠 Renda / Aluguer da Banca / Loja</option>
+              <option value="🧹 Material de Limpeza & Sacos Plásticos">🧹 Material de Limpeza & Sacos Plásticos</option>
+              <option value="🚗 Transporte e Frete de Mercadoria">🚗 Transporte e Frete de Mercadoria</option>
+              <option value="🛠️ Manutenção (Frio, Balanças, Equipamento)">🛠️ Manutenção (Frio, Balanças, Equipamento)</option>
+              <option value="🍲 Alimentação e Café da Loja">🍲 Alimentação e Café da Loja</option>
+              <option value="📦 Outras Despesas Operacionais">📦 Outras Despesas Operacionais</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="form-group">
+            <label for="despesa-ramo">Ramo / Filial do Estabelecimento</label>
+            <select id="despesa-ramo" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;font-weight:600;font-size:14px;"></select>
+          </div>
+          <div class="form-group">
+            <label for="despesa-valor">Valor a Pagar (MT) *</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="number" id="despesa-valor" min="0" step="0.01" placeholder="0,00" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;font-weight:800;font-size:16px;color:#dc2626;">
+              <button type="button" class="btn btn-small btn-light" onclick="adicionarValorDespesa(50)" style="font-weight:700;padding:9px 8px;font-size:12px;">+50</button>
+              <button type="button" class="btn btn-small btn-light" onclick="adicionarValorDespesa(100)" style="font-weight:700;padding:9px 8px;font-size:12px;">+100</button>
+              <button type="button" class="btn btn-small btn-light" onclick="adicionarValorDespesa(500)" style="font-weight:700;padding:9px 8px;font-size:12px;">+500</button>
+              <button type="button" class="btn btn-small btn-light" onclick="adicionarValorDespesa(1000)" style="font-weight:700;padding:9px 8px;font-size:12px;">+1.000</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:6px;background:#fef3c7;padding:10px 14px;border-radius:8px;border:1px solid #fde68a;">
+          <input type="checkbox" id="despesa-sair-caixa" checked style="width:auto;height:18px;cursor:pointer;">
+          <label for="despesa-sair-caixa" style="margin:0;font-size:13px;font-weight:700;color:#92400e;cursor:pointer;">
+            💸 Retirar este dinheiro diretamente do Caixa / Turno de hoje (Sangria automática)
+          </label>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button id="btn-registar-despesa" class="btn btn-entrar" type="button" onclick="registarDespesa()" style="width:auto;padding:12px 26px;font-weight:800;font-size:14px;background:#dc2626;display:inline-flex;align-items:center;gap:6px;">
+            💾 Registar Custo / Despesa
+          </button>
+          <span style="font-size:12px;color:#64748b;">O lançamento é gravado com auditoria inalterável.</span>
+        </div>
+      </div>
+
+      <!-- HISTÓRICO DE DESPESAS -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <h4 style="margin:0;color:#1e293b;font-size:15px;">📋 Histórico de Despesas Operacionais</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input type="text" id="despesas-pesquisa" oninput="renderDespesas()" placeholder="🔍 Pesquisar descrição..." style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;max-width:200px;">
+            <select id="despesas-filtro-categoria" onchange="renderDespesas()" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;">
+              <option value="TODAS">Todas as Categorias</option>
+              <option value="⚡ Energia Elétrica (Credelec / Luz)">⚡ Energia (Credelec)</option>
+              <option value="💧 Água (FIPAG / Abastecimento)">💧 Água (FIPAG)</option>
+              <option value="🏠 Renda / Aluguer da Banca / Loja">🏠 Renda</option>
+              <option value="🧹 Material de Limpeza & Sacos Plásticos">🧹 Sacos & Limpeza</option>
+              <option value="🚗 Transporte e Frete de Mercadoria">🚗 Frete / Transporte</option>
+              <option value="🛠️ Manutenção (Frio, Balanças, Equipamento)">🛠️ Manutenção & Gelo</option>
+              <option value="🍲 Alimentação e Café da Loja">🍲 Alimentação</option>
+              <option value="📦 Outras Despesas Operacionais">📦 Outras Despesas</option>
+            </select>
+            <select id="despesas-filtro-periodo" onchange="renderDespesas()" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;">
+              <option value="todos">Todo o Histórico</option>
+              <option value="hoje" selected>Hoje</option>
+              <option value="mes">Este Mês</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Data & Hora</th>
+            <th>Descrição & Categoria</th>
+            <th>Ramo</th>
+            <th>Valor (MT)</th>
+            <th>Origem</th>
+            <th>Registado por</th>
+            <th>Ações</th>
+          </tr></thead>
+          <tbody id="tabela-despesas"></tbody>
+        </table></div>
+      </div>
+    </section>
 
     <!-- RELATÓRIOS -->
     <section class="secao" id="sec-relatorios">
@@ -1030,6 +1295,129 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="card">
         <h3 style="margin-bottom:10px;">Análise inteligente</h3>
         <div id="analise-inteligente"></div>
+      </div>
+    </section>
+
+    <!-- LUCRO REAL & DRE DO ESTABELECIMENTO -->
+    <section class="secao" id="sec-lucro">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+        <div>
+          <h2 style="margin:0;color:#0f172a;display:flex;align-items:center;gap:8px;">
+            <span>📊</span> Apuramento de Lucro Real & DRE
+          </h2>
+          <p style="font-size:13px;color:#64748b;margin:3px 0 0 0;">
+            Cálculo financeiro consolidado: Vendas Totais − Compras de Stock − Gastos do Negócio (Luz, Água, Rendas) − Pagamentos de Funcionários.
+          </p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-light" onclick="window.renderSecaoLucro()" style="padding:9px 14px;font-size:13px;font-weight:700;">🔄 Recalcular</button>
+          <button type="button" class="btn btn-light" onclick="window.imprimirDRELucro()" style="padding:9px 14px;font-size:13px;font-weight:700;">🖨️ Imprimir DRE</button>
+          <button type="button" class="btn btn-light" onclick="window.exportarDREExcel()" style="padding:9px 14px;font-size:13px;font-weight:700;color:#047857;border:1px solid #86efac;background:#f0fdf4;">📊 Exportar Excel</button>
+          <button type="button" class="btn btn-success" onclick="window.enviarDREWhatsApp()" style="background-color:#25d366;padding:9px 14px;font-size:13px;font-weight:700;">📱 WhatsApp</button>
+        </div>
+      </div>
+
+      <!-- SELEÇÃO DE PERÍODO & RAMO -->
+      <div class="card" style="padding:14px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:12px;font-weight:800;color:#475569;margin-right:4px;">PERÍODO:</span>
+            <button type="button" class="btn btn-small btn-filtro-lucro" data-periodo="hoje" onclick="window.filtrarPeriodoLucro('hoje')" style="padding:6px 12px;font-weight:700;font-size:12px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">☀️ Hoje (Diário)</button>
+            <button type="button" class="btn btn-small btn-filtro-lucro" data-periodo="ontem" onclick="window.filtrarPeriodoLucro('ontem')" style="padding:6px 12px;font-weight:700;font-size:12px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">Ontem</button>
+            <button type="button" class="btn btn-small btn-filtro-lucro active" data-periodo="mes" onclick="window.filtrarPeriodoLucro('mes')" style="padding:6px 12px;font-weight:800;font-size:12px;border-radius:6px;background:#2563eb;color:#fff;border:none;cursor:pointer;">📅 Este Mês (Mensal)</button>
+            <button type="button" class="btn btn-small btn-filtro-lucro" data-periodo="mes_passado" onclick="window.filtrarPeriodoLucro('mes_passado')" style="padding:6px 12px;font-weight:700;font-size:12px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">Mês Passado</button>
+            <button type="button" class="btn btn-small btn-filtro-lucro" data-periodo="ano" onclick="window.filtrarPeriodoLucro('ano')" style="padding:6px 12px;font-weight:700;font-size:12px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">🗓️ Este Ano (Anual)</button>
+            <button type="button" class="btn btn-small btn-filtro-lucro" data-periodo="custom" onclick="window.filtrarPeriodoLucro('custom')" style="padding:6px 12px;font-weight:700;font-size:12px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;">⚙️ Personalizado</button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label for="lucro-filtro-ramo" style="font-size:12px;font-weight:700;color:#475569;margin:0;">Filial / Ramo:</label>
+            <select id="lucro-filtro-ramo" onchange="window.renderSecaoLucro()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-weight:700;"></select>
+          </div>
+        </div>
+
+        <!-- CAMPOS DE DATA PERSONALIZADA -->
+        <div id="lucro-datas-custom" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:700;color:#64748b;">De:</span>
+          <input type="date" id="lucro-data-inicio" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">
+          <span style="font-size:12px;font-weight:700;color:#64748b;">Até:</span>
+          <input type="date" id="lucro-data-fim" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">
+          <button type="button" class="btn btn-primary btn-small" onclick="window.renderSecaoLucro()" style="padding:7px 14px;font-size:12px;">Aplicar Intervalo</button>
+        </div>
+      </div>
+
+      <!-- BANNER DE DESTAQUE: LUCRO LÍQUIDO VS PREJUÍZO -->
+      <div id="lucro-banner-destaque" class="card" style="padding:22px;border-radius:14px;margin-bottom:16px;background:#ecfdf5;border:2px solid #86efac;text-align:center;">
+        <div style="font-size:13px;font-weight:800;color:#047857;text-transform:uppercase;letter-spacing:1px;" id="lucro-banner-rotulo">
+          🏆 RESULTADO LÍQUIDO REAL DO PERÍODO
+        </div>
+        <div id="lucro-banner-valor" style="font-size:36px;font-weight:900;color:#065f46;margin:8px 0;">
+          MT 0,00
+        </div>
+        <div id="lucro-banner-margem" style="font-size:14px;font-weight:700;color:#047857;">
+          Margem Líquida: 0.0% das vendas
+        </div>
+        <p id="lucro-banner-detalhe" style="font-size:13px;color:#1e3a8a;margin:8px auto 0;max-width:650px;line-height:1.5;">
+          A carregar apuramento financeiro...
+        </p>
+      </div>
+
+      <!-- 4 KPIS ESTRUTURAIS -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:16px;">
+        <div class="card" style="margin-bottom:0;padding:16px;border-left:5px solid #10b981;">
+          <div style="font-size:12px;color:#64748b;font-weight:700;text-transform:uppercase;">(+) Faturamento / Vendas</div>
+          <div id="kpi-lucro-vendas" style="font-size:24px;font-weight:900;color:#047857;margin-top:4px;">MT 0,00</div>
+          <div id="kpi-lucro-vendas-qtd" style="font-size:11px;color:#64748b;margin-top:2px;">0 vendas no balcão</div>
+        </div>
+
+        <div class="card" style="margin-bottom:0;padding:16px;border-left:5px solid #3b82f6;">
+          <div style="font-size:12px;color:#64748b;font-weight:700;text-transform:uppercase;">(−) Compras de Mercadoria / Stock</div>
+          <div id="kpi-lucro-compras" style="font-size:24px;font-weight:900;color:#1d4ed8;margin-top:4px;">MT 0,00</div>
+          <div id="kpi-lucro-compras-qtd" style="font-size:11px;color:#64748b;margin-top:2px;">0 compras registadas</div>
+        </div>
+
+        <div class="card" style="margin-bottom:0;padding:16px;border-left:5px solid #ef4444;">
+          <div style="font-size:12px;color:#64748b;font-weight:700;text-transform:uppercase;">(−) Gastos / Despesas do Negócio</div>
+          <div id="kpi-lucro-despesas" style="font-size:24px;font-weight:900;color:#b91c1c;margin-top:4px;">MT 0,00</div>
+          <div id="kpi-lucro-despesas-detalhe" style="font-size:11px;color:#64748b;margin-top:2px;">Credelec, Água, Rendas, etc.</div>
+        </div>
+
+        <div class="card" style="margin-bottom:0;padding:16px;border-left:5px solid #f59e0b;">
+          <div style="font-size:12px;color:#64748b;font-weight:700;text-transform:uppercase;">(−) Folha Salarial / Funcionários</div>
+          <div id="kpi-lucro-salarios" style="font-size:24px;font-weight:900;color:#b45309;margin-top:4px;">MT 0,00</div>
+          <div id="kpi-lucro-salarios-detalhe" style="font-size:11px;color:#64748b;margin-top:2px;">Custo da equipa no período</div>
+        </div>
+      </div>
+
+      <!-- DEMONSTRATIVO CONTÁBIL DRE (DETALHADO) -->
+      <div class="card" style="border:1px solid #e2e8f0;padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+          <div>
+            <h3 style="margin:0;color:#0f172a;font-size:16px;font-weight:800;">
+              📋 Demonstrativo do Resultado do Exercício (DRE)
+            </h3>
+            <p style="margin:2px 0 0;font-size:12px;color:#64748b;">
+              Discriminação de todas as receitas e saídas para auditoria e gestão da empresa.
+            </p>
+          </div>
+          <span id="lucro-periodo-tag" class="badge badge-green" style="font-size:12px;padding:6px 12px;">Este Mês</span>
+        </div>
+
+        <div class="table-wrap">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #cbd5e1;">
+                <th style="padding:10px;text-align:left;">Conta / Descrição</th>
+                <th style="padding:10px;text-align:center;">Natureza</th>
+                <th style="padding:10px;text-align:right;">Valor (MT)</th>
+                <th style="padding:10px;text-align:right;">% s/ Faturamento</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-dre-linhas">
+              <!-- Linhas calculadas dinamicamente -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -1112,17 +1500,41 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <section class="secao" id="sec-funcionarios">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
         <div>
-          <h2>🧑‍💼 Equipa de Funcionários & Vales Salariais</h2>
+          <h2>🧑‍💼 Equipa de Funcionários, Salários & Vales</h2>
           <p style="font-size:13px;color:#64748b;margin-top:2px;">
-            Gestão da equipa de colaboradores e controlo de adiantamentos salariais (vales).
+            Gestão completa da equipa, definição do salário mensal para controlo de custos, e acompanhamento de adiantamentos salariais (vales).
           </p>
+        </div>
+      </div>
+
+      <!-- KPIS FINANCEIROS DE PESSOAL E SALÁRIOS -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:16px;">
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #3b82f6;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Equipa Total</div>
+          <div id="kpi-func-total" style="font-size:22px;font-weight:800;color:#1e3a8a;margin-top:4px;">0</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Colaboradores ativos</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #10b981;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Folha Salarial Mensal</div>
+          <div id="kpi-func-folha" style="font-size:22px;font-weight:800;color:#059669;margin-top:4px;">MT 0,00</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Soma dos pagamentos mensais</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #f59e0b;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Vales / Adiantamentos no Mês</div>
+          <div id="kpi-func-vales" style="font-size:22px;font-weight:800;color:#d97706;margin-top:4px;">MT 0,00</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Adiantamentos concedidos</div>
+        </div>
+        <div class="card" style="margin-bottom:0;padding:14px;border-left:4px solid #6366f1;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">Salários Restantes a Pagar</div>
+          <div id="kpi-func-liquido" style="font-size:22px;font-weight:800;color:#4f46e5;margin-top:4px;">MT 0,00</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Salário base - vales retirados</div>
         </div>
       </div>
 
       <!-- ABAS DE NAVEGAÇÃO EM FUNCIONÁRIOS -->
       <div class="tabs-bar-func" style="display:flex;gap:6px;background:#f1f5f9;padding:4px;border-radius:10px;margin-bottom:16px;">
         <button type="button" class="tab-func-btn active" data-tab-func="equipa" onclick="alternarAbaFuncionarios('equipa')" style="flex:1;padding:10px 8px;font-weight:700;font-size:13px;border:none;background:#2563eb;color:#fff;border-radius:8px;cursor:pointer;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-          👥 Equipa de Funcionários
+          👥 Equipa de Funcionários & Salários
         </button>
         <button type="button" class="tab-func-btn" data-tab-func="vales" onclick="alternarAbaFuncionarios('vales')" style="flex:1;padding:10px 8px;font-weight:700;font-size:13px;border:none;background:transparent;color:#475569;border-radius:8px;cursor:pointer;text-align:center;">
           💸 Vales & Adiantamentos Salariais
@@ -1133,19 +1545,34 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div id="tab-func-conteudo-equipa">
         <div class="card">
           <div class="grid">
-            <div class="form-group"><label for="func-nome">Nome</label><input type="text" id="func-nome"></div>
-            <div class="form-group"><label for="func-email">E-mail</label><input type="email" id="func-email"></div>
-            <div class="form-group"><label for="func-telefone">Telefone</label><input type="text" id="func-telefone"></div>
+            <div class="form-group"><label for="func-nome">Nome Completo *</label><input type="text" id="func-nome" placeholder="Ex: João Baptista"></div>
+            <div class="form-group"><label for="func-email">E-mail de Acesso *</label><input type="email" id="func-email" placeholder="funcionario@empresa.com"></div>
+            <div class="form-group"><label for="func-telefone">Telefone</label><input type="text" id="func-telefone" placeholder="8xx xxx xxx"></div>
             <div class="form-group"><label for="func-ramo">Ramo de Atuação / Filial</label><select id="func-ramo"></select></div>
+            <div class="form-group">
+              <label for="func-salario-mensal" style="color:#059669;font-weight:800;">💵 Salário / Pagamento Mensal (MT) *</label>
+              <input type="number" id="func-salario-mensal" min="0" step="50" placeholder="Ex: 5000" style="padding:10px;border:1.5px solid #10b981;border-radius:8px;font-weight:800;color:#047857;background:#f0fdf4;">
+            </div>
             <div class="form-group"><label for="func-senha">Senha de Acesso (Mínimo 6 caracteres) *</label><input type="password" id="func-senha" placeholder="Mínimo 6 caracteres"></div>
             <div class="form-group"><label for="func-pin">Código PIN de Bloqueio Rápido (4 a 6 números, opcional)</label><input type="password" id="func-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234"></div>
             <div class="form-group"><label for="func-foto">Foto (link/URL, opcional)</label><input type="text" id="func-foto" placeholder="https://..."></div>
           </div>
-          <button id="btn-cadastrar-funcionario" class="btn btn-entrar" style="width:auto;padding:10px 20px;">Cadastrar funcionário</button>
+          <button id="btn-cadastrar-funcionario" class="btn btn-entrar" style="width:auto;padding:10px 24px;font-weight:700;">Cadastrar funcionário</button>
         </div>
         <div class="card">
           <div class="table-wrap"><table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Ramo / Filial</th><th>Função</th><th>Vales do Mês</th><th>Estado</th><th>Ações</th></tr></thead>
+            <thead><tr>
+              <th>Nome</th>
+              <th>E-mail</th>
+              <th>Telefone</th>
+              <th>Ramo / Filial</th>
+              <th>Função</th>
+              <th style="color:#059669;">Salário Mensal</th>
+              <th style="color:#b45309;">Vales do Mês</th>
+              <th style="color:#2563eb;">Líquido a Pagar</th>
+              <th>Estado</th>
+              <th>Ações</th>
+            </tr></thead>
             <tbody id="tabela-funcionarios"></tbody>
           </table></div>
         </div>
@@ -1195,7 +1622,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             Controlo e registo completo de ausências, baixas médicas, férias anuais, dispensas pontuais e justificação de faltas da equipa.
           </p>
         </div>
-        <button id="btn-nova-dispensa" class="btn btn-entrar" type="button" style="width:auto;padding:10px 20px;font-weight:700;display:inline-flex;align-items:center;gap:6px;">
+        <button id="btn-nova-dispensa" class="btn btn-entrar" type="button" onclick="window.abrirModalNovaDispensa()" style="width:auto;padding:10px 20px;font-weight:700;display:inline-flex;align-items:center;gap:6px;">
           ➕ Solicitar / Registar Dispensa
         </button>
       </div>
@@ -1374,81 +1801,149 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
     </section>
 
-    <!-- SUBSCRIÇÃO -->
+    <!-- SUBSCRIÇÃO & ATIVAÇÃO DA LICENÇA -->
     <section class="secao" id="sec-subscricao">
-      <h2>Subscrição & Licenciamento FABEF ERP PRO</h2>
-
-      <!-- CARTÃO DE REGRAS E POLÍTICA -->
-      <div class="card" style="border-left: 4px solid #2563eb;">
-        <h3 style="margin-top:0; color:#1e3a8a; font-size:16px;">📜 Regras da Subscrição & Período Gratuito</h3>
-        <ul style="font-size:13px; color:#334155; line-height:1.6; margin:8px 0 0 18px; padding:0;">
-          <li><strong>7 Dias Grátis:</strong> Teste livre com acesso a todas as funcionalidades sem nenhum custo inicial.</li>
-          <li><strong>8º Dia em Diante (Modo Restrito Gratuito):</strong> O gerente pode continuar a usar a app gratuitamente, porém com restrições operacionais (limite de <strong>5 vendas por dia</strong>, <strong>3 encomendas por dia</strong> e funcionalidades analíticas/expansão de funcionários temporariamente pausadas).</li>
-          <li><strong>Plano Completo de 30 Dias:</strong> Apenas <strong>250 MT</strong> para o negócio, com direito ao uso de <strong>até 3 pessoas</strong> (o Gerente + 2 Funcionários).</li>
-          <li><strong>Funcionários Adicionais:</strong> Se quiser adicionar mais funcionários, paga apenas <strong>+20% do valor da subscrição (50 MT)</strong> por cada funcionário extra.</li>
-        </ul>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <h2 style="margin:0;">💳 Subscrição & Ativação FABEF ERP PRO</h2>
+          <p style="font-size:13px;color:#64748b;margin-top:2px;margin-bottom:0;">
+            Acesso total para a sua loja em Moçambique com M-Pesa, E-Mola ou Chave de Ativação Instantânea.
+          </p>
+        </div>
+        <button type="button" class="btn btn-light" onclick="verificarSubscricao()" style="padding:8px 14px;font-weight:700;">🔄 Atualizar Estado</button>
       </div>
 
-      <!-- ESTADO ATUAL -->
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <!-- ESTADO ATUAL DO ESTABELECIMENTO -->
+      <div class="card" style="border-left: 4px solid #10b981; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
           <div>
             <span style="font-size:12px; color:#64748b; font-weight:700; text-transform:uppercase;">Estado Atual do Seu Estabelecimento:</span>
-            <div style="margin-top:4px;"><strong id="estado-subscricao" style="font-size:16px; color:#0f172a;">—</strong></div>
+            <div style="margin-top:4px;"><strong id="estado-subscricao" style="font-size:18px; color:#0f172a;">—</strong></div>
+            <div id="subscricao-info-detalhe" style="font-size:12px; color:#64748b; margin-top:3px;"></div>
           </div>
           <div id="badge-dias-restantes"></div>
         </div>
       </div>
 
-      <!-- CALCULADORA INTERATIVA DE PAGAMENTO -->
+      <!-- COMO FUNCIONAM OS 7 DIAS & POLÍTICA SEM BLOQUEIO TOTAL -->
+      <div class="card" style="border-left: 4px solid #2563eb; margin-bottom:16px;">
+        <h3 style="margin-top:0; color:#1e3a8a; font-size:15px; margin-bottom:8px;">📜 Como funciona o Período de Teste e a Ativação aos 7 Dias?</h3>
+        <div style="font-size:13px; color:#334155; line-height:1.6;">
+          <p style="margin-top:0; margin-bottom:8px;">
+            🎉 <strong>Dias 1 a 7 (Período Grátis Total):</strong> Tem acesso livre e ilimitado a todas as ferramentas PRO (vendas, múltiplos ramos, stock, impressões de recibo e equipa).
+          </p>
+          <p style="margin-bottom:8px;">
+            🛡️ <strong>Aos 7 Dias (Sem Bloqueio de Dados):</strong> Se o período de teste expirar, o sistema <strong>NUNCA apaga nem bloqueia os seus dados</strong>. O sistema passa para o <em>Plano Grátis com limites diários</em> (5 vendas/dia e 3 encomendas/dia) para que a sua loja nunca pare.
+          </p>
+          <p style="margin-bottom:0;">
+            ⭐ <strong>Subscrição PRO (30 Dias):</strong> Apenas <strong>250 MT/mês</strong> para o negócio completo, cobrindo o <strong>Gerente + 2 Funcionários (total 3 pessoas)</strong>. Sem limite de vendas, sem restrições e com apoio técnico.
+          </p>
+        </div>
+      </div>
+
+      <!-- CANAIS OFICIAIS DE PAGAMENTO EM MOÇAMBIQUE -->
+      <div class="card" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; margin-bottom:16px;">
+        <h3 style="margin-top:0; color:#0f172a; font-size:15px; margin-bottom:10px;">🇲🇿 Contas Oficiais para Transferência (250 MT)</h3>
+        <p style="font-size:12px; color:#64748b; margin-top:0; margin-bottom:14px;">
+          Efetue a transferência de <strong>250 MT</strong> para qualquer uma das contas abaixo e ative o sistema imediatamente:
+        </p>
+
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; margin-bottom:14px;">
+          <!-- CARTÃO M-PESA -->
+          <div style="background:#fff; border:1.5px solid #fecaca; border-radius:10px; padding:14px; position:relative;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; font-weight:800; color:#dc2626;">🔴 VODACOM M-PESA</span>
+              <span style="background:#fee2e2; color:#991b1b; font-size:10px; font-weight:800; padding:2px 6px; border-radius:6px;">Moçambique</span>
+            </div>
+            <div style="font-size:20px; font-weight:900; color:#0f172a; margin:8px 0 4px; letter-spacing:0.5px;">
+              84 564 3405
+            </div>
+            <div style="font-size:12px; color:#475569;">
+              Titular: <strong>Faruque Abílio</strong>
+            </div>
+            <button type="button" class="btn btn-small btn-light" onclick="navigator.clipboard?.writeText('845643405'); alert('Número M-Pesa 845643405 copiado!');" style="margin-top:10px; width:100%; font-size:11px; font-weight:700;">📋 Copiar Número M-Pesa</button>
+          </div>
+
+          <!-- CARTÃO E-MOLA -->
+          <div style="background:#fff; border:1.5px solid #fed7aa; border-radius:10px; padding:14px; position:relative;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; font-weight:800; color:#ea580c;">🟠 MOVITEL E-MOLA</span>
+              <span style="background:#ffedd5; color:#9a3412; font-size:10px; font-weight:800; padding:2px 6px; border-radius:6px;">Moçambique</span>
+            </div>
+            <div style="font-size:20px; font-weight:900; color:#0f172a; margin:8px 0 4px; letter-spacing:0.5px;">
+              86 564 3405
+            </div>
+            <div style="font-size:12px; color:#475569;">
+              Titular: <strong>Faruque Abílio</strong>
+            </div>
+            <button type="button" class="btn btn-small btn-light" onclick="navigator.clipboard?.writeText('865643405'); alert('Número E-Mola 865643405 copiado!');" style="margin-top:10px; width:100%; font-size:11px; font-weight:700;">📋 Copiar Número E-Mola</button>
+          </div>
+        </div>
+
+        <!-- BOTÃO DIRETO WHATSAPP -->
+        <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <strong style="color:#166534; font-size:13px;">💬 Ativação Rápida por WhatsApp</strong>
+            <div style="font-size:12px; color:#15803d;">Envie o comprovativo da transferência diretamente para o Faruque ativar a sua licença em minutos.</div>
+          </div>
+          <button type="button" class="btn" onclick="abrirWhatsAppSuporteAtivacao()" style="background:#16a34a; color:#fff; font-weight:800; font-size:13px; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+            📲 Enviar Comprovativo no WhatsApp
+          </button>
+        </div>
+      </div>
+
+      <!-- ATIVAÇÃO POR CÓDIGO DE TRANSAÇÃO OU CHAVE DE LICENÇA -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:16px;">
+        <!-- OPÇÃO A: INSERIR CÓDIGO DA MENSAGEM MPESA/EMOLA -->
+        <div class="card" style="margin-bottom:0;">
+          <h4 style="margin-top:0; color:#0f172a; font-size:14px; margin-bottom:6px;">📱 1. Validar Código da SMS (M-Pesa / E-Mola)</h4>
+          <p style="font-size:12px; color:#64748b; margin-top:0; margin-bottom:10px;">
+            Insira o código que recebeu por SMS após pagar os 250 MT (ex: <code>CI260926.1234.A01234</code>):
+          </p>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label for="subscricao-ref-sms" style="font-size:12px; font-weight:700;">Código de Transação / Referência *</label>
+            <input type="text" id="subscricao-ref-sms" placeholder="Ex: CI260926... ou 84xxxxxxx" style="font-family:monospace; padding:10px; border:1px solid #cbd5e1; border-radius:8px; width:100%; font-size:13px;">
+          </div>
+          <button type="button" class="btn btn-primary" onclick="submeterComprovativoPagamento()" style="width:100%; padding:10px; font-weight:700; background:#2563eb; color:#fff; border:none; border-radius:8px; cursor:pointer;">
+            ✅ Registar Código & Ativar
+          </button>
+        </div>
+
+        <!-- OPÇÃO B: ATIVAR COM CHAVE DE LICENÇA -->
+        <div class="card" style="margin-bottom:0;">
+          <h4 style="margin-top:0; color:#0f172a; font-size:14px; margin-bottom:6px;">🔑 2. Ativar com Chave de Licença PRO</h4>
+          <p style="font-size:12px; color:#64748b; margin-top:0; margin-bottom:10px;">
+            Se recebeu uma chave de ativação do suporte ou deseja testar a chave promocional:
+          </p>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label for="subscricao-chave-licenca" style="font-size:12px; font-weight:700;">Chave de Licença (PRO) *</label>
+            <input type="text" id="subscricao-chave-licenca" placeholder="Ex: FABEF-PRO-2026 ou PRO30" style="text-transform:uppercase; font-family:monospace; font-weight:700; padding:10px; border:1px solid #cbd5e1; border-radius:8px; width:100%; font-size:13px;">
+          </div>
+          <button type="button" class="btn btn-success" onclick="ativarLicencaPorChave()" style="width:100%; padding:10px; font-weight:700; background:#10b981; color:#fff; border:none; border-radius:8px; cursor:pointer;">
+            🚀 Validar Chave & Ativar 30 Dias
+          </button>
+        </div>
+      </div>
+
+      <!-- CALCULADORA DE EQUIPA EXTRA -->
       <div class="card">
-        <h3 style="margin-top:0; color:#0f172a; font-size:15px; margin-bottom:12px;">💳 Renovação / Pagamento da Subscrição (30 Dias)</h3>
-        
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
-            <div>
-              <strong>Subscrição Base (30 Dias)</strong>
-              <div style="font-size:12px; color:#64748b;">Inclui Gerente + 2 Funcionários (total 3 pessoas)</div>
-            </div>
-            <span style="font-weight:800; font-size:16px; color:#0f172a;">250 MT</span>
+        <h3 style="margin-top:0; color:#0f172a; font-size:14px; margin-bottom:8px;">👥 Expansão de Equipa (Funcionários Adicionais)</h3>
+        <p style="font-size:12px; color:#64748b; margin-top:0; margin-bottom:12px;">
+          A subscrição base de 250 MT já inclui <strong>Gerente + 2 Funcionários (total 3 utilizadores)</strong>. Se tiver mais caixas ou operadores na loja, cada funcionário adicional custa apenas <strong>+50 MT/mês (+20%)</strong>.
+        </p>
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px 16px; border-radius:8px; border:1px solid #e2e8f0; flex-wrap:wrap; gap:10px;">
+          <div>
+            <strong>Funcionários Adicionais:</strong>
+            <span id="calc-qtd-extras" style="font-weight:800; font-size:15px; margin-left:8px; color:#2563eb;">0</span>
           </div>
-
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px; padding-top:10px; border-top:1px dashed #cbd5e1;">
-            <div>
-              <strong>Funcionários Extras</strong>
-              <div style="font-size:12px; color:#64748b;">+20% da subscrição (+50 MT) por cada funcionário extra</div>
-            </div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <button type="button" id="btn-calc-menos-func" class="btn btn-light btn-small" style="width:32px; height:32px; font-weight:800; padding:0;">−</button>
-              <span id="calc-qtd-extras" style="font-weight:800; font-size:16px; min-width:24px; text-align:center;">0</span>
-              <button type="button" id="btn-calc-mais-func" class="btn btn-light btn-small" style="width:32px; height:32px; font-weight:800; padding:0;">+</button>
-            </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button type="button" id="btn-calc-menos-func" class="btn btn-light btn-small" style="width:30px; height:30px; font-weight:800; padding:0;">−</button>
+            <button type="button" id="btn-calc-mais-func" class="btn btn-light btn-small" style="width:30px; height:30px; font-weight:800; padding:0;">+</button>
           </div>
-
-          <div style="display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:2px solid #cbd5e1; font-size:16px;">
-            <strong style="color:#0f172a;">Total a Pagar (30 Dias):</strong>
-            <strong id="calc-total-pagar" style="font-size:20px; color:#10b981;">250 MT</strong>
+          <div style="font-size:15px;">
+            Total mensalidade: <strong id="calc-total-pagar" style="color:#10b981; font-size:18px;">250 MT</strong>
           </div>
         </div>
-
-        <div class="grid">
-          <div class="form-group">
-            <label for="pagamento-operadora">Carteira Móvel / Operadora</label>
-            <select id="pagamento-operadora">
-              <option value="MPESA">M-Pesa (Vodacom)</option>
-              <option value="EMOLA">E-Mola (Movitel)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="pagamento-telefone">Número de Telefone (84/85 ou 86/87)</label>
-            <input type="text" id="pagamento-telefone" placeholder="8xx xxx xxx" maxlength="9">
-          </div>
-        </div>
-
-        <button id="btn-solicitar-pagamento" class="btn btn-entrar" style="width:auto; padding:12px 24px; font-size:14px; font-weight:800; background:#10b981; border:none; border-radius:8px;">
-          📲 Efetuar Pagamento de <span id="btn-texto-valor-pagamento">250 MT</span>
-        </button>
-        <div id="resultado-pagamento" class="status-msg" style="margin-top:12px;"></div>
       </div>
     </section>
 
@@ -1571,7 +2066,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
             <strong id="config-pin-estado" style="font-size:14px;color:#16a34a;">🟢 PIN ATIVO E PROTEGIDO</strong>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button id="btn-alterar-pin" class="btn btn-primary" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;">🔢 Definir / Alterar PIN</button>
+            <button id="btn-alterar-pin" class="btn btn-primary" type="button" onclick="window.abrirModalDefinirPin()" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">🔢 Definir / Alterar PIN</button>
             <button id="btn-config-alterar-senha" class="btn" type="button" onclick="document.getElementById('modal-alterar-senha')?.classList.add('show')" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;background:#0f172a;color:#fff;">🔑 Alterar Senha</button>
             <button id="btn-testar-bloqueio" class="btn btn-light" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:600;">🔒 Testar Bloqueio</button>
           </div>
@@ -1597,42 +2092,15 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
       <!-- ABA 2: DESPESAS DO ESTABELECIMENTO -->
       <div id="tab-config-conteudo-despesas" style="display:none;">
-        <div class="card" style="border-top:3px solid #dc2626;">
-          <h3 style="color:#991b1b;margin-bottom:6px;">⚡ Registar Despesa / Custo do Estabelecimento</h3>
-          <p style="font-size:13px; color:#64748b; margin-top:-2px; margin-bottom:14px;">
-            Registo de saídas financeiras e custos fixos da empresa: Energia elétrica (Credelec / Luz), Água (FIPAG), Renda da banca/loja, Sacos plásticos, Transporte e Manutenção.
+        <div class="card" style="border-top:3px solid #dc2626; text-align:center; padding:30px 20px;">
+          <span style="font-size:36px; display:block; margin-bottom:8px;">⚡</span>
+          <h3 style="color:#991b1b;margin-bottom:6px;">Módulo Dedicado de Despesas do Estabelecimento</h3>
+          <p style="font-size:13px; color:#64748b; margin:0 auto 16px; max-width:480px;">
+            O registo e histórico de despesas operacionais (Credelec, Água FIPAG, Renda, Sacos, Fretes e Manutenção) agora possui uma secção própria com KPIs financeiros, comprovativos para impressão e sangria automática do caixa.
           </p>
-          <div class="grid">
-            <div class="form-group"><label for="despesa-descricao">Descrição do Custo / Despesa *</label><input type="text" id="despesa-descricao" placeholder="Ex: Credelec 500 MT, Água FIPAG, Sacos plásticos, Renda..."></div>
-            <div class="form-group">
-              <label for="despesa-categoria">Categoria do Custo *</label>
-              <select id="despesa-categoria" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%;font-weight:600;">
-                <option value="⚡ Energia Elétrica (Credelec / Luz)">⚡ Energia Elétrica (Credelec / Luz)</option>
-                <option value="💧 Água (FIPAG / Abastecimento)">💧 Água (FIPAG / Abastecimento)</option>
-                <option value="🏠 Renda / Aluguer da Banca / Loja">🏠 Renda / Aluguer da Banca / Loja</option>
-                <option value="🧹 Material de Limpeza & Sacos Plásticos">🧹 Material de Limpeza & Sacos Plásticos</option>
-                <option value="🚗 Transporte e Frete de Mercadoria">🚗 Transporte e Frete de Mercadoria</option>
-                <option value="🛠️ Manutenção (Frio, Balanças, Equipamento)">🛠️ Manutenção (Frio, Balanças, Equipamento)</option>
-                <option value="🍲 Alimentação e Café da Loja">🍲 Alimentação e Café da Loja</option>
-                <option value="📦 Outras Despesas Operacionais">📦 Outras Despesas Operacionais</option>
-              </select>
-            </div>
-            <div class="form-group"><label for="despesa-valor">Valor a Pagar (MT) *</label><input type="number" id="despesa-valor" min="0" step="0.01" placeholder="0,00" style="font-weight:800;font-size:16px;"></div>
-          </div>
-          <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-            <input type="checkbox" id="despesa-sair-caixa" checked style="width:auto;">
-            <label for="despesa-sair-caixa" style="margin:0;font-size:13px;font-weight:600;color:#b45309;">
-              💸 Retirar este dinheiro diretamente do Caixa / Turno de hoje (Sangria automática)
-            </label>
-          </div>
-          <button id="btn-registar-despesa" class="btn btn-entrar" type="button" onclick="registarDespesa()" style="width:auto;padding:10px 22px;font-weight:700;background:#dc2626;">💾 Registar Custo / Despesa</button>
-        </div>
-        <div class="card">
-          <h4 style="margin:0 0 10px; color:#1e293b;">📋 Histórico de Despesas Operacionais</h4>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Data</th><th>Descrição & Categoria</th><th>Valor</th><th>Registado por</th><th>Ramo</th></tr></thead>
-            <tbody id="tabela-despesas"></tbody>
-          </table></div>
+          <button type="button" class="btn btn-entrar" onclick="mostrarSecao('despesas')" style="padding:11px 24px; font-weight:800; background:#dc2626; font-size:14px; display:inline-flex; align-items:center; gap:6px;">
+            ⚡ Abrir Painel de Despesas
+          </button>
         </div>
       </div>
     </section>
@@ -1818,35 +2286,153 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
       <div class="form-group" style="text-align:left;">
         <label for="input-novo-pin" style="font-weight:700;">Novo Código PIN (4 a 6 números)</label>
-        <input type="password" id="input-novo-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:22px;letter-spacing:6px;font-weight:bold;">
+        <div style="position:relative;">
+          <input type="password" id="input-novo-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;width:100%;height:46px;padding-right:40px;">
+          <button type="button" onclick="const i=document.getElementById('input-novo-pin'); i.type = i.type==='password'?'text':'password'; this.textContent = i.type==='password'?'👁️':'🔒';" style="position:absolute;right:8px;top:8px;background:none;border:none;cursor:pointer;font-size:18px;" title="Ver/Ocultar PIN">👁️</button>
+        </div>
       </div>
 
       <div class="form-group" style="text-align:left;">
         <label for="input-confirmar-pin" style="font-weight:700;">Confirmar Novo PIN</label>
-        <input type="password" id="input-confirmar-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:22px;letter-spacing:6px;font-weight:bold;">
+        <div style="position:relative;">
+          <input type="password" id="input-confirmar-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Ex: 1234" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;width:100%;height:46px;padding-right:40px;">
+          <button type="button" onclick="const i=document.getElementById('input-confirmar-pin'); i.type = i.type==='password'?'text':'password'; this.textContent = i.type==='password'?'👁️':'🔒';" style="position:absolute;right:8px;top:8px;background:none;border:none;cursor:pointer;font-size:18px;" title="Ver/Ocultar PIN">👁️</button>
+        </div>
       </div>
 
       <div id="status-config-pin" class="status-msg"></div>
 
       <div class="modal-acoes" style="margin-top:16px;">
         <button type="button" class="btn btn-light" id="btn-cancelar-pin" onclick="fecharModal('modal-configurar-pin')" style="flex:1;">Cancelar</button>
-        <button type="button" class="btn btn-entrar" id="btn-salvar-pin" style="flex:1;background:#2563eb;">🔒 Ativar PIN</button>
+        <button type="button" class="btn btn-entrar" id="btn-salvar-pin" onclick="window.salvarNovoPin()" style="flex:1.2;background:#2563eb;font-weight:700;font-size:14px;">🔒 Guardar Novo PIN</button>
       </div>
     </div>
   </div>
 
   <div class="modal-overlay" id="modal-editar-funcionario">
     <div class="modal-box">
-      <h3>Editar funcionário</h3>
+      <h3>Editar Funcionário & Salário</h3>
       <input type="hidden" id="edit-func-id">
       <div class="form-group"><label for="edit-func-nome">Nome</label><input type="text" id="edit-func-nome"></div>
       <div class="form-group"><label for="edit-func-telefone">Telefone</label><input type="text" id="edit-func-telefone"></div>
       <div class="form-group"><label for="edit-func-ramo">Ramo de Atuação / Filial</label><select id="edit-func-ramo"></select></div>
+      <div class="form-group">
+        <label for="edit-func-salario-mensal" style="color:#059669;font-weight:700;">Salário / Pagamento Mensal (MT)</label>
+        <input type="number" id="edit-func-salario-mensal" min="0" step="50" placeholder="0.00" style="padding:10px;border:1.5px solid #10b981;border-radius:8px;font-weight:800;color:#047857;">
+      </div>
       <div class="form-group"><label for="edit-func-pin">Definir Novo PIN do Funcionário (4 a 6 números, opcional)</label><input type="password" id="edit-func-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Deixe em branco para manter o atual"></div>
       <p style="font-size:12px;color:#64748b;">O e-mail de acesso não pode ser alterado aqui. Para desativar o acesso, use o botão "Desativar" na lista.</p>
       <div class="modal-acoes">
         <button class="btn btn-light" type="button" onclick="fecharModal('modal-editar-funcionario')" style="flex:1;">Cancelar</button>
         <button id="btn-salvar-edicao-funcionario" class="btn btn-entrar" style="flex:1;">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL CONFERÊNCIA CEGA: FECHAR CAIXA ================= -->
+  <div class="modal-overlay" id="modal-fechar-caixa-cego">
+    <div class="modal-box" style="max-width: 460px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-size:28px;">🔐</span>
+        <div>
+          <h3 style="margin:0;color:#0f172a;font-size:18px;">Fechamento de Caixa — Conferência Cega</h3>
+          <p style="margin:2px 0 0;font-size:12px;color:#64748b;">Auditoria de segurança contra desfalque ou sobra</p>
+        </div>
+      </div>
+
+      <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:12px;margin:12px 0;">
+        <div style="font-size:12px;font-weight:800;color:#991b1b;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+          <span>🛡️</span> Regra de Auditoria Financeira
+        </div>
+        <p style="font-size:12px;color:#7f1d1d;margin:0;line-height:1.4;">
+          Para garantir total transparência e evitar fraudes ou desvios, o saldo teórico do sistema <strong>não é revelado previamente</strong>. Conte fisicamente todo o dinheiro em notas e moedas na gaveta e introduza o valor apurado.
+        </p>
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label for="fecho-caixa-dinheiro-contado" style="font-size:13px;font-weight:800;color:#1e3a8a;">
+          💵 Dinheiro Físico Contado na Gaveta (MT) *
+        </label>
+        <input type="number" id="fecho-caixa-dinheiro-contado" min="0" step="0.5" placeholder="0,00" autocomplete="off" style="font-size:22px;font-weight:900;height:50px;text-align:center;color:#0f172a;border:2px solid #3b82f6;border-radius:10px;background:#f8fafc;width:100%;">
+        <div style="font-size:11px;color:#64748b;margin-top:4px;text-align:center;">
+          Ex: Se contou 3.500 Meticais em notas e moedas, digite 3500.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="fecho-caixa-observacoes">Observações do Fecho (opcional)</label>
+        <textarea id="fecho-caixa-observacoes" rows="2" placeholder="Ex: Notas rasgadas, moedas contadas, turno encerrado pontualmente..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;"></textarea>
+      </div>
+
+      <div class="modal-acoes" style="margin-top:16px;">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-fechar-caixa-cego')" style="flex:1;">Cancelar</button>
+        <button id="btn-confirmar-fecho-cego" class="btn btn-danger" type="button" onclick="window.confirmarFechoCaixaCego()" style="flex:1.6;font-weight:800;padding:12px;background:#dc2626;">
+          🔒 Confirmar e Revelar Apuramento
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL RESULTADO DE FECHO DE CAIXA ================= -->
+  <div class="modal-overlay" id="modal-resultado-fecho-caixa">
+    <div class="modal-box" style="max-width: 520px;">
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="width:52px;height:52px;background:#eff6ff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:26px;border:2px solid #bfdbfe;margin-bottom:8px;">
+          🧾
+        </div>
+        <h3 style="margin:0;color:#0f172a;font-size:20px;">Comprovativo de Fecho de Caixa</h3>
+        <p id="res-fecho-subtitulo" style="font-size:12px;color:#64748b;margin:3px 0 0 0;">
+          Apuramento e Auditoria de Turno
+        </p>
+      </div>
+
+      <!-- BANNER DE SITUAÇÃO: DESFALQUE, SOBRA OU EXATO -->
+      <div id="res-fecho-banner-status" style="padding:14px;border-radius:10px;margin-bottom:14px;text-align:center;">
+        <div id="res-fecho-rotulo" style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;"></div>
+        <div id="res-fecho-diferenca" style="font-size:26px;font-weight:900;margin:4px 0;"></div>
+        <div id="res-fecho-explicacao" style="font-size:12px;"></div>
+      </div>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #cbd5e1;">
+          <span style="color:#64748b;">(+) Fundo Inicial (Abertura):</span>
+          <strong id="res-fecho-abertura">MT 0,00</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #cbd5e1;">
+          <span style="color:#64748b;">(+) Vendas a Dinheiro (Numerário):</span>
+          <strong id="res-fecho-vendas-dinheiro" style="color:#15803d;">MT 0,00</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #cbd5e1;">
+          <span style="color:#64748b;">(+) Vendas Digitais (M-Pesa / Cartão):</span>
+          <strong id="res-fecho-vendas-outras" style="color:#0284c7;">MT 0,00</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #cbd5e1;">
+          <span style="color:#64748b;">(+) Reforços / Entradas extras:</span>
+          <strong id="res-fecho-reforcos">MT 0,00</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #cbd5e1;">
+          <span style="color:#64748b;">(−) Sangrias / Retiradas de Dinheiro:</span>
+          <strong id="res-fecho-sangrias" style="color:#dc2626;">MT 0,00</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;margin-top:4px;border-top:2px solid #cbd5e1;font-size:14px;">
+          <span style="font-weight:700;color:#1e3a8a;">Saldo Teórico Esperado na Gaveta:</span>
+          <strong id="res-fecho-esperado" style="color:#1e3a8a;font-weight:800;">MT 0,00</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;background:#fff;border-radius:6px;padding:8px;margin-top:4px;border:1.5px solid #cbd5e1;font-size:15px;">
+          <span style="font-weight:800;color:#0f172a;">💵 Saldo Físico Contado:</span>
+          <strong id="res-fecho-contado" style="font-weight:900;color:#0f172a;">MT 0,00</strong>
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:#64748b;margin-bottom:14px;line-height:1.4;">
+        Turno encerrado por: <strong id="res-fecho-operador">Operador</strong> em <span id="res-fecho-data">Hoje</span>. Auditoria inalterável registada.
+      </div>
+
+      <div class="modal-acoes">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-resultado-fecho-caixa')" style="flex:1;">Concluir e Fechar</button>
+        <button class="btn btn-primary" type="button" onclick="window.imprimirUltimoComprovativoFecho()" style="flex:1.4;background:#2563eb;color:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+          🖨️ Imprimir Comprovativo
+        </button>
       </div>
     </div>
   </div>
@@ -2548,7 +3134,7 @@ window.FABEF_CARREGADO = false;
 
     <div class="modal-acoes">
       <button class="btn btn-light" type="button" onclick="fecharModal('modal-dispensa-funcionario')" style="flex:1;">Cancelar</button>
-      <button id="btn-guardar-dispensa" class="btn btn-primary" type="button" style="flex:1.4;font-weight:800;background:#10b981;color:#fff;border:none;padding:11px;border-radius:8px;cursor:pointer;">
+      <button id="btn-guardar-dispensa" class="btn btn-primary" type="button" onclick="window.salvarDispensa()" style="flex:1.4;font-weight:800;background:#10b981;color:#fff;border:none;padding:11px;border-radius:8px;cursor:pointer;">
         💾 Guardar Dispensa
       </button>
     </div>
