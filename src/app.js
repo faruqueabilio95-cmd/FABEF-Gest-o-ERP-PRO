@@ -1566,37 +1566,73 @@ function pedirRenderTudo() {
    e volta a ligar-se à internet.
 ===================================================== */
 const COLECOES_POR_RAMO = new Set(["produtos","compras","vendas","despesas","encomendas","funcionarios","gastos_funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
-const COLECOES_POR_DIA = new Set(["despesas","compras","encomendas","auditoria_logs","sugestoes"]);
+const COLECOES_POR_DIA = new Set(["encomendas","auditoria_logs","sugestoes"]);
 function referenciaColecaoFiltrada(nome) {
     const ref = subRef(nome);
     return COLECOES_POR_RAMO.has(nome) && FABEF.ramo ? query(ref, where("ramo", "==", FABEF.ramo)) : ref;
 }
 function dataDoRegisto(item) {
-    const v=item?.data||item?.dataVenda||item?.dataCriacao||item?.criadoEm;
-    if(!v) return "";
-    if(typeof v === "object" && typeof v.toDate === "function") return v.toDate().toISOString().slice(0,10);
-    const d=new Date(v);
-    if (Number.isNaN(d.getTime())) return String(v).slice(0,10);
-    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+    if (item?.diaOperacional && /^\d{4}-\d{2}-\d{2}$/.test(item.diaOperacional)) {
+        return item.diaOperacional;
+    }
+    const v = item?.data || item?.dataVenda || item?.dataCriacao || item?.criadoEm;
+    if (!v) return "";
+    if (typeof v === "object" && typeof v.toDate === "function") return v.toDate().toISOString().slice(0, 10);
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v).slice(0, 10);
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
 }
+window.dataDoRegisto = dataDoRegisto;
+
+function dataOntemStr() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+window.dataOntemStr = dataOntemStr;
+
+function formatarDataExtensa(diaStr) {
+    if (!diaStr || diaStr === "Sem data") return "Sem data definida";
+    const hoje = dataHojeStr();
+    const ontem = dataOntemStr();
+    const partes = diaStr.split("-");
+    const dataFormatada = partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : diaStr;
+    if (diaStr === hoje) return `🟢 HOJE (${dataFormatada})`;
+    if (diaStr === ontem) return `🗓️ ONTEM (${dataFormatada})`;
+    try {
+        const d = new Date(diaStr + "T12:00:00");
+        const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+        const diaSemana = diasSemana[d.getDay()];
+        return `📅 ${diaSemana}, ${dataFormatada}`;
+    } catch(e) {
+        return `📅 ${dataFormatada}`;
+    }
+}
+window.formatarDataExtensa = formatarDataExtensa;
 function aplicarFiltroDia(){
     for(const nome of COLECOES_POR_DIA){
         const estado=nome==="auditoria_logs"?"auditoria":nome;
         const raw=FABEF._raw?.[nome]||[];
-        if (FABEF.turnoId && ["despesas","encomendas"].includes(nome)) {
+        if (FABEF.turnoId && nome === "encomendas") {
             FABEF[estado]=raw.filter(x => x.turnoId === FABEF.turnoId && dataDoRegisto(x)===FABEF.dataAtiva);
         } else {
             FABEF[estado]=raw.filter(x=>dataDoRegisto(x)===FABEF.dataAtiva);
         }
     }
-    // As vendas ficam SEMPRE completas em FABEF.vendas para permitir ao gerente consultar
-    // relatórios hoje, semanais, mensais, anuais ou por turno sem perder vendas anteriores!
+    // As vendas, despesas e compras ficam SEMPRE completas em memória para permitir ao gerente consultar
+    // relatórios hoje, semanais, mensais, anuais, lucro DRE ou histórico sem perder dados!
     FABEF.vendas = FABEF._raw?.vendas || FABEF.vendas || [];
+    FABEF.despesas = FABEF._raw?.despesas || FABEF.despesas || [];
+    FABEF.compras = FABEF._raw?.compras || FABEF.compras || [];
+
     if (FABEF.turnoId) {
         FABEF.vendasTurno = FABEF.vendas.filter(x => x.turnoId === FABEF.turnoId);
+        FABEF.despesasTurno = FABEF.despesas.filter(x => (!x.turnoId || x.turnoId === FABEF.turnoId) && dataDoRegisto(x) === FABEF.dataAtiva);
     } else {
         FABEF.vendasTurno = FABEF.vendas.filter(x => dataDoRegisto(x) === FABEF.dataAtiva);
+        FABEF.despesasTurno = FABEF.despesas.filter(x => dataDoRegisto(x) === FABEF.dataAtiva);
     }
 }
 function definirDiaAtivo(data){ if(!/^\d{4}-\d{2}-\d{2}$/.test(data||"")) return; FABEF.dataAtiva=data; aplicarFiltroDia(); renderTudo(); }
@@ -1726,7 +1762,7 @@ function aplicarRestricoesDeAcessoPorPapel() {
     // Secções estritamente reservadas ao Gerente:
     // O funcionário Não PODE ver nem alterar os ramos que o gerente está a gerir,
     // nem compras, relatórios, metas, funcionários, subscrição, etc.
-    const secoesReservadasAoGerente = ["ramos", "compras", "relatorios", "metas", "desempenho", "funcionarios", "auditoria", "subscricao", "config"];
+    const secoesReservadasAoGerente = ["lucro", "ramos", "compras", "relatorios", "metas", "desempenho", "funcionarios", "auditoria", "subscricao", "config"];
     secoesReservadasAoGerente.forEach(sec => {
         const botao = document.querySelector(`.sidebar button[data-sec="${sec}"]`);
         if (botao) botao.style.display = ehGerenteLogado ? "" : "none";
@@ -1957,6 +1993,8 @@ function mostrarSecao(nome) {
     } else if (nome === "funcionarios") {
         if (typeof renderFuncionarios === "function") renderFuncionarios();
         if (typeof renderGastosFuncionarios === "function") renderGastosFuncionarios();
+    } else if (nome === "lucro") {
+        if (typeof renderSecaoLucro === "function") renderSecaoLucro();
     } else if (nome === "vendas") {
         if (typeof renderVendas === "function") renderVendas();
     }
@@ -4072,33 +4110,275 @@ async function finalizarVenda() {
    MÓDULO LÓGICO: HISTÓRICO E RENDERS DE VENDAS
 ===================================================== */
 
-document.getElementById("vendas-pesquisa").addEventListener("input", renderVendas);
-document.getElementById("vendas-periodo").addEventListener("change", renderVendas);
+window.FABEF_FILTRO_VENDAS_PERIODO = "hoje";
+
+window.definirAbaVenda = function(periodo) {
+    window.FABEF_FILTRO_VENDAS_PERIODO = periodo;
+    const sel = document.getElementById("vendas-periodo");
+    if (sel) sel.value = periodo;
+
+    const inpData = document.getElementById("vendas-data-especifica");
+    if (inpData) {
+        inpData.style.display = (periodo === "custom") ? "inline-block" : "none";
+        if (periodo === "custom" && !inpData.value) {
+            inpData.value = dataHojeStr();
+        }
+    }
+
+    document.querySelectorAll(".btn-aba-venda").forEach(btn => {
+        btn.classList.remove("active");
+        btn.style.background = "#f1f5f9";
+        btn.style.color = "#334155";
+        btn.style.border = "1.5px solid #cbd5e1";
+    });
+
+    const idBtn = `aba-venda-${periodo}`;
+    const btnAtivo = document.getElementById(idBtn);
+    if (btnAtivo) {
+        btnAtivo.classList.add("active");
+        btnAtivo.style.background = "#10b981";
+        btnAtivo.style.color = "#fff";
+        btnAtivo.style.border = "none";
+    }
+
+    renderVendas();
+};
+
+window.filtrarDiaEspecifico = function(diaStr) {
+    if (!diaStr) return;
+    const inpData = document.getElementById("vendas-data-especifica");
+    if (inpData) {
+        inpData.value = diaStr;
+        inpData.style.display = "inline-block";
+    }
+    const sel = document.getElementById("vendas-periodo");
+    if (sel) sel.value = "custom";
+    window.FABEF_FILTRO_VENDAS_PERIODO = "custom";
+
+    document.querySelectorAll(".btn-aba-venda").forEach(btn => {
+        btn.classList.remove("active");
+        btn.style.background = "#f1f5f9";
+        btn.style.color = "#334155";
+        btn.style.border = "1.5px solid #cbd5e1";
+    });
+
+    renderVendas();
+    const secVendas = document.getElementById("sec-vendas");
+    if (secVendas) secVendas.scrollIntoView({ behavior: "smooth" });
+};
+
+document.getElementById("vendas-pesquisa")?.addEventListener("input", renderVendas);
+document.getElementById("vendas-periodo")?.addEventListener("change", (e) => {
+    window.definirAbaVenda(e.target.value);
+});
+document.getElementById("vendas-data-especifica")?.addEventListener("change", renderVendas);
 
 
 function renderVendas() {
-    const pesquisa = document.getElementById("vendas-pesquisa")?.value.toLowerCase() || "";
-    const periodo = document.getElementById("vendas-periodo")?.value || "todos";
-    let inicio = null;
-    if (periodo === "hoje") inicio = dataHoje();
-    if (periodo === "7") inicio = diasAtras(7);
-    if (periodo === "30") inicio = diasAtras(30);
-    if (periodo === "ano") inicio = new Date(new Date().getFullYear(), 0, 1);
+    const pesquisa = document.getElementById("vendas-pesquisa")?.value.toLowerCase().trim() || "";
+    let periodo = window.FABEF_FILTRO_VENDAS_PERIODO || document.getElementById("vendas-periodo")?.value || "hoje";
+    const inpDataEsp = document.getElementById("vendas-data-especifica");
+    const dataEspecifica = inpDataEsp?.value || "";
+
+    const hojeStr = dataHojeStr();
+    const ontemStr = dataOntemStr();
 
     // Obtém todas as vendas da empresa no ramo ativo (da lista em memória ou do raw histórico)
     const fonteVendas = (FABEF.vendas && FABEF.vendas.length > 0) ? FABEF.vendas : (FABEF._raw?.vendas || []);
 
-    const listaFiltrada = fonteVendas.filter(v => {
-        if (periodo === "turno") {
-            if (!v.turnoId || v.turnoId !== FABEF.turnoId) return false;
-        } else if (inicio) {
-            const dataVenda = new Date(v.data || v.date || 0);
-            if (dataVenda < inicio) return false;
+    // 1. Cálculo global de Hoje vs Ontem para o ramo ativo (sempre apurado para contextualização do gerente)
+    let fatHoje = 0, qtdHoje = 0;
+    let fatOntem = 0, qtdOntem = 0;
+
+    fonteVendas.forEach(v => {
+        if (v.ramo && v.ramo !== FABEF.ramo) return;
+        const ehCancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+        if (ehCancelada) return;
+        const d = dataDoRegisto(v);
+        if (d === hojeStr) {
+            fatHoje += numero(v.total);
+            qtdHoje++;
+        } else if (d === ontemStr) {
+            fatOntem += numero(v.total);
+            qtdOntem++;
         }
+    });
+
+    // 2. Atualiza o Banner de Status e Comparação Diária
+    const elBannerTexto = document.getElementById("vendas-banner-texto");
+    const elBannerComp = document.getElementById("vendas-banner-comparativo");
+    const elRotuloFat = document.getElementById("vendas-kpi-rotulo-fat");
+    const elSubFat = document.getElementById("vendas-kpi-comparativo-sub");
+
+    const difOntem = fatHoje - fatOntem;
+    const sinalDif = difOntem >= 0 ? "+" : "−";
+    const corDif = difOntem >= 0 ? "#047857" : "#b91c1c";
+
+    if (periodo === "hoje") {
+        if (elBannerTexto) elBannerTexto.innerHTML = `🟢 A visualizar vendas de <strong>HOJE (${formatarDataExtensa(hojeStr)})</strong>. Todas as vendas anteriores estão guardadas e separadas no dia anterior.`;
+        if (elBannerComp) elBannerComp.innerHTML = `Ontem faturou: <strong>${dinheiro(fatOntem)}</strong> (${qtdOntem} vendas) | Comparativo: <strong style="color:${corDif};">${sinalDif} ${dinheiro(Math.abs(difOntem))}</strong>`;
+        if (elRotuloFat) elRotuloFat.textContent = "Total Faturado (Hoje)";
+        if (elSubFat) elSubFat.innerHTML = `Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
+    } else if (periodo === "ontem") {
+        if (elBannerTexto) elBannerTexto.innerHTML = `🗓️ A visualizar vendas de <strong>ONTEM (${formatarDataExtensa(ontemStr)})</strong>. Registos arquivados do dia anterior.`;
+        if (elBannerComp) elBannerComp.innerHTML = `Hoje em curso: <strong>${dinheiro(fatHoje)}</strong> (${qtdHoje} vendas)`;
+        if (elRotuloFat) elRotuloFat.textContent = "Total Faturado (Ontem)";
+        if (elSubFat) elSubFat.innerHTML = `Hoje está em: <strong>${dinheiro(fatHoje)}</strong>`;
+    } else if (periodo === "progressao") {
+        if (elBannerTexto) elBannerTexto.innerHTML = `🏆 <strong>Progressão dos Dias</strong>: Veja abaixo a evolução dia a dia do negócio e qual foi o dia que vendeu melhor.`;
+        if (elBannerComp) elBannerComp.innerHTML = `Hoje: <strong>${dinheiro(fatHoje)}</strong> | Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
+        if (elRotuloFat) elRotuloFat.textContent = "Total de Todas as Vendas";
+        if (elSubFat) elSubFat.innerHTML = `Hoje: ${dinheiro(fatHoje)} | Ontem: ${dinheiro(fatOntem)}`;
+    } else if (periodo === "agrupado") {
+        if (elBannerTexto) elBannerTexto.innerHTML = `📅 A visualizar vendas <strong>agrupadas por dia</strong> com divisores e subtotais diários para cada dia de trabalho.`;
+        if (elBannerComp) elBannerComp.innerHTML = `Hoje: <strong>${dinheiro(fatHoje)}</strong> | Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
+        if (elRotuloFat) elRotuloFat.textContent = "Total Faturado (Geral Agrupado)";
+        if (elSubFat) elSubFat.innerHTML = `Hoje: ${dinheiro(fatHoje)} | Ontem: ${dinheiro(fatOntem)}`;
+    } else if (periodo === "custom") {
+        const txtData = dataEspecifica ? formatarDataExtensa(dataEspecifica) : "Data Selecionada";
+        if (elBannerTexto) elBannerTexto.innerHTML = `📅 A visualizar vendas do dia específico: <strong>${txtData}</strong>.`;
+        if (elBannerComp) elBannerComp.innerHTML = `Hoje: <strong>${dinheiro(fatHoje)}</strong> | Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
+        if (elRotuloFat) elRotuloFat.textContent = `Total Faturado (${dataEspecifica || 'Data'})`;
+        if (elSubFat) elSubFat.innerHTML = `Hoje: ${dinheiro(fatHoje)}`;
+    } else {
+        if (elBannerTexto) elBannerTexto.innerHTML = `🌐 A visualizar histórico geral de vendas registadas no estabelecimento.`;
+        if (elBannerComp) elBannerComp.innerHTML = `Hoje: <strong>${dinheiro(fatHoje)}</strong> | Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
+        if (elRotuloFat) elRotuloFat.textContent = "Total Faturado no Histórico";
+        if (elSubFat) elSubFat.innerHTML = `Hoje: ${dinheiro(fatHoje)} | Ontem: ${dinheiro(fatOntem)}`;
+    }
+
+    // 3. Montagem do Painel de Progressão Diária
+    const painelProg = document.getElementById("painel-progressao-diaria");
+    if (painelProg) {
+        if (periodo === "progressao") {
+            painelProg.classList.remove("hidden");
+        } else {
+            painelProg.classList.add("hidden");
+        }
+    }
+
+    // Agrupa dados dia a dia para a tabela de progressão
+    const mapaDias = new Map();
+    fonteVendas.forEach(v => {
+        if (v.ramo && v.ramo !== FABEF.ramo) return;
+        const ehCancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+        if (ehCancelada) return;
+        const dia = dataDoRegisto(v) || "Sem data";
+        if (!mapaDias.has(dia)) {
+            mapaDias.set(dia, {
+                dia: dia,
+                total: 0,
+                dinheiro: 0,
+                outros: 0,
+                qtd: 0
+            });
+        }
+        const reg = mapaDias.get(dia);
+        const tot = numero(v.total);
+        reg.total += tot;
+        reg.qtd++;
+        const forma = (v.pagamento || "").toLowerCase();
+        if (forma === "numerário" || forma === "dinheiro") {
+            reg.dinheiro += tot;
+        } else if (v.pagamentoDetalhe && numero(v.pagamentoDetalhe.dinheiro) > 0) {
+            reg.dinheiro += numero(v.pagamentoDetalhe.dinheiro);
+            reg.outros += Math.max(0, tot - numero(v.pagamentoDetalhe.dinheiro));
+        } else {
+            reg.outros += tot;
+        }
+    });
+
+    const listaDiasProg = Array.from(mapaDias.values()).sort((a, b) => b.dia.localeCompare(a.dia));
+    let melhorDiaReg = null;
+    listaDiasProg.forEach(item => {
+        if (!melhorDiaReg || item.total > melhorDiaReg.total) {
+            melhorDiaReg = item;
+        }
+    });
+
+    const elBadgeMelhor = document.getElementById("badge-melhor-dia");
+    if (elBadgeMelhor) {
+        if (melhorDiaReg && melhorDiaReg.total > 0) {
+            elBadgeMelhor.innerHTML = `🏆 Recorde de Vendas: <strong>${formatarDataExtensa(melhorDiaReg.dia)}</strong> (${dinheiro(melhorDiaReg.total)})`;
+        } else {
+            elBadgeMelhor.textContent = "⭐ Sem registos suficientes para apurar o melhor dia";
+        }
+    }
+
+    const tabelaProgCorpo = document.getElementById("tabela-progressao-dias");
+    if (tabelaProgCorpo) {
+        if (listaDiasProg.length === 0) {
+            tabelaProgCorpo.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#64748b;padding:16px;">Sem registos de vendas para traçar a progressão diária.</td></tr>`;
+        } else {
+            tabelaProgCorpo.innerHTML = listaDiasProg.map(item => {
+                const ehMelhor = melhorDiaReg && item.dia === melhorDiaReg.dia && item.total > 0;
+                const ehHoje = item.dia === hojeStr;
+                const ehOntem = item.dia === ontemStr;
+                const ticketDia = item.qtd > 0 ? (item.total / item.qtd) : 0;
+
+                let tagClassif = `<span class="badge badge-gray" style="font-weight:600;">Histórico</span>`;
+                let linhaBg = "";
+                if (ehMelhor) {
+                    tagClassif = `<span class="badge" style="background:#fef3c7;color:#92400e;font-weight:800;border:1px solid #f59e0b;">🏆 MELHOR DIA</span>`;
+                    linhaBg = "background:#fffbeb;";
+                } else if (ehHoje) {
+                    tagClassif = `<span class="badge badge-green" style="font-weight:700;">🟢 Dia Atual (Em curso)</span>`;
+                    linhaBg = "background:#f0fdf4;";
+                } else if (ehOntem) {
+                    tagClassif = `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;">🗓️ Ontem</span>`;
+                    linhaBg = "background:#f8fafc;";
+                }
+
+                return `
+                <tr style="${linhaBg}">
+                    <td style="font-weight:700;color:#0f172a;">${formatarDataExtensa(item.dia)}</td>
+                    <td>${tagClassif}</td>
+                    <td style="text-align:center;font-weight:600;">${item.qtd} vendas</td>
+                    <td style="text-align:right;font-weight:800;color:#047857;font-size:14px;">${dinheiro(item.total)}</td>
+                    <td style="text-align:right;font-weight:600;color:#1e3a8a;">${dinheiro(item.dinheiro)}</td>
+                    <td style="text-align:right;font-weight:600;color:#0369a1;">${dinheiro(item.outros)}</td>
+                    <td style="text-align:right;font-weight:600;">${dinheiro(ticketDia)}</td>
+                    <td style="text-align:center;">
+                        <button type="button" class="btn btn-small btn-light" onclick="filtrarDiaEspecifico('${item.dia}')" style="padding:4px 10px;font-size:11px;font-weight:700;border:1px solid #cbd5e1;background:#fff;" title="Ver detalhes das vendas deste dia">
+                            👁️ Ver Vendas
+                        </button>
+                    </td>
+                </tr>`;
+            }).join("");
+        }
+    }
+
+    // 4. Filtragem da lista principal de vendas
+    let inicioData = null;
+    if (periodo === "7") inicioData = diasAtras(7);
+    if (periodo === "30") inicioData = diasAtras(30);
+    if (periodo === "ano") inicioData = new Date(new Date().getFullYear(), 0, 1);
+
+    const listaFiltrada = fonteVendas.filter(v => {
         if (v.ramo && v.ramo !== FABEF.ramo) return false;
-        const textoCompleto = JSON.stringify(v).toLowerCase();
-        return !pesquisa || textoCompleto.includes(pesquisa);
-    }).sort((a,b) => new Date(b.data || b.date || 0) - new Date(a.data || a.date || 0));
+
+        const diaVenda = dataDoRegisto(v);
+
+        if (periodo === "hoje") {
+            if (diaVenda !== hojeStr) return false;
+        } else if (periodo === "ontem") {
+            if (diaVenda !== ontemStr) return false;
+        } else if (periodo === "turno") {
+            if (!v.turnoId || v.turnoId !== FABEF.turnoId) return false;
+        } else if (periodo === "custom") {
+            if (dataEspecifica && diaVenda !== dataEspecifica) return false;
+        } else if (inicioData) {
+            const dataObj = new Date(v.data || v.date || 0);
+            if (dataObj < inicioData) return false;
+        }
+
+        if (pesquisa) {
+            const textoCompleto = JSON.stringify(v).toLowerCase();
+            if (!textoCompleto.includes(pesquisa)) return false;
+        }
+
+        return true;
+    }).sort((a, b) => new Date(b.data || b.date || 0) - new Date(a.data || a.date || 0));
 
     // Cálculos de KPI para o período selecionado
     let faturamentoPeriodo = 0;
@@ -4129,63 +4409,174 @@ function renderVendas() {
 
     if (elKpiFat) elKpiFat.textContent = dinheiro(faturamentoPeriodo);
     if (elKpiKg) elKpiKg.textContent = kgPeriodo > 0 ? `${kgPeriodo.toFixed(3)} kg` : "0.000 kg";
-    if (elKpiQtd) elKpiQtd.textContent = String(qtdValidas);
+    if (elKpiQtd) elKpiQtd.textContent = `${qtdValidas} vendas`;
     if (elKpiTicket) elKpiTicket.textContent = dinheiro(ticketMedio);
 
     const tabelaCorpo = document.getElementById("tabela-vendas");
     if (!tabelaCorpo) return;
 
-    tabelaCorpo.innerHTML = listaFiltrada.map(v => {
-        const itensMapeados = (v.itens || v.items || []).map(x => {
-            const qtd = numero(x.quantidade || x.qty);
-            const un = (x.unidade && x.unidade !== "unidade") ? ` ${x.unidade}` : "";
-            const atributos = [];
-            if (x.tamanho) atributos.push(`Tam: ${escapeHTML(x.tamanho)}`);
-            if (x.cor) atributos.push(`Cor: ${escapeHTML(x.cor)}`);
-            const atrTxt = atributos.length ? ` <span style="color:#0284c7;font-weight:600;font-size:11px;">(${atributos.join(", ")})</span>` : "";
-            return `<div style="margin-bottom:3px;">• <strong>${escapeHTML(x.nome || "Produto")}</strong>${atrTxt} × <span style="font-weight:600;">${qtd}${un}</span></div>`;
-        }).join("");
-        const ehFalhada = v.status === "FALHADA_CANCELADA" || v.status === "FALHADA" || v.status === "CANCELADA";
-        const ehCorrigida = v.status === "CORRIGIDA_PRECO";
-        return `
-        <tr style="${ehFalhada ? 'background: #fff1f2; opacity: 0.88;' : (ehCorrigida ? 'background: #eff6ff;' : '')}">
-            <td>
-                ${dataTexto(v.data || v.date)}
-                ${ehFalhada ? `
-                    <div style="margin-top:4px;"><span class="badge badge-red" style="font-size:11px;">⚠️ Falhada / Cancelada</span></div>
-                    <div style="font-size:11px;color:#b91c1c;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || v.motivoFalha || 'Venda anulada')}</div>
-                ` : ""}
-                ${ehCorrigida ? `
-                    <div style="margin-top:4px;"><span class="badge" style="background:#0284c7;color:#fff;font-size:11px;">✏️ Preço Corrigido (Antes: ${dinheiro(v.precoOriginal)})</span></div>
-                    <div style="font-size:11px;color:#1d4ed8;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || 'Ajuste de preço')}</div>
-                ` : ""}
-            </td>
-            <td>${escapeHTML(v.operadorNome || v.user || "—")}</td>
-            <td style="white-space: normal; max-width: 220px;">${itensMapeados}</td>
-            <td><strong style="${ehFalhada ? 'text-decoration: line-through; color: #94a3b8;' : ''}">${dinheiro(v.total)}</strong></td>
-            <td>${escapeHTML(v.pagamento || v.method || "—")}</td>
-            <td>${escapeHTML(v.nuitCliente || "Isento")}</td>
-            <td>${escapeHTML(v.ramo || "—")}</td>
-            <td>
-                <details class="pasta-acoes-venda" style="display:inline-block;position:relative;">
-                    <summary class="btn btn-small" style="cursor:pointer;list-style:none;background:#f8fafc;border:1.5px solid #cbd5e1;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;color:#1e293b;display:inline-flex;align-items:center;gap:6px;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,0.05);white-space:nowrap;">
-                        📁 Opções da Venda ▾
-                    </summary>
-                    <div style="position:absolute;right:0;top:calc(100% + 4px);z-index:90;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);min-width:190px;padding:6px;display:flex;flex-direction:column;gap:5px;">
-                        <button class="btn btn-light btn-small" onclick="this.closest('details').removeAttribute('open'); imprimirReciboVenda('${escapeHTML(v.id)}')" type="button" style="text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;" title="Imprimir Recibo Térmico ou A4">🖨️ Imprimir Recibo</button>
-                        <button class="btn btn-success btn-small" onclick="this.closest('details').removeAttribute('open'); enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;color:#fff;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;border:none;" title="Enviar Recibo pelo WhatsApp">📱 Enviar WhatsApp</button>
-                        <button class="btn btn-primary btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalEditarVenda('${escapeHTML(v.id)}')" type="button" style="background:#2563eb;color:#fff;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;border:none;" title="Editar valor, forma de pagamento ou cliente">✏️ Editar Venda</button>
-                        ${!ehFalhada ? `
-                            <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:12px;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;border-radius:6px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar ao Gerente</button>
-                        ` : ""}
-                        <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); apagarVenda('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;" title="Apagar definitivamente e repor stock">🗑️ Apagar Venda</button>
+    if (listaFiltrada.length === 0) {
+        let msgVazia = "Nenhuma operação de venda localizada nos critérios definidos.";
+        if (periodo === "hoje") {
+            msgVazia = `🟢 Nenhuma venda registada hoje (${formatarDataExtensa(hojeStr)}) até ao momento.<br><span style="font-size:12px;color:#94a3b8;">O caixa deste novo dia está limpo. As vendas de ontem permanecem salvas na aba <strong>🗓️ Ontem</strong>.</span>`;
+        } else if (periodo === "ontem") {
+            msgVazia = `🗓️ Nenhuma venda registada no dia de ontem (${formatarDataExtensa(ontemStr)}).`;
+        } else if (periodo === "custom") {
+            msgVazia = `📅 Nenhuma venda localizada para o dia ${dataEspecifica || ''}.`;
+        }
+        tabelaCorpo.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#64748b;padding:24px;line-height:1.6;">${msgVazia}</td></tr>`;
+        return;
+    }
+
+    // Se estiver agrupado por dias ou visualização de todo o histórico, organiza com cabeçalhos por dia
+    const agruparPorDia = (periodo === "agrupado" || periodo === "todos" || periodo === "7" || periodo === "30" || periodo === "ano");
+
+    if (agruparPorDia && !pesquisa) {
+        const gruposPorDia = new Map();
+        listaFiltrada.forEach(v => {
+            const d = dataDoRegisto(v) || "Sem data";
+            if (!gruposPorDia.has(d)) gruposPorDia.set(d, []);
+            gruposPorDia.get(d).push(v);
+        });
+
+        let htmlFinal = "";
+        gruposPorDia.forEach((vendasDoDia, diaChave) => {
+            const subtotalDia = vendasDoDia.reduce((s, v) => {
+                const cancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+                return s + (cancelada ? 0 : numero(v.total));
+            }, 0);
+
+            let dinDia = 0, digDia = 0;
+            vendasDoDia.forEach(v => {
+                const cancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+                if (cancelada) return;
+                const forma = (v.pagamento || "").toLowerCase();
+                const tot = numero(v.total);
+                if (forma === "numerário" || forma === "dinheiro") dinDia += tot;
+                else if (v.pagamentoDetalhe && numero(v.pagamentoDetalhe.dinheiro) > 0) {
+                    dinDia += numero(v.pagamentoDetalhe.dinheiro);
+                    digDia += Math.max(0, tot - numero(v.pagamentoDetalhe.dinheiro));
+                } else digDia += tot;
+            });
+
+            const ehHojeSec = (diaChave === hojeStr);
+            const ehOntemSec = (diaChave === ontemStr);
+            const corBorda = ehHojeSec ? "#10b981" : (ehOntemSec ? "#3b82f6" : "#cbd5e1");
+            const fundoCabecalho = ehHojeSec ? "#ecfdf5" : (ehOntemSec ? "#eff6ff" : "#f8fafc");
+
+            htmlFinal += `
+            <tr style="background:${fundoCabecalho};border-top:3px solid ${corBorda};border-bottom:1.5px solid #cbd5e1;">
+                <td colspan="8" style="padding:10px 14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <div>
+                            <span style="font-size:14px;font-weight:800;color:#0f172a;">${formatarDataExtensa(diaChave)}</span>
+                            <span style="font-size:12px;color:#475569;margin-left:8px;font-weight:600;">(${vendasDoDia.length} vendas registadas)</span>
+                        </div>
+                        <div style="font-size:13px;font-weight:700;color:#0f172a;">
+                            Total do Dia: <span style="color:#047857;font-size:15px;font-weight:900;">${dinheiro(subtotalDia)}</span>
+                            <span style="margin-left:10px;font-size:12px;color:#475569;">(💵 Gaveta: ${dinheiro(dinDia)} | 📱 Digital: ${dinheiro(digDia)})</span>
+                        </div>
                     </div>
-                </details>
-            </td>
-        </tr>`;
-    }).join("") || `<tr><td colspan="8" style="text-align:center;color:#64748b;">Nenhuma operação de venda localizada nos critérios definidos.</td></tr>`;
+                </td>
+            </tr>
+            `;
+
+            vendasDoDia.forEach(v => {
+                htmlFinal += renderLinhaVendaHTML(v);
+            });
+        });
+
+        tabelaCorpo.innerHTML = htmlFinal;
+    } else {
+        // Renderização simples com cabeçalho de dia no topo se for Hoje ou Ontem
+        let cabecalhoUnico = "";
+        if (periodo === "hoje") {
+            cabecalhoUnico = `
+            <tr style="background:#ecfdf5;border-top:3px solid #10b981;border-bottom:1.5px solid #cbd5e1;">
+                <td colspan="8" style="padding:10px 14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <div>
+                            <span style="font-size:14px;font-weight:800;color:#065f46;">${formatarDataExtensa(hojeStr)}</span>
+                            <span style="font-size:12px;color:#047857;margin-left:8px;font-weight:700;">(Turno Atual do Caixa — ${listaFiltrada.length} vendas)</span>
+                        </div>
+                        <div style="font-size:13px;font-weight:700;color:#065f46;">
+                            Total Faturado Hoje: <strong style="font-size:16px;color:#047857;">${dinheiro(faturamentoPeriodo)}</strong>
+                        </div>
+                    </div>
+                </td>
+            </tr>`;
+        } else if (periodo === "ontem") {
+            cabecalhoUnico = `
+            <tr style="background:#eff6ff;border-top:3px solid #3b82f6;border-bottom:1.5px solid #cbd5e1;">
+                <td colspan="8" style="padding:10px 14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <div>
+                            <span style="font-size:14px;font-weight:800;color:#1e40af;">${formatarDataExtensa(ontemStr)}</span>
+                            <span style="font-size:12px;color:#1d4ed8;margin-left:8px;font-weight:700;">(Registos Concluídos do Dia Anterior — ${listaFiltrada.length} vendas)</span>
+                        </div>
+                        <div style="font-size:13px;font-weight:700;color:#1e40af;">
+                            Total Fechado Ontem: <strong style="font-size:16px;color:#1d4ed8;">${dinheiro(faturamentoPeriodo)}</strong>
+                        </div>
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        tabelaCorpo.innerHTML = cabecalhoUnico + listaFiltrada.map(v => renderLinhaVendaHTML(v)).join("");
+    }
 }
 window.renderVendas = renderVendas;
+
+function renderLinhaVendaHTML(v) {
+    const itensMapeados = (v.itens || v.items || []).map(x => {
+        const qtd = numero(x.quantidade || x.qty);
+        const un = (x.unidade && x.unidade !== "unidade") ? ` ${x.unidade}` : "";
+        const atributos = [];
+        if (x.tamanho) atributos.push(`Tam: ${escapeHTML(x.tamanho)}`);
+        if (x.cor) atributos.push(`Cor: ${escapeHTML(x.cor)}`);
+        const atrTxt = atributos.length ? ` <span style="color:#0284c7;font-weight:600;font-size:11px;">(${atributos.join(", ")})</span>` : "";
+        return `<div style="margin-bottom:3px;">• <strong>${escapeHTML(x.nome || "Produto")}</strong>${atrTxt} × <span style="font-weight:600;">${qtd}${un}</span></div>`;
+    }).join("");
+    const ehFalhada = v.status === "FALHADA_CANCELADA" || v.status === "FALHADA" || v.status === "CANCELADA";
+    const ehCorrigida = v.status === "CORRIGIDA_PRECO";
+    return `
+    <tr style="${ehFalhada ? 'background: #fff1f2; opacity: 0.88;' : (ehCorrigida ? 'background: #eff6ff;' : '')}">
+        <td>
+            <div style="font-weight:700;color:#0f172a;">${dataTexto(v.data || v.date)}</div>
+            <div style="font-size:11px;color:#64748b;">${formatarDataExtensa(dataDoRegisto(v))}</div>
+            ${ehFalhada ? `
+                <div style="margin-top:4px;"><span class="badge badge-red" style="font-size:11px;">⚠️ Falhada / Cancelada</span></div>
+                <div style="font-size:11px;color:#b91c1c;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || v.motivoFalha || 'Venda anulada')}</div>
+            ` : ""}
+            ${ehCorrigida ? `
+                <div style="margin-top:4px;"><span class="badge" style="background:#0284c7;color:#fff;font-size:11px;">✏️ Preço Corrigido (Antes: ${dinheiro(v.precoOriginal)})</span></div>
+                <div style="font-size:11px;color:#1d4ed8;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || 'Ajuste de preço')}</div>
+            ` : ""}
+        </td>
+        <td>${escapeHTML(v.operadorNome || v.user || "—")}</td>
+        <td style="white-space: normal; max-width: 220px;">${itensMapeados}</td>
+        <td><strong style="${ehFalhada ? 'text-decoration: line-through; color: #94a3b8;' : ''}">${dinheiro(v.total)}</strong></td>
+        <td>${escapeHTML(v.pagamento || v.method || "—")}</td>
+        <td>${escapeHTML(v.nuitCliente || "Isento")}</td>
+        <td>${escapeHTML(v.ramo || "—")}</td>
+        <td>
+            <details class="pasta-acoes-venda" style="display:inline-block;position:relative;">
+                <summary class="btn btn-small" style="cursor:pointer;list-style:none;background:#f8fafc;border:1.5px solid #cbd5e1;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;color:#1e293b;display:inline-flex;align-items:center;gap:6px;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,0.05);white-space:nowrap;">
+                    📁 Opções ▾
+                </summary>
+                <div style="position:absolute;right:0;top:calc(100% + 4px);z-index:90;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);min-width:190px;padding:6px;display:flex;flex-direction:column;gap:5px;">
+                    <button class="btn btn-light btn-small" onclick="this.closest('details').removeAttribute('open'); imprimirReciboVenda('${escapeHTML(v.id)}')" type="button" style="text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;" title="Imprimir Recibo Térmico ou A4">🖨️ Imprimir Recibo</button>
+                    <button class="btn btn-success btn-small" onclick="this.closest('details').removeAttribute('open'); enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;color:#fff;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;border:none;" title="Enviar Recibo pelo WhatsApp">📱 Enviar WhatsApp</button>
+                    <button class="btn btn-primary btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalEditarVenda('${escapeHTML(v.id)}')" type="button" style="background:#2563eb;color:#fff;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;border:none;" title="Editar valor, forma de pagamento ou cliente">✏️ Editar Venda</button>
+                    ${!ehFalhada ? `
+                        <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:12px;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;border-radius:6px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar ao Gerente</button>
+                    ` : ""}
+                    <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); apagarVenda('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;" title="Apagar definitivamente e repor stock">🗑️ Apagar Venda</button>
+                </div>
+            </details>
+        </td>
+    </tr>`;
+}
 
 window.imprimirReciboVenda = function(vendaId) {
     const v = FABEF.vendas.find(x => x.id === vendaId);
@@ -5263,6 +5654,7 @@ function ouvirCaixa() {
                     FABEF.turno = { id: d.id, ...d.data() };
                 }
 
+                aplicarFiltroDia();
                 atualizarTelaCaixa();
 
                 if (primeiraVez) { primeiraVez = false; resolve(); }
@@ -5290,21 +5682,64 @@ function ouvirCaixa() {
 document.getElementById("btn-abrir-caixa").addEventListener("click", abrirCaixa);
 
 
+async function encerrarTurnoAnteriorAutomatico(turnoIdAntigo, dataTurno) {
+    try {
+        const esperado = saldoEsperadoCaixa();
+        const payloadFecho = {
+            estado: "FECHADO",
+            saldoEsperado: esperado,
+            saldoContado: esperado,
+            diferenca: 0,
+            situacao: "ENCERRADO_ABERTURA_NOVO_DIA",
+            dataFecho: new Date().toISOString(),
+            diaOperacional: dataTurno,
+            observacoes: `Caixa anterior encerrado automaticamente na abertura do novo dia (${dataHojeStr()})`,
+            fechadoPor: FABEF.userData?.nome || FABEF.user?.email || "Gerente",
+            atualizadoEm: serverTimestamp()
+        };
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            await updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", turnoIdAntigo), payloadFecho);
+        }
+        if (FABEF.turno && FABEF.turno.id === turnoIdAntigo) {
+            FABEF.turno.estado = "FECHADO";
+        }
+        FABEF.turnoId = null;
+        FABEF.turno = null;
+        await gravarAuditoria(`Encerrou caixa anterior de ${dataTurno} para abertura do novo dia`, "INFO");
+    } catch (e) {
+        console.warn("Aviso ao encerrar turno anterior:", e);
+        FABEF.turnoId = null;
+        FABEF.turno = null;
+    }
+}
+
 async function abrirCaixa() {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
         alert("Só o gerente pode abrir o caixa. Peça ao gerente para autenticar-se e abrir o turno antes de começar a vender.");
         return;
     }
 
+    const hojeStr = dataHojeStr();
+
     if (FABEF.turnoId) {
-        alert("Operação bloqueada: Já existe um turno de caixa em execução.");
-        return;
+        const dataAberturaTurno = FABEF.turno?.dataAbertura ? dataDoRegisto({ data: FABEF.turno.dataAbertura }) : (FABEF.turno?.diaOperacional || "");
+        if (dataAberturaTurno && dataAberturaTurno !== hojeStr) {
+            const querFechar = confirm(`⚠️ O caixa anterior foi aberto no dia ${dataAberturaTurno} e não foi encerrado ontem.\n\nPara iniciar as vendas do novo dia (${hojeStr}) com registos totalmente separados (sem misturar ontem com hoje), o caixa anterior precisa de ser encerrado.\n\nDeseja encerrar o caixa anterior agora para abrir o novo dia de trabalho?`);
+            if (querFechar) {
+                await encerrarTurnoAnteriorAutomatico(FABEF.turnoId, dataAberturaTurno);
+            } else {
+                return;
+            }
+        } else {
+            alert("Operação bloqueada: Já existe um turno de caixa ativo em execução para hoje.");
+            return;
+        }
     }
 
     const valor = numero(document.getElementById("caixa-valor-inicial").value);
 
     try {
-        FABEF.dataAtiva = new Date().toLocaleDateString("en-CA");
+        FABEF.dataAtiva = hojeStr;
         const payload = {
             estado: "ABERTO",
             ramo: FABEF.ramo,
@@ -5313,30 +5748,42 @@ async function abrirCaixa() {
             totalVendasDinheiro: 0,
             sangrias: [],
             reforcos: [],
+            diaOperacional: hojeStr,
             operadorId: FABEF.user.uid,
             operadorNome: FABEF.userData?.nome || FABEF.user.email,
             dataAbertura: new Date().toISOString(),
             criadoEm: serverTimestamp()
         };
 
-        const ref = await addDoc(subRef("caixas_turnos"), payload);
+        let refId = "turno_" + Date.now();
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            const ref = await addDoc(subRef("caixas_turnos"), payload);
+            refId = ref.id;
+        }
 
-        FABEF.turnoId = ref.id;
+        FABEF.turnoId = refId;
         FABEF.turno = {
-            id: ref.id,
+            id: refId,
             estado: "ABERTO",
             ramo: payload.ramo,
             abertura: payload.abertura,
             totalVendas: payload.totalVendas,
             totalVendasDinheiro: payload.totalVendasDinheiro,
+            diaOperacional: hojeStr,
             sangrias: [],
             reforcos: []
         };
 
+        // Redefine a visualização de vendas para 'hoje', garantindo uma folha limpa de vendas do novo dia
+        if (typeof window.definirAbaVenda === "function") {
+            window.definirAbaVenda("hoje");
+        }
+
         aplicarFiltroDia();
         atualizarTelaCaixa();
         renderTudo();
-        await gravarAuditoria("Realizou a abertura de novo turno de caixa com fundo de faturamento inicial de " + dinheiro(valor), "INFO");
+        await gravarAuditoria("Realizou a abertura de novo turno de caixa para o dia " + hojeStr + " com fundo inicial de " + dinheiro(valor), "INFO");
+        alert(`✅ Caixa do Novo Dia (${hojeStr}) aberto com sucesso!\n\nFundo de faturamento inicial: ${dinheiro(valor)}.\nTodas as vendas de ontem e dias anteriores foram preservadas no histórico.`);
     } catch (error) {
         console.error(error);
         alert("Erro ao realizar abertura de caixa:\n" + mensagemFirebase(error));
@@ -5408,65 +5855,284 @@ async function registarReforco() {
 }
 
 
-async function fecharCaixa() {
-    if (!FABEF.turnoId) return;
+window.FABEF_SALDO_REVELADO_GERENTE = false;
+window.toggleRevelarSaldoGerente = function() {
+    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    if (!ehGerente) {
+        alert("Apenas o gerente possui autorização para consultar o saldo preliminar da gaveta.");
+        return;
+    }
+    window.FABEF_SALDO_REVELADO_GERENTE = !window.FABEF_SALDO_REVELADO_GERENTE;
+    atualizarTelaCaixa();
+};
 
-    // Fecho de caixa é uma ação de controlo: só o gerente confirma o fecho.
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("Apenas o gerente pode confirmar o fecho do caixa. Peça ao gerente para autenticar-se e fechar o turno.");
+window.abrirModalFecharCaixaCego = function() {
+    if (!FABEF.turnoId) {
+        alert("Não existe nenhum turno de caixa aberto no momento.");
         return;
     }
 
-    const esperado = saldoEsperadoCaixa();
-    const contadoTexto = prompt(
-        `Saldo esperado em dinheiro no caixa: ${dinheiro(esperado)}\n\nConte o dinheiro físico na gaveta e introduza o valor contado:`,
-        esperado.toFixed(2)
-    );
-    if (contadoTexto === null) return; // cancelou
-    const contado = numero(contadoTexto);
-    const diferenca = contado - esperado;
+    const inputContado = document.getElementById("fecho-caixa-dinheiro-contado");
+    if (inputContado) {
+        inputContado.value = "";
+    }
+    const inputObs = document.getElementById("fecho-caixa-observacoes");
+    if (inputObs) {
+        inputObs.value = "";
+    }
 
-    if (Math.abs(diferenca) > 0.5) {
-        const confirmar = confirm(
-            `Atenção: existe uma diferença de caixa de ${dinheiro(diferenca)} (${diferenca > 0 ? "sobra" : "falta"}).\n\nDeseja continuar e fechar o turno mesmo assim?`
-        );
-        if (!confirmar) return;
-    } else if (!confirm("Aviso Financeiro: Deseja realmente encerrar o caixa e fechar o turno atual de faturamento?")) {
+    abrirModal("modal-fechar-caixa-cego");
+    setTimeout(() => {
+        document.getElementById("fecho-caixa-dinheiro-contado")?.focus();
+    }, 150);
+};
+
+window.confirmarFechoCaixaCego = async function() {
+    if (!FABEF.turnoId) return;
+
+    const inputContado = document.getElementById("fecho-caixa-dinheiro-contado");
+    const valorDigitado = inputContado ? inputContado.value.trim() : "";
+    if (valorDigitado === "") {
+        alert("Por favor, introduza o valor físico total que contou na gaveta (notas e moedas). Se a gaveta estiver vazia, introduza 0.");
+        inputContado?.focus();
         return;
+    }
+
+    const contado = numero(valorDigitado);
+    if (contado < 0) {
+        alert("O valor em caixa não pode ser negativo.");
+        inputContado?.focus();
+        return;
+    }
+
+    const btnConfirmar = document.getElementById("btn-confirmar-fecho-cego");
+    if (btnConfirmar) {
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerText = "⏳ A fechar turno e calcular apuramento...";
     }
 
     try {
-        await updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+        const esperado = saldoEsperadoCaixa();
+        const diferenca = contado - esperado;
+        const houveDesfalque = diferenca < -0.01;
+        const houveSobra = diferenca > 0.01;
+        const obs = document.getElementById("fecho-caixa-observacoes")?.value.trim() || "";
+
+        const operadorNome = FABEF.userData?.nome || FABEF.user?.email || "Operador";
+        const agoraStr = new Date().toISOString();
+
+        const dadosFecho = {
+            turnoId: FABEF.turnoId,
             estado: "FECHADO",
+            abertura: numero(FABEF.turno?.abertura || 0),
+            totalVendas: numero(FABEF.turno?.totalVendas || 0),
+            totalVendasDinheiro: numero(FABEF.turno?.totalVendasDinheiro || 0),
+            totalVendasOutras: Math.max(0, numero(FABEF.turno?.totalVendas || 0) - numero(FABEF.turno?.totalVendasDinheiro || 0)),
+            reforcosTotal: (FABEF.turno?.reforcos || []).reduce((s, x) => s + numero(x.valor), 0),
+            sangriasTotal: (FABEF.turno?.sangrias || []).reduce((s, x) => s + numero(x.valor), 0),
             saldoEsperado: esperado,
             saldoContado: contado,
             diferenca: diferenca,
-            fechadoPor: FABEF.userData?.nome || FABEF.user.email,
-            dataFecho: new Date().toISOString(),
-            atualizadoEm: serverTimestamp()
-        });
+            desfalque: houveDesfalque ? Math.abs(diferenca) : 0,
+            sobra: houveSobra ? diferenca : 0,
+            situacao: houveDesfalque ? "DESFALQUE" : (houveSobra ? "SOBRA" : "EXATO"),
+            observacoes: obs,
+            fechadoPor: operadorNome,
+            dataFecho: agoraStr,
+            ramo: FABEF.ramo || "Geral"
+        };
 
-        await gravarAuditoria(
-            `Fechou o turno de caixa. Esperado: ${dinheiro(esperado)} | Contado: ${dinheiro(contado)} | Diferença: ${dinheiro(diferenca)}`,
-            Math.abs(diferenca) > 0.5 ? "ALERTA" : "INFO"
-        );
+        window.FABEF_ULTIMO_FECHO = dadosFecho;
 
+        if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+            await updateDoc(doc(db, "empresas", FABEF.empresaId, "caixas_turnos", FABEF.turnoId), {
+                ...dadosFecho,
+                atualizadoEm: serverTimestamp()
+            });
+        }
+
+        let tipoAuditoria = "INFO";
+        let msgAuditoria = `Fechou o caixa. Esperado: ${dinheiro(esperado)} | Contado: ${dinheiro(contado)} | Diferença: ${dinheiro(diferenca)}`;
+        if (houveDesfalque) {
+            tipoAuditoria = "ALERTA";
+            msgAuditoria = `🚨 DESFALQUE DETECTADO NO FECHAMENTO DE CAIXA: Falta de ${dinheiro(Math.abs(diferenca))} (Esperado: ${dinheiro(esperado)}, Contado: ${dinheiro(contado)}). Fechado por ${operadorNome}`;
+        } else if (houveSobra) {
+            tipoAuditoria = "INFO";
+            msgAuditoria = `💰 SOBRA DETECTADA NO CAIXA: Sobra de ${dinheiro(diferenca)} (Esperado: ${dinheiro(esperado)}, Contado: ${dinheiro(contado)}). Fechado por ${operadorNome}`;
+        }
+        await gravarAuditoria(msgAuditoria, tipoAuditoria);
+
+        // Limpa estado local do turno
         FABEF.turnoId = null;
         FABEF.turno = null;
+        window.FABEF_SALDO_REVELADO_GERENTE = false;
 
-        // Limpa também o formulário inicial para o próximo turno
         const inputInicial = document.getElementById("caixa-valor-inicial");
         if (inputInicial) inputInicial.value = "0";
+
+        fecharModal("modal-fechar-caixa-cego");
+
+        // Exibe o Comprovativo e Relatório Final de Apuramento
+        preencherModalResultadoFecho(dadosFecho);
+        abrirModal("modal-resultado-fecho-caixa");
 
         aplicarFiltroDia();
         atualizarTelaCaixa();
         renderTudo();
     } catch (error) {
-        console.error(error);
-        alert("Erro ao fechar o turno de caixa:\n" + mensagemFirebase(error));
+        console.error("Erro ao fechar caixa:", error);
+        alert("Não foi possível concluir o fechamento do caixa:\n" + mensagemFirebase(error));
+    } finally {
+        if (btnConfirmar) {
+            btnConfirmar.disabled = false;
+            btnConfirmar.innerText = "🔒 Confirmar e Revelar Apuramento";
+        }
     }
+};
+
+function preencherModalResultadoFecho(d) {
+    const banner = document.getElementById("res-fecho-banner-status");
+    const rotulo = document.getElementById("res-fecho-rotulo");
+    const valorDif = document.getElementById("res-fecho-diferenca");
+    const explicacao = document.getElementById("res-fecho-explicacao");
+
+    if (banner && rotulo && valorDif && explicacao) {
+        if (d.diferenca < -0.01) {
+            banner.style.background = "#fef2f2";
+            banner.style.border = "2px solid #ef4444";
+            banner.style.color = "#991b1b";
+            rotulo.textContent = "⚠️ DESFALQUE / FALTA DETETADA NO CAIXA";
+            rotulo.style.color = "#b91c1c";
+            valorDif.textContent = "− " + dinheiro(Math.abs(d.diferenca));
+            valorDif.style.color = "#dc2626";
+            explicacao.textContent = "Atenção: O dinheiro físico contado na gaveta é inferior ao saldo registado no sistema. Houve desvio ou erro operacional.";
+            explicacao.style.color = "#991b1b";
+        } else if (d.diferenca > 0.01) {
+            banner.style.background = "#fffbeb";
+            banner.style.border = "2px solid #f59e0b";
+            banner.style.color = "#92400e";
+            rotulo.textContent = "ℹ️ SOBRA DE CAIXA DETETADA";
+            rotulo.style.color = "#b45309";
+            valorDif.textContent = "+ " + dinheiro(d.diferenca);
+            valorDif.style.color = "#d97706";
+            explicacao.textContent = "Existe dinheiro a mais na gaveta física em relação às vendas registadas no sistema.";
+            explicacao.style.color = "#92400e";
+        } else {
+            banner.style.background = "#f0fdf4";
+            banner.style.border = "2px solid #22c55e";
+            banner.style.color = "#166534";
+            rotulo.textContent = "✅ CAIXA 100% CORRETO E EXATO";
+            rotulo.style.color = "#15803d";
+            valorDif.textContent = "Diferença: MT 0,00";
+            valorDif.style.color = "#15803d";
+            explicacao.textContent = "Parabéns! O dinheiro físico contado confere exatamente com o saldo esperado das operações do turno.";
+            explicacao.style.color = "#166534";
+        }
+    }
+
+    const elAbertura = document.getElementById("res-fecho-abertura");
+    const elVendasDin = document.getElementById("res-fecho-vendas-dinheiro");
+    const elVendasOutras = document.getElementById("res-fecho-vendas-outras");
+    const elReforcos = document.getElementById("res-fecho-reforcos");
+    const elSangrias = document.getElementById("res-fecho-sangrias");
+    const elEsperado = document.getElementById("res-fecho-esperado");
+    const elContado = document.getElementById("res-fecho-contado");
+    const elOperador = document.getElementById("res-fecho-operador");
+    const elData = document.getElementById("res-fecho-data");
+
+    if (elAbertura) elAbertura.textContent = dinheiro(d.abertura);
+    if (elVendasDin) elVendasDin.textContent = dinheiro(d.totalVendasDinheiro);
+    if (elVendasOutras) elVendasOutras.textContent = dinheiro(d.totalVendasOutras);
+    if (elReforcos) elReforcos.textContent = dinheiro(d.reforcosTotal);
+    if (elSangrias) elSangrias.textContent = dinheiro(d.sangriasTotal);
+    if (elEsperado) elEsperado.textContent = dinheiro(d.saldoEsperado);
+    if (elContado) elContado.textContent = dinheiro(d.saldoContado);
+    if (elOperador) elOperador.textContent = d.fechadoPor || "Operador";
+    if (elData) elData.textContent = dataTexto(d.dataFecho);
 }
 
+window.imprimirUltimoComprovativoFecho = function() {
+    if (!window.FABEF_ULTIMO_FECHO) {
+        alert("Nenhum fecho recente encontrado para impressão.");
+        return;
+    }
+    imprimirComprovativoFechoCaixa(window.FABEF_ULTIMO_FECHO);
+};
+
+window.imprimirComprovativoFechoCaixa = function(d) {
+    const emp = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(d.ramo) : (FABEF.empresa || {});
+    const nomeEmp = emp.nome || d.ramo || "ESTABELECIMENTO COMERCIAL";
+    const nuitEmp = emp.nuit || "Isento";
+    const telEmp = emp.telefone || "—";
+    const endEmp = emp.endereco || "Moçambique";
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+
+    const ehDesfalque = d.diferenca < -0.01;
+    const ehSobra = d.diferenca > 0.01;
+    const situacaoTexto = ehDesfalque ? "DESFALQUE NO CAIXA" : (ehSobra ? "SOBRA NO CAIXA" : "CAIXA EXATO");
+    const corSituacao = ehDesfalque ? "#dc2626" : (ehSobra ? "#d97706" : "#15803d");
+
+    const html = `
+    <!DOCTYPE html>
+    <html lang="pt">
+    <head>
+        <meta charset="UTF-8">
+        <title>Comprovativo de Fecho de Caixa</title>
+        <style>
+            body { font-family: 'Courier New', Courier, monospace, system-ui; width: 320px; margin: 10px auto; padding: 10px; color: #000; font-size: 12px; }
+            .centro { text-align: center; }
+            .linha { display: flex; justify-content: space-between; margin: 4px 0; }
+            .separador { border-top: 1px dashed #000; margin: 8px 0; }
+            .destaque { font-weight: bold; font-size: 14px; }
+            .status-box { border: 2px solid ${corSituacao}; padding: 8px; text-align: center; margin: 8px 0; font-weight: bold; }
+            @media print { body { width: 100%; margin: 0; } }
+        </style>
+    </head>
+    <body>
+        <div class="centro">
+            <h3 style="margin:0;">${escapeHTML(nomeEmp)}</h3>
+            <div>NUIT: ${escapeHTML(nuitEmp)} | Tel: ${escapeHTML(telEmp)}</div>
+            <div>${escapeHTML(endEmp)}</div>
+            <div class="separador"></div>
+            <strong>COMPROVATIVO DE FECHO DE CAIXA</strong>
+            <div style="font-size:11px;">CONFERÊNCIA CEGA & AUDITORIA</div>
+            <div>${dataTexto(d.dataFecho)}</div>
+        </div>
+        <div class="separador"></div>
+        <div class="linha"><span>Operador/Fechado por:</span><strong>${escapeHTML(d.fechadoPor)}</strong></div>
+        <div class="linha"><span>Filial/Ramo:</span><strong>${escapeHTML(d.ramo)}</strong></div>
+        <div class="separador"></div>
+        <div class="linha"><span>(+) Fundo Inicial:</span><span>${dinheiro(d.abertura)}</span></div>
+        <div class="linha"><span>(+) Vendas Dinheiro:</span><span>${dinheiro(d.totalVendasDinheiro)}</span></div>
+        <div class="linha"><span>(+) Vendas Digitais:</span><span>${dinheiro(d.totalVendasOutras)}</span></div>
+        <div class="linha"><span>(+) Total Reforços:</span><span>${dinheiro(d.reforcosTotal)}</span></div>
+        <div class="linha"><span>(−) Total Sangrias:</span><span>${dinheiro(d.sangriasTotal)}</span></div>
+        <div class="separador"></div>
+        <div class="linha destaque"><span>Saldo Teórico Esperado:</span><span>${dinheiro(d.saldoEsperado)}</span></div>
+        <div class="linha destaque" style="font-size:15px;"><span>Saldo Físico Contado:</span><span>${dinheiro(d.saldoContado)}</span></div>
+        <div class="separador"></div>
+        <div class="status-box" style="color:${corSituacao};">
+            <div>${situacaoTexto}</div>
+            <div style="font-size:16px;">${d.diferenca < 0 ? "− " + dinheiro(Math.abs(d.diferenca)) : (d.diferenca > 0 ? "+ " + dinheiro(d.diferenca) : "MT 0,00")}</div>
+        </div>
+        ${d.observacoes ? `<div style="font-size:11px;margin-top:4px;">Obs: ${escapeHTML(d.observacoes)}</div>` : ""}
+        <div class="separador" style="margin-top:35px;"></div>
+        <div class="centro" style="font-size:11px;">
+            Assinatura do Operador<br><br>
+            _______________________________<br><br>
+            Assinatura do Gerente<br><br>
+            _______________________________
+        </div>
+        <script>window.onload = function() { window.print(); };</script>
+    </body>
+    </html>
+    `;
+
+    w.document.write(html);
+    w.document.close();
+};
 
 function atualizarTelaCaixa() {
     const aberto = !!FABEF.turnoId;
@@ -5482,15 +6148,28 @@ function atualizarTelaCaixa() {
         vendasSpan.textContent = dinheiro(FABEF.turno?.totalVendas || 0);
     }
 
+    const saldoEsperadoNum = saldoEsperadoCaixa();
     const saldoSpan = document.getElementById("caixa-saldo-esperado");
     if (saldoSpan) {
-        saldoSpan.textContent = dinheiro(saldoEsperadoCaixa());
+        saldoSpan.textContent = dinheiro(saldoEsperadoNum);
+    }
+
+    // Conferência Cega no texto da tela
+    const saldoCegaTexto = document.getElementById("caixa-saldo-cega-texto");
+    if (saldoCegaTexto) {
+        if (window.FABEF_SALDO_REVELADO_GERENTE) {
+            saldoCegaTexto.textContent = "👁️ " + dinheiro(saldoEsperadoNum) + " (Modo Supervisão)";
+            saldoCegaTexto.style.color = "#047857";
+        } else {
+            saldoCegaTexto.textContent = "🔒 [ Oculto para Evitar Viciação de Contagem ]";
+            saldoCegaTexto.style.color = "#1e3a8a";
+        }
     }
 
     const listaMovimentos = document.getElementById("caixa-movimentos");
     if (listaMovimentos) {
-        const sangrias = (FABEF.turno?.sangrias || []).map(m => `<li style="color:#ef4444;">âˆ’ ${dinheiro(m.valor)} (Sangria) — ${escapeHTML(m.motivo)} — ${escapeHTML(m.operadorNome || "")}</li>`);
-        const reforcos = (FABEF.turno?.reforcos || []).map(m => `<li style="color:#10b981;">+ ${dinheiro(m.valor)} (Reforço) — ${escapeHTML(m.motivo)} — ${escapeHTML(m.operadorNome || "")}</li>`);
+        const sangrias = (FABEF.turno?.sangrias || []).map(m => `<li style="color:#ef4444;">− ${dinheiro(m.valor)} (Sangria) — ${escapeHTML(m.motivo || "")} — ${escapeHTML(m.operadorNome || "")}</li>`);
+        const reforcos = (FABEF.turno?.reforcos || []).map(m => `<li style="color:#10b981;">+ ${dinheiro(m.valor)} (Reforço) — ${escapeHTML(m.motivo || "")} — ${escapeHTML(m.operadorNome || "")}</li>`);
         const todos = [...sangrias, ...reforcos];
         listaMovimentos.innerHTML = todos.length ? `<ul style="padding-left:18px;">${todos.join("")}</ul>` : `<p style="color:#64748b;font-size:13px;">Sem sangrias ou reforços neste turno.</p>`;
     }
@@ -5500,13 +6179,14 @@ function atualizarTelaCaixa() {
     document.getElementById("caixa-fecho")?.classList.toggle("hidden", !aberto);
     document.getElementById("aviso-pos-caixa")?.classList.toggle("hidden", aberto);
 
-    // Abrir/fechar o caixa é uma ação exclusiva do gerente — o funcionário só
-    // consulta o estado, para ficar claro quem tem de agir.
     const ehGerenteCaixa = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
     const btnAbrir = document.getElementById("btn-abrir-caixa");
     const btnFechar = document.getElementById("btn-fechar-caixa");
+    const btnRevelar = document.getElementById("btn-revelar-saldo-caixa");
     if (btnAbrir) btnAbrir.style.display = ehGerenteCaixa ? "" : "none";
-    if (btnFechar) btnFechar.style.display = ehGerenteCaixa ? "" : "none";
+    if (btnFechar) btnFechar.style.display = ""; // O operador pode fechar o turno com a contagem cega
+    if (btnRevelar) btnRevelar.style.display = ehGerenteCaixa ? "inline-block" : "none";
+
     const avisoCaixaFuncionario = document.getElementById("aviso-caixa-funcionario");
     if (avisoCaixaFuncionario) {
         avisoCaixaFuncionario.style.display = (!ehGerenteCaixa && !aberto) ? "" : "none";
@@ -5568,6 +6248,7 @@ async function registarDespesa() {
         categoria: categoria,
         ramo: ramo,
         sairDoCaixa: sairDoCaixa,
+        turnoId: FABEF.turnoId || null,
         utilizadorId: FABEF.user?.uid || "admin",
         utilizadorNome: usuarioAtualNome,
         data: new Date().toISOString(),
@@ -5593,6 +6274,11 @@ async function registarDespesa() {
         ...payload
     };
     FABEF.despesas.unshift(novoItem);
+    if (!FABEF._raw) FABEF._raw = {};
+    if (!Array.isArray(FABEF._raw.despesas)) FABEF._raw.despesas = [];
+    if (!FABEF._raw.despesas.some(d => d.id === docId)) {
+        FABEF._raw.despesas.unshift(novoItem);
+    }
 
     try {
         if (FABEF.empresaId) {
@@ -5908,6 +6594,605 @@ window.exportarDespesasExcel = function() {
 
 window.registarDespesa = registarDespesa;
 window.renderDespesas = renderDespesas;
+
+
+/* =====================================================
+   MÓDULO LÓGICO: APURAMENTO DE LUCRO REAL & DRE DO ESTABELECIMENTO
+   Calcula a diferença financeira real:
+   Vendas Totais − Compras de Stock − Gastos Operacionais − Folha Salarial
+===================================================== */
+window.FABEF_LUCRO_PERIODO = "mes";
+
+window.filtrarPeriodoLucro = function(periodo) {
+    window.FABEF_LUCRO_PERIODO = periodo;
+
+    document.querySelectorAll(".btn-filtro-lucro").forEach(btn => {
+        const ativo = btn.dataset.periodo === periodo;
+        btn.classList.toggle("active", ativo);
+        if (ativo) {
+            btn.style.background = "#2563eb";
+            btn.style.color = "#fff";
+            btn.style.border = "none";
+            btn.style.fontWeight = "800";
+        } else {
+            btn.style.background = "#fff";
+            btn.style.color = "#0f172a";
+            btn.style.border = "1px solid #cbd5e1";
+            btn.style.fontWeight = "700";
+        }
+    });
+
+    const boxCustom = document.getElementById("lucro-datas-custom");
+    if (boxCustom) {
+        boxCustom.style.display = periodo === "custom" ? "flex" : "none";
+    }
+
+    renderSecaoLucro();
+};
+
+window.renderSecaoLucro = function() {
+    const secLucro = document.getElementById("sec-lucro");
+    if (!secLucro) return;
+
+    // Atualiza opções de ramo no filtro
+    const selRamo = document.getElementById("lucro-filtro-ramo");
+    if (selRamo && selRamo.options.length === 0) {
+        const ramos = typeof obterConfigRamos === "function" ? obterConfigRamos() : [];
+        let opts = `<option value="TODOS">🏢 Todos os Ramos / Filiais</option>`;
+        ramos.forEach(r => {
+            opts += `<option value="${escapeHTML(r.nome)}">${escapeHTML(r.nome)}</option>`;
+        });
+        selRamo.innerHTML = opts;
+        if (FABEF.ramo && ramos.some(r => r.nome === FABEF.ramo)) {
+            selRamo.value = FABEF.ramo;
+        } else {
+            selRamo.value = "TODOS";
+        }
+    }
+
+    const ramoSelecionado = selRamo?.value || "TODOS";
+    const periodo = window.FABEF_LUCRO_PERIODO || "mes";
+
+    const agora = new Date();
+    let dataInicio = new Date(agora);
+    let dataFim = new Date(agora);
+    let rotuloPeriodo = "Este Mês";
+
+    if (periodo === "hoje") {
+        dataInicio.setHours(0, 0, 0, 0);
+        dataFim.setHours(23, 59, 59, 999);
+        rotuloPeriodo = "Hoje (" + agora.toLocaleDateString("pt-MZ") + ")";
+    } else if (periodo === "ontem") {
+        dataInicio.setDate(dataInicio.getDate() - 1);
+        dataInicio.setHours(0, 0, 0, 0);
+        dataFim.setDate(dataFim.getDate() - 1);
+        dataFim.setHours(23, 59, 59, 999);
+        rotuloPeriodo = "Ontem (" + dataInicio.toLocaleDateString("pt-MZ") + ")";
+    } else if (periodo === "mes") {
+        dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0, 0);
+        dataFim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 23, 59, 59, 999);
+        const mesNome = agora.toLocaleDateString("pt-MZ", { month: "long", year: "numeric" });
+        rotuloPeriodo = mesNome.charAt(0).toUpperCase() + mesNome.slice(1);
+    } else if (periodo === "mes_passado") {
+        dataInicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0, 0);
+        dataFim = new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59, 999);
+        const mesNome = dataInicio.toLocaleDateString("pt-MZ", { month: "long", year: "numeric" });
+        rotuloPeriodo = "Mês Passado (" + mesNome + ")";
+    } else if (periodo === "ano") {
+        dataInicio = new Date(agora.getFullYear(), 0, 1, 0, 0, 0, 0);
+        dataFim = new Date(agora.getFullYear(), 11, 31, 23, 59, 59, 999);
+        rotuloPeriodo = "Ano de " + agora.getFullYear();
+    } else if (periodo === "custom") {
+        const inpIni = document.getElementById("lucro-data-inicio")?.value;
+        const inpFim = document.getElementById("lucro-data-fim")?.value;
+        if (inpIni) {
+            dataInicio = new Date(inpIni + "T00:00:00");
+        } else {
+            dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+        }
+        if (inpFim) {
+            dataFim = new Date(inpFim + "T23:59:59.999");
+        } else {
+            dataFim = new Date(agora);
+        }
+        rotuloPeriodo = dataInicio.toLocaleDateString("pt-MZ") + " a " + dataFim.toLocaleDateString("pt-MZ");
+    }
+
+    const tagPeriodo = document.getElementById("lucro-periodo-tag");
+    if (tagPeriodo) tagPeriodo.textContent = rotuloPeriodo;
+
+    // 1. FATURAMENTO (VENDAS)
+    const todasVendas = Array.isArray(FABEF.vendas) ? FABEF.vendas : (FABEF._raw?.vendas || []);
+    const vendasPeriodo = todasVendas.filter(v => {
+        if (v.status === "CANCELADA" || v.status === "FALHADA") return false;
+        if (ramoSelecionado !== "TODOS" && v.ramo && v.ramo !== ramoSelecionado) return false;
+        const dStr = v.data || v.date || v.dataVenda || 0;
+        const dObj = new Date(dStr);
+        return dObj >= dataInicio && dObj <= dataFim;
+    });
+
+    const totalVendas = vendasPeriodo.reduce((s, v) => s + numero(v.total), 0);
+
+    // 2. COMPRAS DE STOCK / CUSTO DE MERCADORIAS
+    const todasCompras = Array.isArray(FABEF.compras) ? FABEF.compras : (FABEF._raw?.compras || []);
+    const comprasPeriodo = todasCompras.filter(c => {
+        if (ramoSelecionado !== "TODOS" && c.ramo && c.ramo !== ramoSelecionado) return false;
+        const dStr = c.data || c.criadoEm || 0;
+        const dObj = new Date(dStr);
+        return dObj >= dataInicio && dObj <= dataFim;
+    });
+
+    const totalCompras = comprasPeriodo.reduce((s, c) => s + numero(c.quantidade * c.custoUnitario || c.valorTotal || 0), 0);
+
+    // Custo das Mercadorias Vendidas (CMV) estimado a partir dos itens das vendas
+    let cmvTotal = 0;
+    vendasPeriodo.forEach(v => {
+        (v.itens || []).forEach(it => {
+            const qtd = numero(it.quantidade || 1);
+            let custoUnit = numero(it.custoUnitario || it.custo || 0);
+            if (custoUnit <= 0 && Array.isArray(FABEF.produtos)) {
+                const p = FABEF.produtos.find(prod => prod.id === it.produtoId || prod.nome === it.nome);
+                if (p) custoUnit = numero(p.custo || 0);
+            }
+            cmvTotal += qtd * custoUnit;
+        });
+    });
+
+    // Se houver compras registadas no período, usa o valor das compras (saída financeira real).
+    // Caso o utilizador não tenha registado compras no período mas tenha produtos com custo, usa o CMV.
+    const custoMercadorias = totalCompras > 0 ? totalCompras : cmvTotal;
+
+    // 3. GASTOS E DESPESAS OPERACIONAIS DO ESTABELECIMENTO
+    const todasDespesas = Array.isArray(FABEF.despesas) ? FABEF.despesas : (FABEF._raw?.despesas || []);
+    const despesasPeriodo = todasDespesas.filter(d => {
+        if (ramoSelecionado !== "TODOS" && d.ramo && d.ramo !== ramoSelecionado) return false;
+        const dStr = d.data || d.criadoEm || 0;
+        const dObj = new Date(dStr);
+        return dObj >= dataInicio && dObj <= dataFim;
+    });
+
+    const totalDespesas = despesasPeriodo.reduce((s, d) => s + numero(d.valor), 0);
+
+    // Detalhe de despesas por categoria
+    const categoriasDespesas = {
+        energia: 0,
+        agua: 0,
+        renda: 0,
+        sacos: 0,
+        transporte: 0,
+        manutencao: 0,
+        alimentacao: 0,
+        outras: 0
+    };
+
+    despesasPeriodo.forEach(d => {
+        const cat = (d.categoria || "").toLowerCase();
+        const v = numero(d.valor);
+        if (cat.includes("credelec") || cat.includes("energia") || cat.includes("luz")) categoriasDespesas.energia += v;
+        else if (cat.includes("água") || cat.includes("agua") || cat.includes("fipag")) categoriasDespesas.agua += v;
+        else if (cat.includes("renda") || cat.includes("aluguer")) categoriasDespesas.renda += v;
+        else if (cat.includes("saco") || cat.includes("limpeza")) categoriasDespesas.sacos += v;
+        else if (cat.includes("transporte") || cat.includes("frete")) categoriasDespesas.transporte += v;
+        else if (cat.includes("manutenção") || cat.includes("manutencao") || cat.includes("gelo") || cat.includes("frio")) categoriasDespesas.manutencao += v;
+        else if (cat.includes("alimentação") || cat.includes("alimentacao") || cat.includes("almoço") || cat.includes("lanche")) categoriasDespesas.alimentacao += v;
+        else categoriasDespesas.outras += v;
+    });
+
+    // 4. FOLHA SALARIAL / CUSTOS COM PESSOAL
+    const listaFuncs = (FABEF.funcionarios || []).filter(f => (f.estado || "ATIVO") === "ATIVO" && (ramoSelecionado === "TODOS" || !f.ramo || f.ramo === ramoSelecionado));
+    const folhaMensalEquipa = listaFuncs.reduce((s, f) => s + numero(f.salarioMensal || 0), 0);
+
+    // Proporcionaliza os salários de acordo com a extensão do período selecionado
+    let custoSalarios = 0;
+    if (periodo === "hoje" || periodo === "ontem") {
+        custoSalarios = folhaMensalEquipa / 30;
+    } else if (periodo === "mes" || periodo === "mes_passado") {
+        custoSalarios = folhaMensalEquipa;
+    } else if (periodo === "ano") {
+        custoSalarios = folhaMensalEquipa * 12;
+    } else {
+        const diffDias = Math.max(1, Math.round((dataFim - dataInicio) / (1000 * 60 * 60 * 24)));
+        custoSalarios = (folhaMensalEquipa / 30) * diffDias;
+    }
+
+    // 5. CÁLCULO DE RESULTADOS: LUCRO BRUTO E LUCRO LÍQUIDO
+    const lucroBruto = totalVendas - custoMercadorias;
+    const totalSaidasGerais = custoMercadorias + totalDespesas + custoSalarios;
+    const lucroLiquido = totalVendas - totalSaidasGerais;
+    const margemLiquida = totalVendas > 0 ? ((lucroLiquido / totalVendas) * 100).toFixed(1) : "0.0";
+    const margemBruta = totalVendas > 0 ? ((lucroBruto / totalVendas) * 100).toFixed(1) : "0.0";
+
+    // 6. ATUALIZAÇÃO DOS KPIS VISUAIS NO DOM
+    const elVendas = document.getElementById("kpi-lucro-vendas");
+    const elVendasQtd = document.getElementById("kpi-lucro-vendas-qtd");
+    const elCompras = document.getElementById("kpi-lucro-compras");
+    const elComprasQtd = document.getElementById("kpi-lucro-compras-qtd");
+    const elDespesas = document.getElementById("kpi-lucro-despesas");
+    const elDespesasDet = document.getElementById("kpi-lucro-despesas-detalhe");
+    const elSalarios = document.getElementById("kpi-lucro-salarios");
+    const elSalariosDet = document.getElementById("kpi-lucro-salarios-detalhe");
+
+    if (elVendas) elVendas.textContent = dinheiro(totalVendas);
+    if (elVendasQtd) elVendasQtd.textContent = `${vendasPeriodo.length} venda(s) realizada(s)`;
+    if (elCompras) elCompras.textContent = dinheiro(custoMercadorias);
+    if (elComprasQtd) elComprasQtd.textContent = totalCompras > 0 ? `${comprasPeriodo.length} compra(s) de stock` : `CMV estimado dos produtos`;
+    if (elDespesas) elDespesas.textContent = dinheiro(totalDespesas);
+    if (elDespesasDet) elDespesasDet.textContent = `${despesasPeriodo.length} gasto(s) operacionais`;
+    if (elSalarios) elSalarios.textContent = dinheiro(custoSalarios);
+    if (elSalariosDet) elSalariosDet.textContent = `${listaFuncs.length} colaborador(es) ativos`;
+
+    // 7. ATUALIZAÇÃO DO BANNER DE DESTAQUE
+    const banner = document.getElementById("lucro-banner-destaque");
+    const rotulo = document.getElementById("lucro-banner-rotulo");
+    const valor = document.getElementById("lucro-banner-valor");
+    const margem = document.getElementById("lucro-banner-margem");
+    const detalhe = document.getElementById("lucro-banner-detalhe");
+
+    if (banner && rotulo && valor && margem && detalhe) {
+        if (lucroLiquido > 0.01) {
+            banner.style.background = "#ecfdf5";
+            banner.style.border = "2.5px solid #10b981";
+            rotulo.textContent = "🏆 RESULTADO LÍQUIDO: LUCRO POSITIVO NO PERÍODO";
+            rotulo.style.color = "#047857";
+            valor.textContent = "+ " + dinheiro(lucroLiquido);
+            valor.style.color = "#065f46";
+            margem.textContent = `Margem Líquida Real: ${margemLiquida}% do faturamento`;
+            margem.style.color = "#047857";
+            detalhe.textContent = `Excelente desempenho financeiro! O negócio faturou ${dinheiro(totalVendas)}, e após deduzir ${dinheiro(custoMercadorias)} em stock, ${dinheiro(totalDespesas)} em custos de funcionamento e ${dinheiro(custoSalarios)} de salários, sobrou ${dinheiro(lucroLiquido)} de lucro líquido no bolso.`;
+            detalhe.style.color = "#065f46";
+        } else if (lucroLiquido < -0.01) {
+            banner.style.background = "#fef2f2";
+            banner.style.border = "2.5px solid #ef4444";
+            rotulo.textContent = "⚠️ RESULTADO LÍQUIDO: PREJUÍZO OPERACIONAL NO PERÍODO";
+            rotulo.style.color = "#b91c1c";
+            valor.textContent = "− " + dinheiro(Math.abs(lucroLiquido));
+            valor.style.color = "#dc2626";
+            margem.textContent = `Défice Operacional: ${margemLiquida}%`;
+            margem.style.color = "#b91c1c";
+            detalhe.textContent = `Atenção à gestão financeira: Os custos e despesas totais (${dinheiro(totalSaidasGerais)}) superaram as vendas (${dinheiro(totalVendas)}), gerando um prejuízo de ${dinheiro(Math.abs(lucroLiquido))}. Recomenda-se rever preços de venda e conter custos operacionais.`;
+            detalhe.style.color = "#7f1d1d";
+        } else {
+            banner.style.background = "#f8fafc";
+            banner.style.border = "2px solid #cbd5e1";
+            rotulo.textContent = "⚖️ PONTO DE EQUILÍBRIO (BREAK-EVEN)";
+            rotulo.style.color = "#334155";
+            valor.textContent = "MT 0,00";
+            valor.style.color = "#0f172a";
+            margem.textContent = "As receitas cobriram exatamente as despesas";
+            margem.style.color = "#64748b";
+            detalhe.textContent = "O faturamento do período cobriu todas as saídas sem sobras de lucro nem prejuízo.";
+            detalhe.style.color = "#475569";
+        }
+    }
+
+    // 8. CONSTRUÇÃO DA TABELA DRE
+    const tabelaDRE = document.getElementById("tabela-dre-linhas");
+    if (!tabelaDRE) return;
+
+    const pct = val => totalVendas > 0 ? ((numero(val) / totalVendas) * 100).toFixed(1) + "%" : "0.0%";
+
+    let linhasHtml = `
+    <tr style="background:#f0fdf4;border-bottom:1px solid #bbf7d0;">
+        <td style="padding:10px;font-weight:800;color:#166534;">(+) 1. RECEITA OPERACIONAL BRUTA (Vendas POS)</td>
+        <td style="padding:10px;text-align:center;"><span class="badge badge-green">ENTRADA</span></td>
+        <td style="padding:10px;text-align:right;font-weight:900;color:#15803d;font-size:14px;">${dinheiro(totalVendas)}</td>
+        <td style="padding:10px;text-align:right;font-weight:700;color:#15803d;">100.0%</td>
+    </tr>
+    <tr style="border-bottom:1px solid #e2e8f0;">
+        <td style="padding:10px;padding-left:24px;color:#475569;">(−) Custo das Mercadorias / Compras de Stock</td>
+        <td style="padding:10px;text-align:center;"><span class="badge badge-red">SAÍDA</span></td>
+        <td style="padding:10px;text-align:right;font-weight:800;color:#dc2626;">− ${dinheiro(custoMercadorias)}</td>
+        <td style="padding:10px;text-align:right;color:#64748b;">${pct(custoMercadorias)}</td>
+    </tr>
+    <tr style="background:#f8fafc;border-bottom:2px solid #cbd5e1;">
+        <td style="padding:10px;font-weight:800;color:#1e3a8a;">(=) 2. LUCRO OPERACIONAL BRUTO (Margem Bruta)</td>
+        <td style="padding:10px;text-align:center;"><span class="badge" style="background:#dbeafe;color:#1e40af;">SUBTOTAL</span></td>
+        <td style="padding:10px;text-align:right;font-weight:900;color:${lucroBruto >= 0 ? '#1e40af' : '#dc2626'};font-size:14px;">${dinheiro(lucroBruto)}</td>
+        <td style="padding:10px;text-align:right;font-weight:800;color:#1e40af;">${margemBruta}%</td>
+    </tr>
+    <tr style="background:#fef2f2;border-bottom:1px solid #fecaca;">
+        <td style="padding:10px;font-weight:800;color:#991b1b;">(−) 3. DESPESAS E CUSTOS OPERACIONAIS DO NEGÓCIO</td>
+        <td style="padding:10px;text-align:center;"><span class="badge badge-red">SAÍDA</span></td>
+        <td style="padding:10px;text-align:right;font-weight:900;color:#b91c1c;font-size:14px;">− ${dinheiro(totalDespesas)}</td>
+        <td style="padding:10px;text-align:right;font-weight:700;color:#b91c1c;">${pct(totalDespesas)}</td>
+    </tr>
+    `;
+
+    if (categoriasDespesas.energia > 0) {
+        linhasHtml += `
+        <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• ⚡ Energia Elétrica (Credelec / Luz)</td>
+            <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
+            <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.energia)}</td>
+            <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.energia)}</td>
+        </tr>`;
+    }
+    if (categoriasDespesas.agua > 0) {
+        linhasHtml += `
+        <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 💧 Água (FIPAG / Abastecimento)</td>
+            <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
+            <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.agua)}</td>
+            <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.agua)}</td>
+        </tr>`;
+    }
+    if (categoriasDespesas.renda > 0) {
+        linhasHtml += `
+        <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 🏠 Renda / Aluguer da Banca ou Loja</td>
+            <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
+            <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.renda)}</td>
+            <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.renda)}</td>
+        </tr>`;
+    }
+    if (categoriasDespesas.sacos > 0) {
+        linhasHtml += `
+        <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 🛍️ Sacos Plásticos, Embalagens & Limpeza</td>
+            <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
+            <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.sacos)}</td>
+            <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.sacos)}</td>
+        </tr>`;
+    }
+    if (categoriasDespesas.transporte > 0) {
+        linhasHtml += `
+        <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 🚗 Fretes e Transporte de Mercadoria</td>
+            <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
+            <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.transporte)}</td>
+            <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.transporte)}</td>
+        </tr>`;
+    }
+    if (categoriasDespesas.manutencao > 0) {
+        linhasHtml += `
+        <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 🛠️ Manutenção (Frio, Congeladores, Equipamentos)</td>
+            <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
+            <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.manutencao)}</td>
+            <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.manutencao)}</td>
+        </tr>`;
+    }
+    if (categoriasDespesas.outras > 0 || categoriasDespesas.alimentacao > 0) {
+        linhasHtml += `
+        <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 📦 Outros Custos Operacionais & Alimentação</td>
+            <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
+            <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.outras + categoriasDespesas.alimentacao)}</td>
+            <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.outras + categoriasDespesas.alimentacao)}</td>
+        </tr>`;
+    }
+
+    linhasHtml += `
+    <tr style="background:#fffbeb;border-bottom:1px solid #fde68a;">
+        <td style="padding:10px;font-weight:800;color:#92400e;">(−) 4. DESPESAS COM PESSOAL (Salários dos Funcionários)</td>
+        <td style="padding:10px;text-align:center;"><span class="badge badge-yellow">SALÁRIOS</span></td>
+        <td style="padding:10px;text-align:right;font-weight:900;color:#b45309;font-size:14px;">− ${dinheiro(custoSalarios)}</td>
+        <td style="padding:10px;text-align:right;font-weight:700;color:#b45309;">${pct(custoSalarios)}</td>
+    </tr>
+    <tr style="background:${lucroLiquido >= 0 ? '#ecfdf5' : '#fef2f2'};border-top:3px solid ${lucroLiquido >= 0 ? '#10b981' : '#ef4444'};">
+        <td style="padding:14px 10px;font-weight:900;font-size:15px;color:${lucroLiquido >= 0 ? '#065f46' : '#991b1b'};">
+            (=) 5. RESULTADO LÍQUIDO DO EXERCÍCIO (LUCRO REAL)
+        </td>
+        <td style="padding:14px 10px;text-align:center;">
+            <span class="badge ${lucroLiquido >= 0 ? 'badge-green' : 'badge-red'}" style="font-size:12px;padding:5px 10px;">
+                ${lucroLiquido >= 0 ? 'LUCRO' : 'PREJUÍZO'}
+            </span>
+        </td>
+        <td style="padding:14px 10px;text-align:right;font-weight:900;font-size:18px;color:${lucroLiquido >= 0 ? '#047857' : '#dc2626'};">
+            ${lucroLiquido >= 0 ? "+ " : "− "}${dinheiro(Math.abs(lucroLiquido))}
+        </td>
+        <td style="padding:14px 10px;text-align:right;font-weight:900;font-size:15px;color:${lucroLiquido >= 0 ? '#047857' : '#dc2626'};">
+            ${margemLiquida}%
+        </td>
+    </tr>
+    `;
+
+    tabelaDRE.innerHTML = linhasHtml;
+
+    // Guarda snapshot para exportações
+    window.FABEF_ULTIMO_DRE = {
+        periodoTexto: rotuloPeriodo,
+        ramo: ramoSelecionado,
+        totalVendas,
+        custoMercadorias,
+        totalCompras,
+        cmvTotal,
+        totalDespesas,
+        categoriasDespesas,
+        custoSalarios,
+        lucroBruto,
+        lucroLiquido,
+        margemLiquida,
+        margemBruta,
+        dataGeracao: new Date().toISOString()
+    };
+};
+
+window.imprimirDRELucro = function() {
+    const dre = window.FABEF_ULTIMO_DRE;
+    if (!dre) {
+        alert("Nenhum balanço de lucro calculado para impressão.");
+        return;
+    }
+
+    const emp = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(dre.ramo) : (FABEF.empresa || {});
+    const nomeEmp = emp.nome || dre.ramo || "ESTABELECIMENTO COMERCIAL";
+    const nuitEmp = emp.nuit || "Isento";
+    const telEmp = emp.telefone || "—";
+    const endEmp = emp.endereco || "Moçambique";
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+
+    const corRes = dre.lucroLiquido >= 0 ? "#15803d" : "#dc2626";
+    const txtRes = dre.lucroLiquido >= 0 ? "LUCRO LÍQUIDO" : "PREJUÍZO";
+
+    const html = `
+    <!DOCTYPE html>
+    <html lang="pt">
+    <head>
+        <meta charset="UTF-8">
+        <title>DRE - Demonstrativo de Lucro Real - ${escapeHTML(nomeEmp)}</title>
+        <style>
+            body { font-family: -apple-system, system-ui, Arial, sans-serif; margin: 30px; color: #0f172a; font-size: 13px; line-height: 1.5; }
+            .cabecalho { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px; }
+            .titulo { font-size: 20px; font-weight: 800; color: #0f172a; text-transform: uppercase; }
+            .tabela { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            .tabela th { background: #f1f5f9; padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-size: 11px; text-transform: uppercase; }
+            .tabela td { padding: 9px; border: 1px solid #e2e8f0; }
+            .total-linha { font-weight: bold; background: #f8fafc; }
+            .resultado-box { border: 2px solid ${corRes}; background: ${dre.lucroLiquido >= 0 ? '#f0fdf4' : '#fef2f2'}; padding: 16px; border-radius: 8px; margin-top: 20px; text-align: center; }
+            .assinaturas { display: flex; justify-content: space-between; margin-top: 60px; text-align: center; }
+            .campo-ass { width: 45%; border-top: 1px solid #000; padding-top: 6px; font-size: 11px; }
+            @media print { body { margin: 15mm; } }
+        </style>
+    </head>
+    <body>
+        <div class="cabecalho">
+            <div class="titulo">${escapeHTML(nomeEmp)}</div>
+            <div>NUIT: ${escapeHTML(nuitEmp)} | Telefone: ${escapeHTML(telEmp)} | ${escapeHTML(endEmp)}</div>
+            <div style="margin-top: 8px; font-weight: 700; color: #2563eb; font-size: 14px;">
+                DEMONSTRATIVO DO RESULTADO DO EXERCÍCIO (DRE & LUCRO REAL)
+            </div>
+            <div style="font-size: 12px; color: #64748b;">Período: <strong>${escapeHTML(dre.periodoTexto)}</strong> | Filial: <strong>${escapeHTML(dre.ramo)}</strong> | Emitido em: ${dataTexto(dre.dataGeracao)}</div>
+        </div>
+
+        <table class="tabela">
+            <thead>
+                <tr>
+                    <th>Item Contábil / Descrição</th>
+                    <th style="text-align:center;">Natureza</th>
+                    <th style="text-align:right;">Valor (MT)</th>
+                    <th style="text-align:right;">% s/ Vendas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="font-weight:bold;background:#f0fdf4;">
+                    <td>(+) RECEITA OPERACIONAL BRUTA (Vendas)</td>
+                    <td style="text-align:center;">Entrada</td>
+                    <td style="text-align:right;color:#15803d;">${dinheiro(dre.totalVendas)}</td>
+                    <td style="text-align:right;">100.0%</td>
+                </tr>
+                <tr>
+                    <td style="padding-left:20px;">(−) Custo das Mercadorias / Compras de Stock</td>
+                    <td style="text-align:center;">Custo</td>
+                    <td style="text-align:right;color:#dc2626;">− ${dinheiro(dre.custoMercadorias)}</td>
+                    <td style="text-align:right;">${dre.totalVendas > 0 ? ((dre.custoMercadorias / dre.totalVendas) * 100).toFixed(1) : 0}%</td>
+                </tr>
+                <tr class="total-linha">
+                    <td>(=) LUCRO BRUTO OPERACIONAL</td>
+                    <td style="text-align:center;">Subtotal</td>
+                    <td style="text-align:right;color:#1e40af;">${dinheiro(dre.lucroBruto)}</td>
+                    <td style="text-align:right;">${dre.margemBruta}%</td>
+                </tr>
+                <tr>
+                    <td style="padding-left:20px;">(−) Gastos Operacionais (Luz, Água, Rendas, Fretes)</td>
+                    <td style="text-align:center;">Despesa</td>
+                    <td style="text-align:right;color:#dc2626;">− ${dinheiro(dre.totalDespesas)}</td>
+                    <td style="text-align:right;">${dre.totalVendas > 0 ? ((dre.totalDespesas / dre.totalVendas) * 100).toFixed(1) : 0}%</td>
+                </tr>
+                <tr>
+                    <td style="padding-left:20px;">(−) Custos com Pessoal (Salários de Funcionários)</td>
+                    <td style="text-align:center;">Salários</td>
+                    <td style="text-align:right;color:#b45309;">− ${dinheiro(dre.custoSalarios)}</td>
+                    <td style="text-align:right;">${dre.totalVendas > 0 ? ((dre.custoSalarios / dre.totalVendas) * 100).toFixed(1) : 0}%</td>
+                </tr>
+                <tr style="font-weight:bold;font-size:15px;background:${dre.lucroLiquido >= 0 ? '#ecfdf5' : '#fef2f2'};border-top:2px solid ${corRes};">
+                    <td style="color:${corRes};">(=) RESULTADO LÍQUIDO FINAL (${txtRes})</td>
+                    <td style="text-align:center;color:${corRes};">${txtRes}</td>
+                    <td style="text-align:right;color:${corRes};">${dre.lucroLiquido >= 0 ? "+ " : "− "}${dinheiro(Math.abs(dre.lucroLiquido))}</td>
+                    <td style="text-align:right;color:${corRes};">${dre.margemLiquida}%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="resultado-box">
+            <div style="font-size: 13px; font-weight: bold; color: ${corRes}; text-transform: uppercase;">
+                ${txtRes} APURADO NO PERÍODO: ${escapeHTML(dre.periodoTexto)}
+            </div>
+            <div style="font-size: 26px; font-weight: 900; color: ${corRes}; margin: 6px 0;">
+                ${dre.lucroLiquido >= 0 ? "+ " : "− "}${dinheiro(Math.abs(dre.lucroLiquido))}
+            </div>
+            <div style="font-size: 13px; color: #475569;">
+                Margem Líquida Real sobre as Vendas: <strong>${dre.margemLiquida}%</strong>
+            </div>
+        </div>
+
+        <div class="assinaturas">
+            <div class="campo-ass">
+                Responsável Contábil / Financeiro<br>Data: ___/___/______
+            </div>
+            <div class="campo-ass">
+                Gerente Geral da Empresa<br>Data: ___/___/______
+            </div>
+        </div>
+
+        <script>
+            window.addEventListener('load', () => { setTimeout(() => window.print(), 250); });
+        </script>
+    </body>
+    </html>
+    `;
+
+    w.document.write(html);
+    w.document.close();
+};
+
+window.exportarDREExcel = function() {
+    const dre = window.FABEF_ULTIMO_DRE;
+    if (!dre) {
+        alert("Nenhum balanço de lucro calculado para exportação.");
+        return;
+    }
+
+    let csv = "\uFEFF"; // UTF-8 BOM
+    csv += "DEMONSTRATIVO DO RESULTADO DO EXERCÍCIO (DRE)\r\n";
+    csv += `Empresa;${FABEF.empresa?.nome || "Empresa"}\r\n`;
+    csv += `Período;${dre.periodoTexto}\r\n`;
+    csv += `Filial;${dre.ramo}\r\n`;
+    csv += `Data de Emissão;${dataTexto(dre.dataGeracao)}\r\n\r\n`;
+
+    csv += "Item Contábil;Natureza;Valor (MT);% s/ Vendas\r\n";
+    csv += `(+) Receita Operacional Bruta (Vendas);Entrada;${dre.totalVendas.toFixed(2)};100.0%\r\n`;
+    csv += `(−) Custo das Mercadorias / Compras;Custo;-${dre.custoMercadorias.toFixed(2)};${(dre.totalVendas > 0 ? (dre.custoMercadorias / dre.totalVendas) * 100 : 0).toFixed(1)}%\r\n`;
+    csv += `(=) Lucro Bruto Operacional;Subtotal;${dre.lucroBruto.toFixed(2)};${dre.margemBruta}%\r\n`;
+    csv += `(−) Despesas Operacionais Gerais;Despesa;-${dre.totalDespesas.toFixed(2)};${(dre.totalVendas > 0 ? (dre.totalDespesas / dre.totalVendas) * 100 : 0).toFixed(1)}%\r\n`;
+    csv += `(−) Despesas com Pessoal (Salários);Salários;-${dre.custoSalarios.toFixed(2)};${(dre.totalVendas > 0 ? (dre.custoSalarios / dre.totalVendas) * 100 : 0).toFixed(1)}%\r\n`;
+    csv += `(=) RESULTADO LÍQUIDO FINAL;${dre.lucroLiquido >= 0 ? "LUCRO" : "PREJUÍZO"};${dre.lucroLiquido.toFixed(2)};${dre.margemLiquida}%\r\n`;
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `DRE_Lucro_Real_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+};
+
+window.enviarDREWhatsApp = function() {
+    const dre = window.FABEF_ULTIMO_DRE;
+    if (!dre) {
+        alert("Nenhum balanço de lucro disponível.");
+        return;
+    }
+
+    const ehLucro = dre.lucroLiquido >= 0;
+    const msg = `📊 *BALANÇO DE LUCRO REAL & DRE*
+🏢 *${FABEF.empresa?.nome || "FABEF ERP"}*
+📅 *Período:* ${dre.periodoTexto}
+🏷️ *Ramo:* ${dre.ramo}
+
+💵 *(+) Vendas Totais:* ${dinheiro(dre.totalVendas)}
+🚚 *(−) Compras de Stock:* ${dinheiro(dre.custoMercadorias)}
+⚡ *(−) Despesas (Luz, Água, Rendas):* ${dinheiro(dre.totalDespesas)}
+🧑‍💼 *(−) Folha Salarial:* ${dinheiro(dre.custoSalarios)}
+━━━━━━━━━━━━━━━━━━━━
+${ehLucro ? '🟢 *LUCRO LÍQUIDO REAL:*' : '🔴 *PREJUÍZO OPERACIONAL:*'} *${dinheiro(Math.abs(dre.lucroLiquido))}*
+📈 *Margem Líquida:* ${dre.margemLiquida}%
+
+_Relatório financeiro emitido via FABEF Gestão ERP PRO._`;
+
+    const url = "https://wa.me/?text=" + encodeURIComponent(msg);
+    window.open(url, "_blank");
+};
 
 
 /* =====================================================
@@ -6541,6 +7826,7 @@ async function cadastrarNovoFuncionario() {
     const email=document.getElementById("func-email")?.value.trim();
     const telefone=document.getElementById("func-telefone")?.value.trim();
     const ramoFunc=document.getElementById("func-ramo")?.value || FABEF.ramo || "";
+    const salarioMensal = numero(document.getElementById("func-salario-mensal")?.value || 0);
     const senha=document.getElementById("func-senha")?.value || "";
     const pinFunc=document.getElementById("func-pin")?.value.trim() || "";
     const foto=document.getElementById("func-foto")?.value.trim() || "";
@@ -6563,6 +7849,7 @@ async function cadastrarNovoFuncionario() {
             nome,
             email,
             telefone,
+            salarioMensal: salarioMensal,
             foto,
             ramo: ramoFunc,
             empresaId: FABEF.empresaId,
@@ -6579,9 +7866,9 @@ async function cadastrarNovoFuncionario() {
         if (ramoFunc === FABEF.ramo) {
             FABEF.funcionarios.push({id:uidFuncionario,...perfil});
         }
-        ["func-nome","func-email","func-telefone","func-senha","func-pin","func-foto"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+        ["func-nome","func-email","func-telefone","func-salario-mensal","func-senha","func-pin","func-foto"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
         renderFuncionarios();
-        await gravarAuditoria(`Cadastrou um novo funcionário na equipa: ${nome} (${email}) no ramo ${ramoFunc}`,"INFO");
+        await gravarAuditoria(`Cadastrou um novo funcionário na equipa: ${nome} (${email}) no ramo ${ramoFunc} com salário de ${dinheiro(salarioMensal)}`,"INFO");
         alert("Funcionário cadastrado com sucesso para o ramo: " + ramoFunc);
     } catch(error) { console.error(error); alert("Não foi possível criar a conta do funcionário:\n"+mensagemFirebase(error)); }
     finally { if(secondaryApp){ try{await deleteApp(secondaryApp);}catch(e){} } }
@@ -6596,6 +7883,27 @@ function renderFuncionarios(){
     const gastosGerente = (FABEF.gastosFuncionarios || []).filter(g => g.funcionarioId === gerenteId || g.funcionarioId === (FABEF.user?.uid || "gerente") || g.funcionarioId?.startsWith("gerente"));
     const totalGastosGerente = gastosGerente.reduce((s, g) => s + numero(g.valor), 0);
 
+    // Mostra os funcionários do ramo ou todos da empresa se for Gerente
+    const listaFuncionarios = (FABEF.funcionarios || []).filter(f => souGerente || !f.ramo || f.ramo === FABEF.ramo);
+
+    // Atualiza KPIs da equipa e folha salarial
+    const ativos = listaFuncionarios.filter(f => (f.estado || "ATIVO") === "ATIVO");
+    const folhaTotal = ativos.reduce((s, f) => s + numero(f.salarioMensal || 0), 0);
+
+    const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const valesDesteMes = (FABEF.gastosFuncionarios || []).filter(g => new Date(g.data || 0) >= inicioMes);
+    const totalValesMes = valesDesteMes.reduce((s, g) => s + numero(g.valor), 0);
+    const liquidoRestante = Math.max(0, folhaTotal - totalValesMes);
+
+    const kpiTotal = document.getElementById("kpi-func-total");
+    const kpiFolha = document.getElementById("kpi-func-folha");
+    const kpiVales = document.getElementById("kpi-func-vales");
+    const kpiLiquido = document.getElementById("kpi-func-liquido");
+    if (kpiTotal) kpiTotal.textContent = String(ativos.length);
+    if (kpiFolha) kpiFolha.textContent = dinheiro(folhaTotal);
+    if (kpiVales) kpiVales.textContent = dinheiro(totalValesMes);
+    if (kpiLiquido) kpiLiquido.textContent = dinheiro(liquidoRestante);
+
     const acoesGerente = souGerente ? `
         <div style="display:flex;gap:5px;flex-wrap:wrap;">
             <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial('${escapeHTML(gerenteId)}')" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale) do Gerente">💸 Vale</button>
@@ -6609,21 +7917,22 @@ function renderFuncionarios(){
             <td>${escapeHTML(FABEF.empresa?.telefone || "—")}</td>
             <td><span class="badge" style="background:#0284c7;color:#fff;">Todos os Ramos</span></td>
             <td><span class="badge badge-green" style="background-color:#0f172a;color:#fff;">GERENTE</span></td>
+            <td style="color:#64748b;font-weight:700;">Pró-labore</td>
             <td>
                 <strong style="${totalGastosGerente > 0 ? 'color:#b45309;' : 'color:#64748b;'}">${dinheiro(totalGastosGerente)}</strong>
                 ${gastosGerente.length > 0 ? `<small style="display:block;color:#64748b;font-size:11px;">(${gastosGerente.length} registo${gastosGerente.length > 1 ? 's' : ''})</small>` : ''}
             </td>
+            <td style="color:#64748b;">—</td>
             <td><span class="badge badge-green">ATIVO</span></td>
             <td>${acoesGerente}</td>
         </tr>`;
-
-    // Mostra os funcionários do ramo ou todos da empresa se for Gerente
-    const listaFuncionarios = (FABEF.funcionarios || []).filter(f => souGerente || !f.ramo || f.ramo === FABEF.ramo);
 
     const funcionarios = listaFuncionarios.map(f => {
         const ativo = (f.estado || "ATIVO") === "ATIVO";
         const gastosDoFunc = (FABEF.gastosFuncionarios || []).filter(g => g.funcionarioId === f.id);
         const totalGastos = gastosDoFunc.reduce((s, g) => s + numero(g.valor), 0);
+        const salBase = numero(f.salarioMensal || 0);
+        const salLiquido = Math.max(0, salBase - totalGastos);
 
         const acoes = souGerente ? `
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
@@ -6641,8 +7950,14 @@ function renderFuncionarios(){
             <td><span class="badge badge-blue">${escapeHTML(f.ramo || FABEF.ramo || "—")}</span></td>
             <td><span class="badge badge-yellow">OPERADOR</span></td>
             <td>
+                <strong style="color:#059669;font-weight:800;">${dinheiro(salBase)}</strong>
+            </td>
+            <td>
                 <strong style="${totalGastos > 0 ? 'color:#b45309;' : 'color:#64748b;'}">${dinheiro(totalGastos)}</strong>
                 ${gastosDoFunc.length > 0 ? `<small style="display:block;color:#64748b;font-size:11px;">(${gastosDoFunc.length} registo${gastosDoFunc.length > 1 ? 's' : ''})</small>` : ''}
+            </td>
+            <td>
+                <strong style="color:#2563eb;font-weight:800;">${dinheiro(salLiquido)}</strong>
             </td>
             <td><span class="badge ${ativo ? 'badge-green' : 'badge-red'}">${escapeHTML(f.estado || "ATIVO")}</span></td>
             <td>${acoes}</td>
@@ -6660,6 +7975,8 @@ window.abrirEdicaoFuncionario = function(id) {
     document.getElementById("edit-func-id").value = f.id;
     document.getElementById("edit-func-nome").value = f.nome || "";
     document.getElementById("edit-func-telefone").value = f.telefone || "";
+    const inputSal = document.getElementById("edit-func-salario-mensal");
+    if (inputSal) inputSal.value = numero(f.salarioMensal || 0) || "";
     const inputPin = document.getElementById("edit-func-pin");
     if (inputPin) inputPin.value = "";
     const selectRamo = document.getElementById("edit-func-ramo");
@@ -6674,6 +7991,7 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
     const nome = document.getElementById("edit-func-nome").value.trim();
     const telefone = document.getElementById("edit-func-telefone").value.trim();
     const ramo = document.getElementById("edit-func-ramo")?.value || FABEF.ramo;
+    const salarioMensal = numero(document.getElementById("edit-func-salario-mensal")?.value || 0);
     const novoPin = document.getElementById("edit-func-pin")?.value.trim() || "";
     if (!id || !nome) { alert("O nome do funcionário é obrigatório."); return; }
 
@@ -6683,7 +8001,7 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
     }
 
     try {
-        const dadosAtualizados = { nome, telefone, ramo, atualizadoEm: serverTimestamp() };
+        const dadosAtualizados = { nome, telefone, ramo, salarioMensal, atualizadoEm: serverTimestamp() };
         if (novoPin) {
             const hash = await calcularHashPin(novoPin);
             dadosAtualizados.pinHash = hash;
@@ -6698,6 +8016,7 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
             f.nome = nome; 
             f.telefone = telefone;
             f.ramo = ramo;
+            f.salarioMensal = salarioMensal;
             if (novoPin) {
                 f.pinHash = dadosAtualizados.pinHash;
                 f.pinConfigurado = true;
@@ -6706,8 +8025,9 @@ document.getElementById("btn-salvar-edicao-funcionario")?.addEventListener("clic
 
         fecharModal("modal-editar-funcionario");
         renderFuncionarios();
-        await gravarAuditoria("Editou os dados do funcionário: " + nome + (novoPin ? " (PIN atualizado)" : "") + (ramo ? ` (Ramo: ${ramo})` : ""), "INFO");
-        alert("Dados do funcionário atualizados com sucesso.");
+        if (typeof renderSecaoLucro === "function") renderSecaoLucro();
+        await gravarAuditoria("Editou os dados do funcionário: " + nome + ` (Salário: ${dinheiro(salarioMensal)})` + (novoPin ? " (PIN atualizado)" : "") + (ramo ? ` (Ramo: ${ramo})` : ""), "INFO");
+        alert("Dados e salário do funcionário atualizados com sucesso.");
     } catch (error) {
         console.error(error);
         alert("Erro ao atualizar funcionário:\n" + mensagemFirebase(error));
@@ -8429,18 +9749,28 @@ function renderDashboard() {
     if (painelUtilizador) painelUtilizador.textContent = FABEF.user?.email || "—";
     if (painelRamo) painelRamo.textContent = FABEF.ramo;
 
-    const hoje = dataHoje();
+    const hojeStr = dataHojeStr();
+    const ontemStr = dataOntemStr();
 
-    // Filtra transações realizadas no dia atual para o somatório rápido do balcão
+    // Filtra transações realizadas estritamente no dia atual para o somatório rápido do balcão (sem misturar com ontem)
     const vendasHoje = FABEF.vendas.filter(v => {
-        const dataVenda = new Date(v.data || v.date || 0);
-        return dataVenda >= hoje;
+        const ehCancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+        return !ehCancelada && dataDoRegisto(v) === hojeStr && (!v.ramo || v.ramo === FABEF.ramo);
     });
 
     const totalHoje = vendasHoje.reduce((s, v) => s + numero(v.total), 0);
+
+    const vendasOntem = FABEF.vendas.filter(v => {
+        const ehCancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+        return !ehCancelada && dataDoRegisto(v) === ontemStr && (!v.ramo || v.ramo === FABEF.ramo);
+    });
+
+    const totalOntem = vendasOntem.reduce((s, v) => s + numero(v.total), 0);
     
     const painelVendas = document.getElementById("inicio-vendas");
-    if (painelVendas) painelVendas.textContent = dinheiro(totalHoje);
+    if (painelVendas) {
+        painelVendas.innerHTML = `<div>${dinheiro(totalHoje)}</div><div style="font-size:12px;font-weight:600;color:#64748b;margin-top:4px;">🗓️ Ontem: <strong style="color:#0f172a;">${dinheiro(totalOntem)}</strong> (${vendasOntem.length} vendas)</div>`;
+    }
 
     // Soma quantos KGs (e litros) foram vendidos hoje, além do valor em MT
     let kgHoje = 0, litroHoje = 0;
@@ -9500,7 +10830,15 @@ async function entrarModoDemo() {
     };
     window.FABEF.caixas_turnos = [window.FABEF.turno];
 
+    const dHoje = dataHojeStr();
+    const dOntem = dataOntemStr();
+    const dAnteontem = (() => {
+        const d = new Date(); d.setDate(d.getDate() - 2);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })();
+
     window.FABEF.vendas = [
+        // Vendas de HOJE (Turno atual em curso)
         {
             id: "venda-01",
             total: 1650,
@@ -9510,6 +10848,8 @@ async function entrarModoDemo() {
             cliente: "Amélia Cossa",
             nuitCliente: "109283741",
             operadorNome: "Faruque Abílio",
+            diaOperacional: dHoje,
+            turnoId: turnoId,
             data: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
             itens: [{ nome: "Arroz Basmati Cigala 25kg", quantidade: 1, preco: 1650, subtotal: 1650, unidade: "saco" }]
         },
@@ -9522,6 +10862,8 @@ async function entrarModoDemo() {
             cliente: "João Machava",
             nuitCliente: "108765432",
             operadorNome: "Faruque Abílio",
+            diaOperacional: dHoje,
+            turnoId: turnoId,
             data: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
             itens: [
                 { nome: "Carne de Novilho / Alcatra Fresca", quantidade: 1.25, preco: 420, subtotal: 525, unidade: "kg" }
@@ -9535,8 +10877,69 @@ async function entrarModoDemo() {
             pagamento: "Dinheiro",
             cliente: "Consumidor Final",
             operadorNome: "Faruque Abílio",
+            diaOperacional: dHoje,
+            turnoId: turnoId,
             data: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
             itens: [{ nome: "Carne Moída / Picada Especial", quantidade: 0.75, preco: 350, subtotal: 262.5, unidade: "kg" }]
+        },
+
+        // Vendas de ONTEM (Arquivadas no dia anterior - Turno fechado ontem)
+        {
+            id: "venda-04",
+            total: 3300,
+            subtotal: 3300,
+            desconto: 0,
+            pagamento: "M-Pesa",
+            cliente: "Restaurante Zambi",
+            nuitCliente: "105554433",
+            operadorNome: "Maria Santos",
+            diaOperacional: dOntem,
+            turnoId: "turno-ontem-01",
+            data: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
+            itens: [{ nome: "Arroz Basmati Cigala 25kg", quantidade: 2, preco: 1650, subtotal: 3300, unidade: "saco" }]
+        },
+        {
+            id: "venda-05",
+            total: 2100,
+            subtotal: 2100,
+            desconto: 0,
+            pagamento: "Dinheiro",
+            cliente: "Helena Tembe",
+            nuitCliente: "102938475",
+            operadorNome: "Maria Santos",
+            diaOperacional: dOntem,
+            turnoId: "turno-ontem-01",
+            data: new Date(Date.now() - 28 * 3600 * 1000).toISOString(),
+            itens: [{ nome: "Carne de Novilho / Alcatra Fresca", quantidade: 5, preco: 420, subtotal: 2100, unidade: "kg" }]
+        },
+        {
+            id: "venda-06",
+            total: 1160,
+            subtotal: 1160,
+            desconto: 0,
+            pagamento: "Dinheiro",
+            cliente: "Consumidor Final",
+            operadorNome: "Maria Santos",
+            diaOperacional: dOntem,
+            turnoId: "turno-ontem-01",
+            data: new Date(Date.now() - 30 * 3600 * 1000).toISOString(),
+            itens: [{ nome: "Óleo Alimentar Mariana 5L", quantidade: 2, preco: 580, subtotal: 1160, unidade: "garrafa" }]
+        },
+
+        // Vendas de 2 DIAS ATRÁS (Histórico de progressão)
+        {
+            id: "venda-07",
+            total: 4950,
+            subtotal: 4950,
+            desconto: 0,
+            pagamento: "M-Pesa",
+            cliente: "Carlos Tembe",
+            nuitCliente: "108877665",
+            operadorNome: "Maria Santos",
+            diaOperacional: dAnteontem,
+            turnoId: "turno-anteontem-01",
+            data: new Date(Date.now() - 52 * 3600 * 1000).toISOString(),
+            itens: [{ nome: "Arroz Basmati Cigala 25kg", quantidade: 3, preco: 1650, subtotal: 4950, unidade: "saco" }]
         }
     ];
 
