@@ -4112,6 +4112,20 @@ async function finalizarVenda() {
 
 window.FABEF_FILTRO_VENDAS_PERIODO = "hoje";
 
+function vincularAbasVendas() {
+    ["hoje", "ontem", "agrupado", "progressao", "todos"].forEach(p => {
+        const btn = document.getElementById(`aba-venda-${p}`) || document.querySelector(`.btn-aba-venda[data-periodo="${p}"]`);
+        if (btn && !btn._vinculado) {
+            btn._vinculado = true;
+            btn.addEventListener("click", function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.definirAbaVenda(p);
+            });
+        }
+    });
+}
+
 window.definirAbaVenda = function(periodo) {
     window.FABEF_FILTRO_VENDAS_PERIODO = periodo;
     const sel = document.getElementById("vendas-periodo");
@@ -4126,23 +4140,30 @@ window.definirAbaVenda = function(periodo) {
     }
 
     document.querySelectorAll(".btn-aba-venda").forEach(btn => {
-        btn.classList.remove("active");
-        btn.style.background = "#f1f5f9";
-        btn.style.color = "#334155";
-        btn.style.border = "1.5px solid #cbd5e1";
+        const p = btn.getAttribute("data-periodo") || btn.id.replace("aba-venda-", "");
+        if (p === periodo) {
+            btn.classList.add("active");
+            btn.style.background = "#10b981";
+            btn.style.color = "#fff";
+            btn.style.border = "none";
+        } else {
+            btn.classList.remove("active");
+            btn.style.background = "#f1f5f9";
+            btn.style.color = "#334155";
+            btn.style.border = "1.5px solid #cbd5e1";
+        }
     });
 
-    const idBtn = `aba-venda-${periodo}`;
-    const btnAtivo = document.getElementById(idBtn);
-    if (btnAtivo) {
-        btnAtivo.classList.add("active");
-        btnAtivo.style.background = "#10b981";
-        btnAtivo.style.color = "#fff";
-        btnAtivo.style.border = "none";
-    }
-
     renderVendas();
+
+    if (periodo === "progressao") {
+        setTimeout(() => {
+            const painelProg = document.getElementById("painel-progressao-diaria");
+            if (painelProg) painelProg.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 60);
+    }
 };
+window.FABEF_DEFINIR_ABA_VENDA = window.definirAbaVenda;
 
 window.filtrarDiaEspecifico = function(diaStr) {
     if (!diaStr) return;
@@ -4172,6 +4193,8 @@ document.getElementById("vendas-periodo")?.addEventListener("change", (e) => {
     window.definirAbaVenda(e.target.value);
 });
 document.getElementById("vendas-data-especifica")?.addEventListener("change", renderVendas);
+document.addEventListener("DOMContentLoaded", vincularAbasVendas);
+setTimeout(vincularAbasVendas, 300);
 
 
 function renderVendas() {
@@ -4429,7 +4452,7 @@ function renderVendas() {
     }
 
     // Se estiver agrupado por dias ou visualização de todo o histórico, organiza com cabeçalhos por dia
-    const agruparPorDia = (periodo === "agrupado" || periodo === "todos" || periodo === "7" || periodo === "30" || periodo === "ano");
+    const agruparPorDia = (periodo === "agrupado" || periodo === "progressao" || periodo === "todos" || periodo === "7" || periodo === "30" || periodo === "ano");
 
     if (agruparPorDia && !pesquisa) {
         const gruposPorDia = new Map();
@@ -4524,6 +4547,23 @@ function renderVendas() {
 
         tabelaCorpo.innerHTML = cabecalhoUnico + listaFiltrada.map(v => renderLinhaVendaHTML(v)).join("");
     }
+
+    // Garante que todas as abas têm listeners vinculados e estilo ativo correto
+    vincularAbasVendas();
+    document.querySelectorAll(".btn-aba-venda").forEach(btn => {
+        const p = btn.getAttribute("data-periodo") || btn.id.replace("aba-venda-", "");
+        if (p === periodo) {
+            btn.classList.add("active");
+            btn.style.background = "#10b981";
+            btn.style.color = "#fff";
+            btn.style.border = "none";
+        } else {
+            btn.classList.remove("active");
+            btn.style.background = "#f1f5f9";
+            btn.style.color = "#334155";
+            btn.style.border = "1.5px solid #cbd5e1";
+        }
+    });
 }
 window.renderVendas = renderVendas;
 
