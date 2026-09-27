@@ -678,19 +678,19 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
       <!-- Abas Rápidas de Navegação Temporal (Separador Claro entre Ontem e Hoje) -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-        <button type="button" class="btn btn-aba-venda active" id="aba-venda-hoje" onclick="definirAbaVenda('hoje')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#10b981;color:#fff;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+        <button type="button" class="btn btn-aba-venda active" id="aba-venda-hoje" data-periodo="hoje" onclick="window.definirAbaVenda ? window.definirAbaVenda('hoje') : definirAbaVenda('hoje')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#10b981;color:#fff;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
           <span>🟢</span> Hoje (Novo Dia)
         </button>
-        <button type="button" class="btn btn-aba-venda" id="aba-venda-ontem" onclick="definirAbaVenda('ontem')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+        <button type="button" class="btn btn-aba-venda" id="aba-venda-ontem" data-periodo="ontem" onclick="window.definirAbaVenda ? window.definirAbaVenda('ontem') : definirAbaVenda('ontem')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
           <span>🗓️</span> Ontem
         </button>
-        <button type="button" class="btn btn-aba-venda" id="aba-venda-agrupado" onclick="definirAbaVenda('agrupado')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+        <button type="button" class="btn btn-aba-venda" id="aba-venda-agrupado" data-periodo="agrupado" onclick="window.definirAbaVenda ? window.definirAbaVenda('agrupado') : definirAbaVenda('agrupado')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
           <span>📅</span> Agrupado por Dias (com Subtotais)
         </button>
-        <button type="button" class="btn btn-aba-venda" id="aba-venda-progressao" onclick="definirAbaVenda('progressao')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+        <button type="button" class="btn btn-aba-venda" id="aba-venda-progressao" data-periodo="progressao" onclick="window.definirAbaVenda ? window.definirAbaVenda('progressao') : definirAbaVenda('progressao')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
           <span>🏆</span> Progressão dos Dias (Qual dia vendeu mais?)
         </button>
-        <button type="button" class="btn btn-aba-venda" id="aba-venda-todos" onclick="definirAbaVenda('todos')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+        <button type="button" class="btn btn-aba-venda" id="aba-venda-todos" data-periodo="todos" onclick="window.definirAbaVenda ? window.definirAbaVenda('todos') : definirAbaVenda('todos')" style="padding:8px 16px;border-radius:20px;font-weight:700;font-size:13px;background:#f1f5f9;color:#334155;border:1.5px solid #cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
           <span>🌐</span> Todo o Histórico
         </button>
       </div>
@@ -2776,6 +2776,18 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 <script>
 function fecharModal(id){ document.getElementById(id)?.classList.remove('show'); }
 document.getElementById('btn-toggle-dark')?.addEventListener('click', () => document.body.classList.toggle('dark'));
+
+window.definirAbaVenda = function(p) {
+  window.FABEF_FILTRO_VENDAS_PERIODO = p;
+  if (typeof window.FABEF_DEFINIR_ABA_VENDA === 'function') {
+    window.FABEF_DEFINIR_ABA_VENDA(p);
+  } else if (typeof window.renderVendas === 'function') {
+    window.renderVendas();
+  }
+};
+function definirAbaVenda(p) {
+  window.definirAbaVenda(p);
+}
 </script>
 <!-- Biblioteca de leitura de código de barras/QR por câmara — funciona em Chrome, Safari (iOS) e Firefox, porque faz a descodificação em JavaScript puro, sem depender de nenhuma função nativa do navegador -->
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
