@@ -430,8 +430,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <details style="margin-top:6px;border-left:3px solid #3b82f6;padding-left:4px;" open>
       <summary style="cursor:pointer;color:#93c5fd;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;letter-spacing:0.5px;">⚙️ Configurações & Sistema</summary>
-      <button data-sec="config" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
-      <button type="button" id="btn-sidebar-menu-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;display:flex;align-items:center;gap:6px;">🔢 Definir PIN de Segurança</button>
+      <button data-sec="config" id="btn-sidebar-config-empresa" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
+      <button type="button" id="btn-sidebar-definir-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;">🔢 Definir / Alterar PIN</button>
+      <button type="button" id="btn-sidebar-alterar-senha" style="background:#0f172a;color:#e2e8f0;font-weight:700;border:1px solid #334155;text-align:left;">🔑 Alterar Minha Senha</button>
       <button data-sec="despesas" style="background:#fff1f2;color:#991b1b;font-weight:700;border:1px solid #fecdd3;">⚡ Despesas do Negócio (Luz, Água, Renda)</button>
       <button data-sec="funcionarios">🧑‍💼 Equipa & Vales Salariais</button>
       <button data-sec="dispensas" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #fde68a;">🏖️ Dispensas Funcionários</button>
@@ -441,14 +442,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </details>
 
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:6px;">
-      <!-- ESPAÇO PARA O FUNCIONÁRIO / GERENTE DEFINIR O SEU PIN -->
-      <button id="btn-sidebar-definir-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#1e293b;border:1.5px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
-        🔢 <span>Definir / Alterar Meu PIN</span>
-      </button>
-      <!-- PARTE DE DEFINIR / ALTERAR SENHA (MANTIDA NO MESMO LUGAR) -->
-      <button id="btn-sidebar-alterar-senha" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;font-size:12px;font-weight:600;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
-        🔑 <span>Alterar Minha Senha</span>
-      </button>
       <button id="btn-sidebar-instalar" style="background:#1e3a8a;border:1px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
         📲 <span>Instalar Aplicativo no Celular</span>
       </button>
@@ -922,7 +915,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Produto</th><th>Fornecedor</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th></tr></thead>
+          <thead><tr><th>Data</th><th>Produto</th><th>Fornecedor</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th><th id="th-acoes-compras">Ações</th></tr></thead>
           <tbody id="tabela-compras"></tbody>
         </table></div>
       </div>
@@ -2053,25 +2046,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <input type="text" id="config-rodape" placeholder="Ex: Obrigado por cuidar da sua beleza no Salão Aurora! Volte sempre.">
         </div>
         <button id="btn-guardar-config" class="btn btn-entrar" style="width:auto;padding:12px 26px;font-weight:700;">💾 Guardar Configurações deste Ramo</button>
-      <div class="card">
-        <h3 style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
-          <span>🛡️</span> Segurança: Código PIN de Bloqueio & Senha da Conta
-        </h3>
-        <p style="font-size:13px;color:#64748b;margin-bottom:12px;">
-          Defina ou altere o seu código PIN de 4 a 6 dígitos para proteger o caixa e bloquear o aplicativo com facilidade. Pode também atualizar a sua senha de login sem sair do sistema.
-        </p>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-          <div>
-            <div style="font-size:12px;color:#64748b;">Estado da Proteção por PIN neste aparelho:</div>
-            <strong id="config-pin-estado" style="font-size:14px;color:#16a34a;">🟢 PIN ATIVO E PROTEGIDO</strong>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button id="btn-alterar-pin" class="btn btn-primary" type="button" onclick="window.abrirModalDefinirPin()" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">🔢 Definir / Alterar PIN</button>
-            <button id="btn-config-alterar-senha" class="btn" type="button" onclick="document.getElementById('modal-alterar-senha')?.classList.add('show')" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;background:#0f172a;color:#fff;">🔑 Alterar Senha</button>
-            <button id="btn-testar-bloqueio" class="btn btn-light" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:600;">🔒 Testar Bloqueio</button>
-          </div>
-        </div>
-      </div>
 
       <div class="card" style="border: 2px solid #3b82f6; background: #eff6ff;">
         <h3 style="color:#1e40af; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
@@ -2225,6 +2199,31 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <h3 id="dc-titulo">Detalhes do cliente</h3>
       <div id="dc-corpo" style="font-size:13px;"></div>
       <div class="modal-acoes"><button class="btn btn-light" type="button" onclick="fecharModal('modal-detalhe-cliente')" style="flex:1;">Fechar</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-editar-compra">
+    <div class="modal-box">
+      <h3>Editar Compra</h3>
+      <input type="hidden" id="edit-compra-id">
+      <p id="edit-compra-produto-nome" style="font-weight:700;margin-bottom:8px;"></p>
+      <div class="grid">
+        <div class="form-group"><label for="edit-compra-fornecedor">Fornecedor</label><input type="text" id="edit-compra-fornecedor" list="lista-fornecedores-compra"></div>
+        <div class="form-group"><label for="edit-compra-quantidade">Quantidade</label><input type="number" id="edit-compra-quantidade" min="0" step="any"></div>
+        <div class="form-group"><label for="edit-compra-custo">Custo unitário</label><input type="number" id="edit-compra-custo" min="0" step="0.01"></div>
+        <div class="form-group">
+          <label for="edit-compra-pagamento">Forma de pagamento</label>
+          <select id="edit-compra-pagamento">
+            <option value="Dinheiro">Pago (dinheiro/M-Pesa/etc.)</option>
+            <option value="Credito">A crédito (fica a dever ao fornecedor)</option>
+          </select>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#64748b;">O stock do produto e a dívida do fornecedor (se for a crédito) são ajustados automaticamente.</p>
+      <div class="modal-acoes">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-editar-compra')" style="flex:1;">Cancelar</button>
+        <button id="btn-salvar-edicao-compra" class="btn btn-entrar" type="button" onclick="window.salvarEdicaoCompra()" style="flex:1;">Guardar Alterações</button>
+      </div>
     </div>
   </div>
 
