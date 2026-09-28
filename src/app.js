@@ -7243,6 +7243,11 @@ document.getElementById("btn-atualizar-relatorio").addEventListener("click", ren
 document.getElementById("relatorio-periodo").addEventListener("change", renderRelatorios);
 
 
+// Estado do relatório deve existir ANTES de qualquer renderização da SPA.
+// O módulo é carregado como ES module e algumas rotinas podem disparar
+// renderTudo() muito cedo; declarar aqui evita erro de Temporal Dead Zone.
+let FABEF_RELATORIO_ATUAL = null;
+
 function renderRelatorios() {
     const periodo = document.getElementById("relatorio-periodo").value;
     let inicio = null;
@@ -7314,8 +7319,6 @@ function renderRelatorios() {
         renderAnaliseInteligente(vendasFiltradas, despesasFiltradas);
     }
 }
-
-let FABEF_RELATORIO_ATUAL = null;
 
 /* =====================================================
    MÓDULO LÓGICO: EXPORTAÇão DE RELATÓRIOS
@@ -8792,105 +8795,6 @@ async function solicitarSubscricaoMovel(){
 }
 
 document.getElementById("btn-solicitar-pagamento")?.addEventListener("click", solicitarSubscricaoMovel);
-
-/* =====================================================
-   CORREÇÃO DE BOTÕES DE SUBSCRIÇÃO V9.9
-   - WhatsApp: abre partilha com mensagem pré-preenchida.
-   - Código SMS: regista pedido pendente para verificação.
-   - Chave PRO: regista pedido pendente para verificação.
-   A ativação real não é feita apenas no navegador.
-===================================================== */
-window.abrirWhatsAppSuporteAtivacao = function() {
-    const empresaNome = FABEF.empresa?.nome || "minha empresa";
-    const texto = [
-        "Olá, quero ativar a subscrição do FABEF ERP PRO.",
-        "Empresa: " + empresaNome,
-        "ID da empresa: " + (FABEF.empresaId || "—"),
-        "Pretendo enviar o comprovativo de pagamento."
-    ].join("\n");
-
-    const url = "https://wa.me/?text=" + encodeURIComponent(texto);
-    window.open(url, "_blank", "noopener,noreferrer");
-};
-
-async function registarPedidoAtivacaoFABEF(tipo, valor) {
-    if (!FABEF.empresaId || !FABEF.user) {
-        throw new Error("É necessário estar autenticado para enviar o pedido.");
-    }
-
-    const dados = {
-        tipo: tipo,
-        valor: String(valor || "").trim(),
-        estado: "PENDENTE",
-        empresaId: FABEF.empresaId,
-        utilizadorId: FABEF.user.uid,
-        utilizadorNome: FABEF.userData?.nome || FABEF.user.email || "",
-        data: new Date().toISOString(),
-        criadoEm: serverTimestamp(),
-        origem: "FABEF ERP PRO - painel de subscrição"
-    };
-
-    await addDoc(subRef("pagamentos"), dados);
-    return dados;
-}
-
-window.submeterComprovativoPagamento = async function() {
-    const input = document.getElementById("subscricao-ref-sms");
-    const valor = (input?.value || "").trim();
-
-    if (!valor) {
-        alert("Introduza o código da transação recebido por SMS.");
-        input?.focus();
-        return;
-    }
-
-    const botao = input?.closest(".card")?.querySelector("button");
-    try {
-        if (botao) botao.disabled = true;
-        await registarPedidoAtivacaoFABEF("CODIGO_TRANSACAO", valor);
-        await gravarAuditoria("Enviou código de transação para validação da subscrição.", "INFO");
-        if (input) input.value = "";
-        alert("✅ Código registado para verificação. A ativação será feita após a confirmação do pagamento.");
-    } catch (error) {
-        console.error("Erro ao registar código de pagamento:", error);
-        alert("Não foi possível registar o código.\n\n" + mensagemFirebase(error));
-    } finally {
-        if (botao) botao.disabled = false;
-    }
-};
-
-window.ativarLicencaPorChave = async function() {
-    const input = document.getElementById("subscricao-chave-licenca");
-    const valor = (input?.value || "").trim().toUpperCase();
-
-    if (!valor) {
-        alert("Introduza a chave de licença.");
-        input?.focus();
-        return;
-    }
-
-    if (valor.length < 6) {
-        alert("A chave de licença parece incompleta. Verifique o código recebido.");
-        input?.focus();
-        return;
-    }
-
-    const botao = input?.closest(".card")?.querySelector("button");
-    try {
-        if (botao) botao.disabled = true;
-        await registarPedidoAtivacaoFABEF("CHAVE_LICENCA", valor);
-        await gravarAuditoria("Enviou chave de licença para validação.", "INFO");
-        if (input) input.value = "";
-        alert("✅ Chave enviada para validação. A licença será ativada após a confirmação.");
-    } catch (error) {
-        console.error("Erro ao registar chave de licença:", error);
-        alert("Não foi possível registar a chave.\n\n" + mensagemFirebase(error));
-    } finally {
-        if (botao) botao.disabled = false;
-    }
-}
-
-
 
 document.getElementById("btn-cadastrar-funcionario")?.addEventListener("click", cadastrarNovoFuncionario);
 
