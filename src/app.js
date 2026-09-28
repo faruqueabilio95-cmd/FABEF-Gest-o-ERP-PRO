@@ -728,6 +728,11 @@ function toast(msg) {
 window.fecharModal = function (id) {
     document.getElementById(id)?.classList.remove("show");
 };
+// Estava em falta e é usada pelo fecho de caixa (abrirModalFecharCaixaCego).
+window.abrirModal = function (id) {
+    document.getElementById(id)?.classList.add("show");
+};
+var abrirModal = window.abrirModal;
 
 
 /* =====================================================
@@ -1297,7 +1302,9 @@ document.getElementById("btn-pin-sair")?.addEventListener("click", async () => {
 });
 
 // Gravação de PIN no Modal
+let FABEF_pinAGuardar = false;
 async function salvarNovoPin() {
+    if (FABEF_pinAGuardar) return;
     const inpNovo = document.getElementById("input-novo-pin");
     const inpConf = document.getElementById("input-confirmar-pin");
     const status = document.getElementById("status-config-pin");
@@ -1323,6 +1330,7 @@ async function salvarNovoPin() {
         return;
     }
 
+    FABEF_pinAGuardar = true;
     try {
         const hash = await calcularHashPin(p1);
         const user = auth.currentUser || FABEF.user;
@@ -1365,7 +1373,7 @@ async function salvarNovoPin() {
             configPinEstado.style.color = "#16a34a";
         }
 
-        await gravarAuditoria("Definiu/atualizou o seu código PIN de segurança pessoal.", "INFO");
+        try { await gravarAuditoria("Definiu/atualizou o seu código PIN de segurança pessoal.", "INFO"); } catch (_) {}
         alert("✅ Código PIN configurado com sucesso!\nO seu aplicativo agora está 100% protegido. O novo PIN será solicitado ao suspender ou reabrir.");
     } catch (err) {
         console.error("Erro ao guardar PIN:", err);
@@ -1373,10 +1381,13 @@ async function salvarNovoPin() {
             status.textContent = "Erro ao guardar PIN: " + err.message;
             status.style.color = "#dc2626";
         }
+    } finally {
+        FABEF_pinAGuardar = false;
     }
 }
 window.salvarNovoPin = salvarNovoPin;
-document.getElementById("btn-salvar-pin")?.addEventListener("click", window.salvarNovoPin);
+// O botão "btn-salvar-pin" já chama window.salvarNovoPin() no onclick do index.html.
+// Não ligar um segundo ouvinte aqui: isso fazia o PIN ser gravado duas vezes por clique.
 
 // Bloqueio por PIN ao minimizar a aplicação ou suspender o telemóvel
 let appFoiMinimizada = false;
@@ -1746,8 +1757,26 @@ function abrirAplicacao() {
    stock, funcionários e vê relatórios — mas Não regista vendas.
    Só as contas de funcionário têm acesso à página "Vender".
 ===================================================== */
+// Secções que o FUNCIONÁRIO pode abrir (tudo o resto é exclusivo do gerente):
+//  Operações & Comercial: pos, vendas, caixa, despesas, clientes, dividas, encomendas
+//  Stock: produtos, inventario, compras, fornecedores
+//  Gestão & Relatórios: relatorios, metas, dispensas, sugestoes
+//  Configurações: despesas, dispensas (+ Definir/Alterar PIN e Alterar Senha, que são modais)
+const SECOES_FUNCIONARIO = [
+    "inicio",
+    "pos", "vendas", "caixa", "despesas", "clientes", "dividas", "encomendas",
+    "produtos", "inventario", "compras", "fornecedores",
+    "relatorios", "metas", "dispensas", "sugestoes"
+];
+
 function aplicarRestricoesDeAcessoPorPapel() {
     const ehGerente = ehUsuarioGerente();
+
+    // Regra geral: ao funcionário, esconde todo o botão de menu que não esteja na lista permitida
+    document.querySelectorAll(".sidebar button[data-sec]").forEach(btn => {
+        const permitido = ehGerente || SECOES_FUNCIONARIO.includes(btn.dataset.sec);
+        btn.style.display = permitido ? "" : "none";
+    });
 
     // 1. ABA DE OPERAÇÕES & COMÉRCIO (Visível para Funcionário e Gerente)
     // POS (Vender), Vendas, Caixa / Turnos, Despesas, Clientes, Fiado / Dívidas, Encomendas
@@ -1783,10 +1812,8 @@ function aplicarRestricoesDeAcessoPorPapel() {
     // 4. ABA DE CONFIGURAÇÕES & SISTEMA
     // Botão de Configurações, Definir PIN, Despesas do Negócio e Dispensas ficam visíveis para Funcionário e Gerente
     document.querySelectorAll('.sidebar button[data-sec="config"]').forEach(btn => {
-        btn.style.display = "";
+        btn.style.display = ehGerente ? "" : "none";
     });
-    const btnMenuPin = document.getElementById("btn-sidebar-menu-pin");
-    if (btnMenuPin) btnMenuPin.style.display = "";
 
     // Itens de Configuração Reservados EXCLUSIVAMENTE ao Gerente:
     // Equipa & Vales Salariais, Ramos, Auditoria e Subscrição
@@ -1798,8 +1825,15 @@ function aplicarRestricoesDeAcessoPorPapel() {
 
     // Todos os grupos (details) da sidebar ficam visíveis
     document.querySelectorAll(".sidebar details").forEach(det => {
-        det.style.display = "";
+        const temVisivel = Array.from(det.querySelectorAll("button")).some(b => b.style.display !== "none");
+        det.style.display = temVisivel ? "" : "none";
     });
+
+    // Informação de administração da conta (ID da empresa, ramo activo) só para o gerente
+    const kpiIdEmpresa = document.getElementById("inicio-id-empresa")?.closest(".kpi");
+    if (kpiIdEmpresa) kpiIdEmpresa.style.display = ehGerente ? "" : "none";
+    const kpiRamoInicio = document.getElementById("inicio-ramo")?.closest(".kpi");
+    if (kpiRamoInicio) kpiRamoInicio.style.display = ehGerente ? "" : "none";
 
     // 5. NA ABA GERAL DE CONFIGURAÇÕES (sec-config):
     // Para o funcionário, a aba Geral tem uma única função: Definir / Alterar o PIN e senha pessoal
@@ -1933,8 +1967,7 @@ document.addEventListener("click", (e) => {
 });
 
 function mostrarSecao(nome) {
-    const secoesApenasGerente = ["lucro", "funcionarios", "ramos", "auditoria", "subscricao", "desempenho"];
-    if (!ehUsuarioGerente() && secoesApenasGerente.includes(nome)) {
+    if (!ehUsuarioGerente() && !SECOES_FUNCIONARIO.includes(nome)) {
         nome = "inicio";
     }
 
@@ -3317,6 +3350,11 @@ function renderCompras() {
     const tabelaCorpo = document.getElementById("tabela-compras");
     if (!tabelaCorpo) return;
 
+    // Só o gerente pode editar ou apagar compras
+    const podeGerir = ehUsuarioGerente();
+    const thAcoes = document.getElementById("th-acoes-compras");
+    if (thAcoes) thAcoes.style.display = podeGerir ? "" : "none";
+
     tabelaCorpo.innerHTML = lista.map(c => `
     <tr>
         <td>${dataTexto(c.data)}</td>
@@ -3325,10 +3363,14 @@ function renderCompras() {
         <td>${numero(c.quantidade)}</td>
         <td>${dinheiro(c.custoUnitario)}</td>
         <td>${dinheiro(numero(c.quantidade) * numero(c.custoUnitario))}</td>
+        ${podeGerir ? `<td style="white-space:nowrap;">
+            <button type="button" class="btn btn-small" onclick="window.abrirModalEditarCompra('${c.id}')" style="width:auto;padding:5px 10px;font-size:12px;">✏️ Editar</button>
+            <button type="button" class="btn btn-small btn-danger" onclick="window.apagarCompra('${c.id}')" style="width:auto;padding:5px 10px;font-size:12px;">🗑️ Apagar</button>
+        </td>` : ""}
     </tr>
     `).join("") || `
     <tr>
-        <td colspan="6" style="text-align: center; color: #64748b;">
+        <td colspan="${podeGerir ? 7 : 6}" style="text-align: center; color: #64748b;">
             Nenhuma operação de compra registada para este negócio.
         </td>
     </tr>
@@ -3336,6 +3378,191 @@ function renderCompras() {
 
     if (typeof renderSugestoesComprasRamo === "function") renderSugestoesComprasRamo();
 }
+
+
+/* =====================================================
+   EDITAR / APAGAR COMPRAS (exclusivo do gerente)
+   Ajusta automaticamente o stock do produto e a dívida
+   do fornecedor quando a compra foi a crédito.
+===================================================== */
+function compraRef(id) {
+    return doc(db, "empresas", FABEF.empresaId, "compras", id);
+}
+
+async function ajustarDividaFornecedorPorNome(nome, delta, ramo) {
+    if (!nome || !delta) return;
+    const forn = FABEF.fornecedores.find(f => (f.nome || "").toLowerCase() === String(nome).toLowerCase());
+    if (forn) {
+        const novaDivida = Math.max(0, numero(forn.divida) + delta);
+        await updateDoc(doc(db, "empresas", FABEF.empresaId, "fornecedores", forn.id), {
+            divida: novaDivida,
+            atualizadoEm: serverTimestamp()
+        });
+        forn.divida = novaDivida;
+    } else if (delta > 0) {
+        const payload = {
+            nome: nome,
+            telefone: "",
+            observacao: "Criado automaticamente a partir de uma compra a crédito.",
+            divida: delta,
+            ramo: ramo || FABEF.ramo,
+            criadoPor: FABEF.user?.uid || "",
+            data: new Date().toISOString(),
+            criadoEm: serverTimestamp()
+        };
+        const ref = await addDoc(subRef("fornecedores"), payload);
+        FABEF.fornecedores.push({ id: ref.id, ...payload });
+    }
+}
+
+function custoDaCompraMaisRecente(produtoId, ignorarId) {
+    const restantes = FABEF.compras
+        .filter(x => x.produtoId === produtoId && x.id !== ignorarId)
+        .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+    return restantes.length ? numero(restantes[0].custoUnitario) : null;
+}
+
+window.abrirModalEditarCompra = function (id) {
+    if (!ehUsuarioGerente()) {
+        alert("Operação negada: apenas o gerente pode editar compras.");
+        return;
+    }
+    const c = FABEF.compras.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById("edit-compra-id").value = c.id;
+    document.getElementById("edit-compra-produto-nome").textContent = "Produto: " + (c.produtoNome || "—");
+    document.getElementById("edit-compra-fornecedor").value = c.fornecedorNome || "";
+    document.getElementById("edit-compra-quantidade").value = numero(c.quantidade);
+    document.getElementById("edit-compra-custo").value = numero(c.custoUnitario);
+    document.getElementById("edit-compra-pagamento").value = c.pagamento === "Credito" ? "Credito" : "Dinheiro";
+    document.getElementById("modal-editar-compra")?.classList.add("show");
+};
+
+let FABEF_compraAGuardar = false;
+window.salvarEdicaoCompra = async function () {
+    if (FABEF_compraAGuardar) return;
+    if (!ehUsuarioGerente()) {
+        alert("Operação negada: apenas o gerente pode editar compras.");
+        return;
+    }
+    const id = document.getElementById("edit-compra-id").value;
+    const c = FABEF.compras.find(x => x.id === id);
+    if (!c) return;
+
+    const fornecedor = document.getElementById("edit-compra-fornecedor").value.trim();
+    const quantidade = numero(document.getElementById("edit-compra-quantidade").value);
+    const custo = numero(document.getElementById("edit-compra-custo").value);
+    const pagamento = document.getElementById("edit-compra-pagamento").value === "Credito" ? "Credito" : "Dinheiro";
+
+    if (!fornecedor || quantidade <= 0 || custo < 0) {
+        alert("Preencha correctamente o fornecedor, a quantidade (maior que 0) e o custo.");
+        return;
+    }
+
+    const qtdAntiga = numero(c.quantidade);
+    const custoAntigo = numero(c.custoUnitario);
+    const delta = quantidade - qtdAntiga;
+    const produto = FABEF.produtos.find(p => p.id === c.produtoId);
+
+    if (produto && numero(produto.stock) + delta < 0) {
+        if (!confirm(`Atenção: esta alteração deixa o stock de "${produto.nome}" negativo (${numero(produto.stock) + delta}), porque parte da mercadoria já foi vendida.\n\nDeseja continuar mesmo assim?`)) return;
+    }
+
+    FABEF_compraAGuardar = true;
+    try {
+        // 1) Dívida ao fornecedor: desfaz o efeito antigo e aplica o novo
+        const creditoAntigo = c.pagamento === "Credito" ? qtdAntiga * custoAntigo : 0;
+        const creditoNovo = pagamento === "Credito" ? quantidade * custo : 0;
+        if ((c.fornecedorNome || "").toLowerCase() === fornecedor.toLowerCase()) {
+            await ajustarDividaFornecedorPorNome(fornecedor, creditoNovo - creditoAntigo, c.ramo);
+        } else {
+            await ajustarDividaFornecedorPorNome(c.fornecedorNome, -creditoAntigo, c.ramo);
+            await ajustarDividaFornecedorPorNome(fornecedor, creditoNovo, c.ramo);
+        }
+
+        // 2) Stock e custo do produto
+        if (produto) {
+            const outrasDoProduto = FABEF.compras.filter(x => x.produtoId === c.produtoId && x.id !== id);
+            const maisRecenteOutras = outrasDoProduto.reduce((m, x) => Math.max(m, new Date(x.data || 0).getTime()), 0);
+            const ehMaisRecente = outrasDoProduto.length === 0 || new Date(c.data || 0).getTime() >= maisRecenteOutras;
+            const upd = { atualizadoEm: serverTimestamp() };
+            if (delta !== 0) upd.stock = increment(delta);
+            if (ehMaisRecente) upd.custo = custo;
+            await updateDoc(produtoRef(c.produtoId), upd);
+            produto.stock = numero(produto.stock) + delta;
+            if (ehMaisRecente) produto.custo = custo;
+        }
+
+        // 3) A própria compra
+        await updateDoc(compraRef(id), {
+            quantidade,
+            custoUnitario: custo,
+            fornecedorNome: fornecedor,
+            pagamento,
+            editadoPor: FABEF.user?.uid || "",
+            atualizadoEm: serverTimestamp()
+        });
+        c.quantidade = quantidade;
+        c.custoUnitario = custo;
+        c.fornecedorNome = fornecedor;
+        c.pagamento = pagamento;
+
+        fecharModal("modal-editar-compra");
+        renderTudo();
+        try {
+            await gravarAuditoria(`Editou a compra de "${c.produtoNome}": ${qtdAntiga} → ${quantidade} un., custo ${custoAntigo} → ${custo}.`, "INFO");
+        } catch (_) {}
+        alert("Compra atualizada com sucesso. Stock e dívida do fornecedor foram ajustados.");
+    } catch (error) {
+        console.error("Erro ao editar compra:", error);
+        alert("Erro ao editar a compra:\n" + mensagemFirebase(error));
+    } finally {
+        FABEF_compraAGuardar = false;
+    }
+};
+
+window.apagarCompra = async function (id) {
+    if (!ehUsuarioGerente()) {
+        alert("Operação negada: apenas o gerente pode apagar compras.");
+        return;
+    }
+    const c = FABEF.compras.find(x => x.id === id);
+    if (!c) return;
+    const qtd = numero(c.quantidade);
+    const total = qtd * numero(c.custoUnitario);
+    const produto = FABEF.produtos.find(p => p.id === c.produtoId);
+
+    let msg = `Apagar a compra de ${qtd} un. de "${c.produtoNome}"?\n\nO stock do produto vai diminuir ${qtd} unidade(s)`;
+    msg += c.pagamento === "Credito" ? ` e a dívida ao fornecedor "${c.fornecedorNome}" diminui ${dinheiro(total)}.` : ".";
+    if (produto && numero(produto.stock) - qtd < 0) {
+        msg += `\n\n⚠️ O stock ficará negativo (${numero(produto.stock) - qtd}), porque parte desta mercadoria já foi vendida.`;
+    }
+    if (!confirm(msg)) return;
+
+    try {
+        if (c.pagamento === "Credito") {
+            await ajustarDividaFornecedorPorNome(c.fornecedorNome, -total, c.ramo);
+        }
+        if (produto) {
+            const custoAnterior = custoDaCompraMaisRecente(c.produtoId, id);
+            const upd = { stock: increment(-qtd), atualizadoEm: serverTimestamp() };
+            if (custoAnterior !== null) upd.custo = custoAnterior;
+            await updateDoc(produtoRef(c.produtoId), upd);
+            produto.stock = numero(produto.stock) - qtd;
+            if (custoAnterior !== null) produto.custo = custoAnterior;
+        }
+        await deleteDoc(compraRef(id));
+        FABEF.compras = FABEF.compras.filter(x => x.id !== id);
+        renderTudo();
+        try {
+            await gravarAuditoria(`Apagou a compra de ${qtd} un. de "${c.produtoNome}" (${dinheiro(total)}).`, "ALERTA");
+        } catch (_) {}
+        alert("Compra apagada. O stock e a dívida do fornecedor foram corrigidos.");
+    } catch (error) {
+        console.error("Erro ao apagar compra:", error);
+        alert("Erro ao apagar a compra:\n" + mensagemFirebase(error));
+    }
+};
 
 
 /* =====================================================
@@ -7767,9 +7994,6 @@ document.getElementById("btn-copiar-dados-empresa")?.addEventListener("click", (
 });
 
 document.getElementById("btn-guardar-config").addEventListener("click", guardarConfiguracoes);
-document.getElementById("btn-alterar-pin")?.addEventListener("click", () => {
-    abrirModalDefinirPin();
-});
 
 async function guardarConfiguracoes() {
     if (!ehUsuarioGerente()) {
@@ -11097,15 +11321,8 @@ document.getElementById("btn-recibo-fechar")?.addEventListener("click", () => {
     fecharModal("modal-recibo-sucesso");
 });
 
-// Suporte para o funcionário ou gerente definir/alterar o PIN a partir da barra lateral (menu 3 pontos)
-document.getElementById("btn-sidebar-definir-pin")?.addEventListener("click", () => {
-    fecharMenuLateral();
-    abrirModalDefinirPin();
-});
-document.getElementById("btn-sidebar-menu-pin")?.addEventListener("click", () => {
-    fecharMenuLateral();
-    abrirModalDefinirPin();
-});
+// O PIN tem UM só ponto de entrada: o botão "Definir / Alterar PIN" do grupo Configurações
+// (btn-sidebar-definir-pin), que chama window.abrirModalDefinirPin() no próprio onclick.
 
 // Suporte para abrir o modal de alteração de senha a partir da barra lateral (MANTIDO RIGOROSAMENTE)
 document.getElementById("btn-sidebar-alterar-senha")?.addEventListener("click", () => {
