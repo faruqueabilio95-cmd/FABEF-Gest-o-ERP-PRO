@@ -242,6 +242,10 @@ window.FABEF = {
     listeners: []
 };
 
+// Estado do relatório: deve existir desde o início do módulo,
+// antes de qualquer possível renderização da aplicação.
+let FABEF_RELATORIO_ATUAL = null;
+
 /* =====================================================
    HELPER DE AUTORIZAÇÃO: VERIFICA SE É GERENTE / ADMIN
 ===================================================== */
@@ -7243,11 +7247,6 @@ document.getElementById("btn-atualizar-relatorio").addEventListener("click", ren
 document.getElementById("relatorio-periodo").addEventListener("change", renderRelatorios);
 
 
-// Estado do relatório deve existir ANTES de qualquer renderização da SPA.
-// O módulo é carregado como ES module e algumas rotinas podem disparar
-// renderTudo() muito cedo; declarar aqui evita erro de Temporal Dead Zone.
-let FABEF_RELATORIO_ATUAL = null;
-
 function renderRelatorios() {
     const periodo = document.getElementById("relatorio-periodo").value;
     let inicio = null;
@@ -8726,6 +8725,7 @@ function verificarSubscricao(){
     FABEF_LICENCA_BLOQUEADA = false; // o plano grátis nunca bloqueia tudo, só limita
     renderAvisoPlano();
 }
+window.verificarSubscricao = verificarSubscricao;
 
 let FABEF_LICENCA_BLOQUEADA = false;
 
