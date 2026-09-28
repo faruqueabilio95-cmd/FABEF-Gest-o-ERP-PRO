@@ -242,10 +242,6 @@ window.FABEF = {
     listeners: []
 };
 
-// Estado do relatório: deve existir desde o início do módulo,
-// antes de qualquer possível renderização da aplicação.
-let FABEF_RELATORIO_ATUAL = null;
-
 /* =====================================================
    HELPER DE AUTORIZAÇÃO: VERIFICA SE É GERENTE / ADMIN
 ===================================================== */
@@ -7247,6 +7243,8 @@ document.getElementById("btn-atualizar-relatorio").addEventListener("click", ren
 document.getElementById("relatorio-periodo").addEventListener("change", renderRelatorios);
 
 
+let FABEF_RELATORIO_ATUAL = null;
+
 function renderRelatorios() {
     const periodo = document.getElementById("relatorio-periodo").value;
     let inicio = null;
@@ -8725,7 +8723,6 @@ function verificarSubscricao(){
     FABEF_LICENCA_BLOQUEADA = false; // o plano grátis nunca bloqueia tudo, só limita
     renderAvisoPlano();
 }
-window.verificarSubscricao = verificarSubscricao;
 
 let FABEF_LICENCA_BLOQUEADA = false;
 
@@ -11485,3 +11482,89 @@ document.getElementById("btn-abrir-sugestoes")?.addEventListener("click", () => 
     window.atualizarDiagnosticoEmpresa();
 });
 
+
+window.executarLogin = executarLogin;
+
+window.criarConta = criarConta;
+
+window.abrirCaixa = abrirCaixa;
+
+window.entrarModoDemo = entrarModoDemo;
+
+
+/* =====================================================
+   PONTE DOS BOTÕES DE SUBSCRIÇÃO / ATIVAÇÃO
+   Estes botões são chamados pelo HTML através de onclick.
+   A ativação real continua dependente de validação do pagamento/chave.
+===================================================== */
+async function registarPedidoAtivacaoFABEF(tipo, valor) {
+    const empresaId = FABEF.empresaId || null;
+    const dados = {
+        tipo,
+        valor: Number(valor) || 250,
+        estado: "PENDENTE",
+        empresaId,
+        ramo: FABEF.ramo || "",
+        uid: FABEF.user?.uid || null,
+        email: FABEF.user?.email || null,
+        criadoEm: serverTimestamp(),
+        origem: "BOTAO_SUBSCRICAO"
+    };
+
+    try {
+        if (!FABEF.isDemoMode && db && empresaId) {
+            await addDoc(collection(db, "empresas", empresaId, "pagamentos"), dados);
+        }
+        return true;
+    } catch (e) {
+        console.warn("Não foi possível registar o pedido de ativação:", e);
+        return false;
+    }
+}
+
+window.abrirWhatsAppSuporteAtivacao = function () {
+    const ref = (document.getElementById("subscricao-ref-sms")?.value || "").trim();
+    const texto = encodeURIComponent(
+        `Olá. Pretendo ativar o FABEF ERP PRO por 250 MT.\n` +
+        `Empresa: ${FABEF.empresa?.nome || "Não informado"}\n` +
+        (ref ? `Referência: ${ref}\n` : "") +
+        `Enviarei o comprovativo para validação.`
+    );
+    const url = `https://wa.me/?text=${texto}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+};
+
+window.submeterComprovativoPagamento = async function () {
+    const input = document.getElementById("subscricao-ref-sms");
+    const ref = (input?.value || "").trim();
+    if (!ref) {
+        alert("Introduza o código de transação recebido por SMS.");
+        input?.focus();
+        return;
+    }
+    const ok = await registarPedidoAtivacaoFABEF("CODIGO_TRANSACAO", 250);
+    if (ok) {
+        await gravarAuditoria(`Pedido de ativação enviado com referência ${ref}.`, "INFO");
+        alert("Código registado. A ativação ficará pendente de validação do pagamento.");
+    } else {
+        alert("Não foi possível registar o pedido neste momento. Verifique a ligação à internet e tente novamente.");
+    }
+};
+
+window.ativarLicencaPorChave = async function () {
+    const input = document.getElementById("subscricao-chave-licenca");
+    const chave = (input?.value || "").trim().toUpperCase();
+    if (!chave) {
+        alert("Introduza a chave de licença.");
+        input?.focus();
+        return;
+    }
+    const ok = await registarPedidoAtivacaoFABEF("CHAVE_LICENCA", 250);
+    if (ok) {
+        await gravarAuditoria(`Pedido de validação de chave de licença ${chave}.`, "INFO");
+        alert("Chave enviada para validação. A licença só será ativada após confirmação válida.");
+    } else {
+        alert("Não foi possível registar o pedido neste momento. Verifique a ligação à internet e tente novamente.");
+    }
+};
+window.verificarSubscricao = verificarSubscricao;
