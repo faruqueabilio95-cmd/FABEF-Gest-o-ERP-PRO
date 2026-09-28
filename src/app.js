@@ -242,6 +242,8 @@ window.FABEF = {
     listeners: []
 };
 
+let FABEF_RELATORIO_ATUAL = null;
+
 /* =====================================================
    HELPER DE AUTORIZAÇÃO: VERIFICA SE É GERENTE / ADMIN
 ===================================================== */
@@ -992,6 +994,7 @@ async function criarConta() {
 }
 
 async function limparEstadoFABEF() {
+    FABEF_arranqueEmCurso = false;
     if (FABEF.listeners && FABEF.listeners.length) {
         FABEF.listeners.forEach(unsub => {
             try { if (typeof unsub === "function") unsub(); } catch (_) {}
@@ -1034,15 +1037,21 @@ async function iniciarSessaoFABEF(user) {
     const loginStatus = elAuth("login-status");
     try {
         FABEF.user = user;
-        if (loginStatus) loginStatus.textContent = "â³ A carregar a empresa...";
+        if (loginStatus) {
+            loginStatus.textContent = "⏳ A preparar o painel...";
+            loginStatus.style.color = "#10b981";
+        }
 
-        // Não existe fallback para perfil inexistente.
+        // Carrega o perfil e a empresa para determinar as permissões
         await carregarPerfil(user);
         await carregarEmpresa();
-        await carregarDados();
 
+        // Abre o painel imediatamente para o utilizador aceder sem esperas
         abrirAplicacao();
         FABEF.carregado = true;
+
+        // Carrega os dados em segundo plano com escutas em tempo real
+        carregarDados().catch(e => console.warn("Aviso no carregamento secundário de dados:", e));
     } catch (error) {
         console.error("Erro crítico ao iniciar a aplicação:", error);
         const mensagem = mensagemFirebase(error);
@@ -1053,8 +1062,6 @@ async function iniciarSessaoFABEF(user) {
             regStatus.textContent = "🔴 Não foi possível carregar a empresa: " + mensagem;
         }
 
-        // Mantém a sessão autenticada para permitir diagnóstico/retry.
-        // Não usamos signOut() aqui, porque um erro do Firestore não significa senha inválida.
         FABEF.carregado = false;
         elAuth("app")?.classList.add("hidden");
         if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
@@ -1407,10 +1414,20 @@ document.getElementById("btn-testar-bloqueio")?.addEventListener("click", () => 
 
 onAuthStateChanged(auth, async user => {
     if (!user) {
+        FABEF_arranqueEmCurso = false;
         await limparEstadoFABEF();
         esconderEcraPin();
         if (elAuth("app")) elAuth("app").classList.add("hidden");
-        if (elAuth("tela-login")) elAuth("tela-login").style.display = "flex";
+        const telaLogin = elAuth("tela-login");
+        if (telaLogin) telaLogin.style.display = "flex";
+        elAuth("login-form")?.classList.remove("hidden");
+        elAuth("registo-form")?.classList.add("hidden");
+        const status = elAuth("login-status");
+        if (status) status.textContent = "";
+        const btnLogin = elAuth("btn-login");
+        if (btnLogin) btnLogin.disabled = false;
+        const senhaInput = elAuth("login-senha");
+        if (senhaInput) senhaInput.value = "";
         return;
     }
 
@@ -1425,23 +1442,9 @@ onAuthStateChanged(auth, async user => {
     // Esperamos a conclusão de criarConta() para evitar uma corrida de inicialização.
     if (FABEF_registoEmCurso) return;
 
-    // VERIFICAÇÃO DE SEGURANÇA OBRIGATÓRIA NO TELEMÓVEL:
-    // Se a sessão já foi validada nesta aba/sessão (acabou de fazer login com senha ou digitou o PIN), abre
-    const sessaoDesbloqueada = sessionStorage.getItem("fabef_sessao_desbloqueada") === "true";
-    if (sessaoDesbloqueada) {
-        await iniciarSessaoFABEF(user);
-        return;
-    }
-
-    // Caso contrário (aplicação reaberta no telemóvel, PWA iniciada ou reiniciada):
-    // EXIGE O PIN OU CONFIGURAÇÃO IMEDIATA DO PIN
-    const hashGuardado = localStorage.getItem(chavePinLocal(user.uid));
-    if (hashGuardado) {
-        mostrarEcraPin(user);
-    } else {
-        // Ainda não configurou o PIN: exige configuração para proteger o telemóvel
-        mostrarModalConfigurarPin(user, true);
-    }
+    // Inicia a sessão diretamente para o utilizador autenticado
+    sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
+    await iniciarSessaoFABEF(user);
 });
 
 async function carregarPerfil(user) {
@@ -1744,144 +1747,122 @@ function abrirAplicacao() {
    Só as contas de funcionário têm acesso à página "Vender".
 ===================================================== */
 function aplicarRestricoesDeAcessoPorPapel() {
-    let perfil = "gerente";
-    if (window.FABEF?.isDemoMode) {
-        perfil = window.FABEF.demoPerfil || "gerente";
-    } else if (FABEF.userData) {
-        perfil = FABEF.userData.perfil || FABEF.userData.role || "gerente";
-    }
-    const ehGerenteLogado = perfil === "gerente";
+    const ehGerente = ehUsuarioGerente();
 
-    // Botão de Vender (POS) no menu lateral
-    const botaoVender = document.querySelector('.sidebar button[data-sec="pos"]');
-    if (botaoVender) {
-        botaoVender.style.display = "";
-        botaoVender.title = ehGerenteLogado ? "Supervisão do POS (O Gerente não vende)" : "Efetuar Vendas de Balcão";
-    }
-
-    // Secções estritamente reservadas ao Gerente:
-    // O funcionário Não PODE ver nem alterar os ramos que o gerente está a gerir,
-    // nem compras, relatórios, metas, funcionários, subscrição, etc.
-    const secoesReservadasAoGerente = ["lucro", "ramos", "compras", "relatorios", "metas", "desempenho", "funcionarios", "auditoria", "subscricao", "config"];
-    secoesReservadasAoGerente.forEach(sec => {
-        const botao = document.querySelector(`.sidebar button[data-sec="${sec}"]`);
-        if (botao) botao.style.display = ehGerenteLogado ? "" : "none";
+    // 1. ABA DE OPERAÇÕES & COMÉRCIO (Visível para Funcionário e Gerente)
+    // POS (Vender), Vendas, Caixa / Turnos, Despesas, Clientes, Fiado / Dívidas, Encomendas
+    ["pos", "vendas", "caixa", "despesas", "clientes", "dividas", "encomendas"].forEach(sec => {
+        document.querySelectorAll(`.sidebar button[data-sec="${sec}"]`).forEach(btn => {
+            btn.style.display = "";
+        });
     });
 
-    // Botões de Caixa e Despesas (Operações) ficam sempre visíveis para o Funcionário
-    const botaoDespesas = document.querySelector('.sidebar button[data-sec="despesas"]');
-    if (botaoDespesas) botaoDespesas.style.display = "";
-
-    const botaoCaixa = document.querySelector('.sidebar button[data-sec="caixa"]');
-    if (botaoCaixa) botaoCaixa.style.display = "";
-
-    // Banner de supervisão na secção de despesas
-    const avisoDespGerente = document.getElementById("aviso-despesas-gerente");
-    if (avisoDespGerente) avisoDespGerente.style.display = ehGerenteLogado ? "block" : "none";
-
-    // Configuração só existe dentro do menu dos 3 pontos e só para o Gerente.
-    document.querySelectorAll('[data-sec="config"]').forEach(el => {
-        el.style.display = ehGerenteLogado ? "" : "none";
+    // 2. ABA DE STOCK (Visível para Funcionário e Gerente)
+    // Produtos, Inventário, Compras, Fornecedores
+    ["produtos", "inventario", "compras", "fornecedores"].forEach(sec => {
+        document.querySelectorAll(`.sidebar button[data-sec="${sec}"]`).forEach(btn => {
+            btn.style.display = "";
+        });
     });
-    const secConfig = document.getElementById("sec-config");
-    if (secConfig && !ehGerenteLogado) secConfig.classList.remove("active");
 
-    // Oculta grupos inteiros da sidebar (details) para o funcionário
+    // 3. ABA DE GESTÃO & RELATÓRIOS
+    // Para Funcionário: Relatórios, Metas, Dispensas e Sugestões
+    ["relatorios", "metas", "dispensas", "sugestoes"].forEach(sec => {
+        document.querySelectorAll(`.sidebar button[data-sec="${sec}"]`).forEach(btn => {
+            btn.style.display = "";
+        });
+    });
+    // Reservado EXCLUSIVAMENTE ao Gerente em Gestão & Relatórios:
+    // Lucro Real (DRE) e Desempenho individual
+    ["lucro", "desempenho"].forEach(sec => {
+        document.querySelectorAll(`.sidebar button[data-sec="${sec}"]`).forEach(btn => {
+            btn.style.display = ehGerente ? "" : "none";
+        });
+    });
+
+    // 4. ABA DE CONFIGURAÇÕES & SISTEMA
+    // Botão de Configurações, Definir PIN, Despesas do Negócio e Dispensas ficam visíveis para Funcionário e Gerente
+    document.querySelectorAll('.sidebar button[data-sec="config"]').forEach(btn => {
+        btn.style.display = "";
+    });
+    const btnMenuPin = document.getElementById("btn-sidebar-menu-pin");
+    if (btnMenuPin) btnMenuPin.style.display = "";
+
+    // Itens de Configuração Reservados EXCLUSIVAMENTE ao Gerente:
+    // Equipa & Vales Salariais, Ramos, Auditoria e Subscrição
+    ["funcionarios", "ramos", "auditoria", "subscricao"].forEach(sec => {
+        document.querySelectorAll(`.sidebar button[data-sec="${sec}"]`).forEach(btn => {
+            btn.style.display = ehGerente ? "" : "none";
+        });
+    });
+
+    // Todos os grupos (details) da sidebar ficam visíveis
     document.querySelectorAll(".sidebar details").forEach(det => {
-        const summaryText = det.querySelector("summary")?.textContent || "";
-        if (summaryText.includes("Administração") || summaryText.includes("Gestão")) {
-            det.style.display = ehGerenteLogado ? "" : "none";
-        }
+        det.style.display = "";
     });
 
-    // Seletor de Ramos de atividade: funcionário não pode ver nem alternar ramos
+    // 5. NA ABA GERAL DE CONFIGURAÇÕES (sec-config):
+    // Para o funcionário, a aba Geral tem uma única função: Definir / Alterar o PIN e senha pessoal
+    const blocoRamosConfig = document.getElementById("config-ramos-tabs-bar")?.closest(".card");
+    const avisoRamoConfig = document.getElementById("aviso-config-ramo-ativo");
+    const cardDadosRamo = document.getElementById("config-titulo-ramo")?.closest(".card");
+    if (blocoRamosConfig) blocoRamosConfig.style.display = ehGerente ? "block" : "none";
+    if (avisoRamoConfig) avisoRamoConfig.style.display = ehGerente ? "flex" : "none";
+    if (cardDadosRamo) cardDadosRamo.style.display = ehGerente ? "block" : "none";
+
+    // Garante que o card de PIN, Senha e PWA fica sempre visível e funcional para o funcionário
+    const cardPinConfig = document.getElementById("btn-alterar-pin")?.closest(".card");
+    if (cardPinConfig) {
+        cardPinConfig.style.display = "block";
+    }
+
+    // Seletor de Ramos de atividade no cabeçalho e inventário: apenas gerente pode alternar ramos
     const seletorRamoProdutos = document.getElementById("select-ramo");
-    if (seletorRamoProdutos) seletorRamoProdutos.style.display = ehGerenteLogado ? "" : "none";
-
+    if (seletorRamoProdutos) seletorRamoProdutos.style.display = ehGerente ? "" : "none";
     const bannerRamoInicio = document.getElementById("inicio-ramo");
-    if (bannerRamoInicio) bannerRamoInicio.style.display = ehGerenteLogado ? "" : "none";
+    if (bannerRamoInicio) bannerRamoInicio.style.display = ehGerente ? "" : "none";
 
-    // Fornecedores: apenas o gerente pode registar fornecedores
+    // Fornecedores e Produtos: apenas gerente cadastra novo produto ou novo fornecedor
     const cardAdicionarForn = document.getElementById("card-adicionar-fornecedor");
-    if (cardAdicionarForn) cardAdicionarForn.style.display = ehGerenteLogado ? "block" : "none";
-
-    // Produtos: funcionário não pode adicionar produtos, só o gerente!
+    if (cardAdicionarForn) cardAdicionarForn.style.display = ehGerente ? "block" : "none";
     const btnNovoProd = document.getElementById("btn-novo-produto");
-    if (btnNovoProd) btnNovoProd.style.display = ehGerenteLogado ? "" : "none";
+    if (btnNovoProd) btnNovoProd.style.display = ehGerente ? "" : "none";
 
-    // Regra Operacional: Gerente NÃO pode registar clientes nem registar dívidas (fiado). Essa missão é exclusiva de funcionário!
+    // Clientes e Dívidas: acessíveis e registáveis por Gerente e Funcionário
     const avisoCli = document.getElementById("aviso-gerente-bloqueado-cliente");
     const avisoDiv = document.getElementById("aviso-gerente-bloqueado-divida");
+    if (avisoCli) avisoCli.style.display = "none";
+    if (avisoDiv) avisoDiv.style.display = "none";
     const btnAddCli = document.getElementById("btn-adicionar-cliente");
     const btnRegDiv = document.getElementById("btn-registar-divida");
-
-    if (ehGerenteLogado) {
-        if (avisoCli) avisoCli.style.display = "block";
-        if (avisoDiv) avisoDiv.style.display = "block";
-        if (btnAddCli) {
-            btnAddCli.disabled = true;
-            btnAddCli.style.display = "";
-            btnAddCli.style.opacity = "0.5";
-            btnAddCli.style.cursor = "not-allowed";
-            btnAddCli.title = "O Gerente não pode registar clientes. Missão exclusiva do Funcionário.";
-        }
-        if (btnRegDiv) {
-            btnRegDiv.disabled = true;
-            btnRegDiv.style.display = "";
-            btnRegDiv.style.opacity = "0.5";
-            btnRegDiv.style.cursor = "not-allowed";
-            btnRegDiv.title = "O Gerente não pode registar dívidas. Missão exclusiva do Funcionário.";
-        }
-    } else {
-        if (avisoCli) avisoCli.style.display = "none";
-        if (avisoDiv) avisoDiv.style.display = "none";
-        if (btnAddCli) {
-            btnAddCli.disabled = false;
-            btnAddCli.style.display = "";
-            btnAddCli.style.pointerEvents = "auto";
-            btnAddCli.style.opacity = "1";
-            btnAddCli.style.cursor = "pointer";
-            btnAddCli.title = "Adicionar novo cliente";
-        }
-        if (btnRegDiv) {
-            btnRegDiv.disabled = false;
-            btnRegDiv.style.display = "";
-            btnRegDiv.style.pointerEvents = "auto";
-            btnRegDiv.style.opacity = "1";
-            btnRegDiv.style.cursor = "pointer";
-            btnRegDiv.title = "Registar nova dívida";
-        }
+    if (btnAddCli) {
+        btnAddCli.disabled = false;
+        btnAddCli.style.display = "";
+        btnAddCli.style.opacity = "1";
+        btnAddCli.style.cursor = "pointer";
+        btnAddCli.title = "Adicionar novo cliente";
     }
-
-    // Garante que o menu lateral para Clientes e Fiado/Dívidas permanece acessível
-    const btnMenuClientes = document.querySelector('.sidebar button[data-sec="clientes"]');
-    if (btnMenuClientes) btnMenuClientes.style.display = "";
-    const btnMenuDividas = document.querySelector('.sidebar button[data-sec="dividas"]');
-    if (btnMenuDividas) btnMenuDividas.style.display = "";
+    if (btnRegDiv) {
+        btnRegDiv.disabled = false;
+        btnRegDiv.style.display = "";
+        btnRegDiv.style.opacity = "1";
+        btnRegDiv.style.cursor = "pointer";
+        btnRegDiv.title = "Registar nova dívida";
+    }
 
     // Atualiza os controles do POS de acordo com o perfil
     verificarAcessoPosGerente();
-
-    // Sempre que entrar, abre na secção de início
-    mostrarSecao("inicio");
 }
 
 function verificarAcessoPosGerente() {
-    let perfilAtual = "gerente";
-    if (window.FABEF?.isDemoMode) {
-        perfilAtual = window.FABEF.demoPerfil || "gerente";
-    } else if (FABEF.userData) {
-        perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
-    }
-
-    const ehGerente = perfilAtual === "gerente";
+    const ehGerente = ehUsuarioGerente();
     const avisoPos = document.getElementById("aviso-pos-gerente-bloqueado");
     const btnFinalizar = document.getElementById("btn-finalizar-venda");
 
     if (avisoPos) {
         avisoPos.style.display = ehGerente ? "block" : "none";
         avisoPos.className = "alert alert-info";
-        avisoPos.innerHTML = `🛡️ <strong>Modo Caixa / Operação Ativa:</strong> A sessão atual está autenticada como <strong>${ehGerente ? 'Gerente / Supervisor' : 'Funcionário Operacional'}</strong>. O funcionário pode registar vendas, calcular por kg ou preço manual, adicionar clientes e fiado.`;
+        avisoPos.innerHTML = `🛡️ <strong>Modo Balcão / Caixa Ativo:</strong> A sessão atual está autenticada como <strong>${ehGerente ? 'Gerente / Dono' : 'Funcionário Operacional'}</strong>.`;
     }
     if (btnFinalizar) {
         btnFinalizar.disabled = false;
@@ -1952,6 +1933,11 @@ document.addEventListener("click", (e) => {
 });
 
 function mostrarSecao(nome) {
+    const secoesApenasGerente = ["lucro", "funcionarios", "ramos", "auditoria", "subscricao", "desempenho"];
+    if (!ehUsuarioGerente() && secoesApenasGerente.includes(nome)) {
+        nome = "inicio";
+    }
+
     // Remove o estado ativo de todas as secções
     document.querySelectorAll(".secao").forEach(s => s.classList.remove("active"));
 
@@ -1988,6 +1974,7 @@ function mostrarSecao(nome) {
     } else if (nome === "despesas") {
         if (typeof renderDespesas === "function") renderDespesas();
     } else if (nome === "config") {
+        aplicarRestricoesDeAcessoPorPapel();
         if (typeof renderConfiguracoes === "function") renderConfiguracoes();
         if (typeof renderDespesas === "function") renderDespesas();
     } else if (nome === "funcionarios") {
@@ -2026,6 +2013,48 @@ window.alternarAbaConfiguracoes = function(aba) {
         renderDespesas();
     }
 };
+
+window.abrirWhatsAppSuporteAtivacao = function() {
+    const nomeEmpresa = FABEF.empresa?.nome || "Minha Empresa";
+    const msg = encodeURIComponent(`Olá Faruque Abílio, efectuei o pagamento da subscrição FABEF ERP PRO para a empresa "${nomeEmpresa}". Segue em anexo o comprovativo para activação.`);
+    window.open(`https://wa.me/258840157474?text=${msg}`, "_blank");
+};
+
+// Vinculação e delegação universal para todas as abas do sistema
+document.addEventListener("click", (e) => {
+    // 1. Abas de vendas (Hoje, Ontem, Agrupado, Progressão, Todos)
+    const btnAbaVenda = e.target.closest(".btn-aba-venda");
+    if (btnAbaVenda) {
+        const p = btnAbaVenda.getAttribute("data-periodo") || btnAbaVenda.id.replace("aba-venda-", "");
+        if (p && typeof window.definirAbaVenda === "function") {
+            window.definirAbaVenda(p);
+        }
+    }
+    // 2. Abas de funcionários (Equipa, Vales)
+    const btnTabFunc = e.target.closest(".tab-func-btn");
+    if (btnTabFunc) {
+        const aba = btnTabFunc.getAttribute("data-tab-func");
+        if (aba && typeof window.alternarAbaFuncionarios === "function") {
+            window.alternarAbaFuncionarios(aba);
+        }
+    }
+    // 3. Abas de configurações (Geral, Despesas)
+    const btnTabConfig = e.target.closest(".tab-config-btn");
+    if (btnTabConfig) {
+        const aba = btnTabConfig.getAttribute("data-tab-config");
+        if (aba && typeof window.alternarAbaConfiguracoes === "function") {
+            window.alternarAbaConfiguracoes(aba);
+        }
+    }
+    // 4. Abas de Lucro Real (Hoje, Ontem, Mês, Mês Passado, Ano, Custom)
+    const btnFiltroLucro = e.target.closest(".btn-filtro-lucro");
+    if (btnFiltroLucro) {
+        const periodo = btnFiltroLucro.getAttribute("data-periodo");
+        if (periodo && typeof window.filtrarPeriodoLucro === "function") {
+            window.filtrarPeriodoLucro(periodo);
+        }
+    }
+});
 
 
 /* =====================================================
@@ -2070,20 +2099,30 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
 });
 
 
-document.getElementById("btn-logout").addEventListener("click", async () => {
-    if (window.FABEF?.isDemoMode) {
-        window.FABEF.isDemoMode = false;
-        await limparEstadoFABEF();
-        document.getElementById("app")?.classList.add("hidden");
-        const telaLogin = document.getElementById("tela-login");
-        if (telaLogin) telaLogin.style.display = "flex";
-        toast("Sessão terminada.");
-        return;
-    }
+document.getElementById("btn-logout")?.addEventListener("click", async () => {
     try {
+        sessionStorage.removeItem("fabef_sessao_desbloqueada");
+        sessionStorage.setItem("fabef_saiu_manual", "true");
+        FABEF_arranqueEmCurso = false;
+        await limparEstadoFABEF();
+        if (window.FABEF) window.FABEF.isDemoMode = false;
         await signOut(auth);
     } catch (error) {
         console.error("Erro ao efetuar logout seguro:", error);
+    } finally {
+        FABEF_arranqueEmCurso = false;
+        esconderEcraPin();
+        document.getElementById("app")?.classList.add("hidden");
+        const telaLogin = document.getElementById("tela-login");
+        if (telaLogin) telaLogin.style.display = "flex";
+        elAuth("login-form")?.classList.remove("hidden");
+        elAuth("registo-form")?.classList.add("hidden");
+        const status = elAuth("login-status");
+        if (status) status.textContent = "";
+        const btnLogin = elAuth("btn-login");
+        if (btnLogin) btnLogin.disabled = false;
+        const senhaInput = elAuth("login-senha");
+        if (senhaInput) senhaInput.value = "";
     }
 });
 
@@ -3881,23 +3920,18 @@ async function finalizarVenda() {
         perfilAtual = FABEF.userData.perfil || FABEF.userData.role || "gerente";
     }
 
-    if (perfilAtual === "gerente") {
-        alert("🛡️ Operação Bloqueada ao Gerente:\n\nO perfil de Gerente é para gestão, supervisão, auditoria e edição/cadastro de artigos.\n\nPara registar vendas operacionais no caixa, aceda com o perfil de Funcionário.");
-        return;
-    }
-
     if (limiteVendasDiariasAtingido()) {
         avisoLimiteAtingido(`Atingiu o limite diário de ${LIMITES_PLANO_GRATIS.vendasDiarias} vendas do plano grátis.`);
         return;
     }
 
-    // O estado do caixa já é mantido em tempo real por um listener persistente.
+    // Se o caixa ainda não estiver aberto, abre automaticamente o caixa do dia sem perder o carrinho
     if (!FABEF.turnoId || FABEF.turno?.estado !== "ABERTO") {
-        FABEF.carrinho = [];
-        renderCarrinho();
-        atualizarTelaCaixa();
-        alert("Operação bloqueada: o caixa / turno está fechado. Abra o caixa antes de realizar vendas.");
-        return;
+        try {
+            await abrirCaixaAutomatico(0);
+        } catch (eCaixa) {
+            console.warn("Aviso ao abrir caixa automaticamente:", eCaixa);
+        }
     }
 
     if (!FABEF.carrinho || !FABEF.carrinho.length) {
@@ -5676,12 +5710,10 @@ function ouvirCaixa() {
 
         let primeiraVez = true;
         try {
-            // Query de segurança: Busca se existe algum caixa com estado ativo aberto para este operador e ramo
+            // Busca os turnos com estado ABERTO (consulta segura sem exigir índice composto no Firestore)
             const q = query(
                 subRef("caixas_turnos"),
-                where("ramo", "==", FABEF.ramo),
-                where("estado", "==", "ABERTO"),
-                limit(1)
+                where("estado", "==", "ABERTO")
             );
 
             FABEF_UNSUB_CAIXA = onSnapshot(q, (snap) => {
@@ -5689,9 +5721,16 @@ function ouvirCaixa() {
                     FABEF.turnoId = null;
                     FABEF.turno = null;
                 } else {
-                    const d = snap.docs[0];
-                    FABEF.turnoId = d.id;
-                    FABEF.turno = { id: d.id, ...d.data() };
+                    const todosAbertos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    // Prioriza o turno do ramo atual, ou o primeiro aberto disponível
+                    const dAtivo = todosAbertos.find(t => !t.ramo || t.ramo === FABEF.ramo) || todosAbertos[0];
+                    if (dAtivo) {
+                        FABEF.turnoId = dAtivo.id;
+                        FABEF.turno = dAtivo;
+                    } else {
+                        FABEF.turnoId = null;
+                        FABEF.turno = null;
+                    }
                 }
 
                 aplicarFiltroDia();
@@ -5754,11 +5793,6 @@ async function encerrarTurnoAnteriorAutomatico(turnoIdAntigo, dataTurno) {
 }
 
 async function abrirCaixa() {
-    if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("Só o gerente pode abrir o caixa. Peça ao gerente para autenticar-se e abrir o turno antes de começar a vender.");
-        return;
-    }
-
     const hojeStr = dataHojeStr();
 
     if (FABEF.turnoId) {
@@ -5789,8 +5823,8 @@ async function abrirCaixa() {
             sangrias: [],
             reforcos: [],
             diaOperacional: hojeStr,
-            operadorId: FABEF.user.uid,
-            operadorNome: FABEF.userData?.nome || FABEF.user.email,
+            operadorId: FABEF.user?.uid || "operador",
+            operadorNome: FABEF.userData?.nome || FABEF.user?.email || "Operador",
             dataAbertura: new Date().toISOString(),
             criadoEm: serverTimestamp()
         };
@@ -7242,8 +7276,6 @@ _Relatório financeiro emitido via FABEF Gestão ERP PRO._`;
 document.getElementById("btn-atualizar-relatorio").addEventListener("click", renderRelatorios);
 document.getElementById("relatorio-periodo").addEventListener("change", renderRelatorios);
 
-
-let FABEF_RELATORIO_ATUAL = null;
 
 function renderRelatorios() {
     const periodo = document.getElementById("relatorio-periodo").value;
@@ -11129,32 +11161,39 @@ document.getElementById("btn-instalar-app-pin")?.addEventListener("click", windo
 
 
 async function abrirCaixaAutomatico(saldoInicial = 0) {
-    if (FABEF.turnoId) return FABEF.turnoId;
+    if (FABEF.turnoId && FABEF.turno?.estado === "ABERTO") return FABEF.turnoId;
     const agora = new Date().toISOString();
+    const hojeStr = dataHojeStr();
     const dadosTurno = {
-        empresaId: FABEF.empresaId,
-        ramo: FABEF.ramo,
-        operadorUid: FABEF.user?.uid || "sistema",
-        operadorNome: FABEF.userData?.nome || "Operador",
-        abertoEm: agora,
-        saldoInicial: Number(saldoInicial) || 0,
         estado: "ABERTO",
+        ramo: FABEF.ramo || "Mercearia / Minimercado",
+        abertura: Number(saldoInicial) || 0,
+        totalVendas: 0,
         totalVendasDinheiro: 0,
         totalVendasMpesa: 0,
         totalVendasEmola: 0,
         totalVendasCartao: 0,
         totalVendasCredito: 0,
-        totalEntradas: 0,
-        totalSaidas: 0,
+        sangrias: [],
+        reforcos: [],
+        diaOperacional: hojeStr,
+        operadorId: FABEF.user?.uid || "operador",
+        operadorNome: FABEF.userData?.nome || FABEF.user?.email || "Operador",
+        dataAbertura: agora,
         criadoEm: serverTimestamp()
     };
-    const refDoc = await addDoc(collection(db, "turnos_caixa"), dadosTurno);
-    FABEF.turnoId = refDoc.id;
-    FABEF.turno = { id: refDoc.id, ...dadosTurno };
-    await gravarAuditoria("Abertura automática de caixa/turno no POS (" + FABEF.ramo + ")", "INFO");
+    let refId = "turno_" + Date.now();
+    if (!window.FABEF?.isDemoMode && db && FABEF.empresaId) {
+        const refDoc = await addDoc(subRef("caixas_turnos"), dadosTurno);
+        refId = refDoc.id;
+    }
+    FABEF.turnoId = refId;
+    FABEF.turno = { id: refId, ...dadosTurno };
+    await gravarAuditoria("Abertura automática de caixa/turno no POS (" + (FABEF.ramo || "Geral") + ")", "INFO");
     atualizarTelaCaixa();
-    return refDoc.id;
+    return refId;
 }
+window.abrirCaixaAutomatico = abrirCaixaAutomatico;
 
 // Vinculação do botão de regularização da licença
 document.getElementById("btn-pagar-licenca")?.addEventListener("click", () => {
@@ -11482,89 +11521,3 @@ document.getElementById("btn-abrir-sugestoes")?.addEventListener("click", () => 
     window.atualizarDiagnosticoEmpresa();
 });
 
-
-window.executarLogin = executarLogin;
-
-window.criarConta = criarConta;
-
-window.abrirCaixa = abrirCaixa;
-
-window.entrarModoDemo = entrarModoDemo;
-
-
-/* =====================================================
-   PONTE DOS BOTÕES DE SUBSCRIÇÃO / ATIVAÇÃO
-   Estes botões são chamados pelo HTML através de onclick.
-   A ativação real continua dependente de validação do pagamento/chave.
-===================================================== */
-async function registarPedidoAtivacaoFABEF(tipo, valor) {
-    const empresaId = FABEF.empresaId || null;
-    const dados = {
-        tipo,
-        valor: Number(valor) || 250,
-        estado: "PENDENTE",
-        empresaId,
-        ramo: FABEF.ramo || "",
-        uid: FABEF.user?.uid || null,
-        email: FABEF.user?.email || null,
-        criadoEm: serverTimestamp(),
-        origem: "BOTAO_SUBSCRICAO"
-    };
-
-    try {
-        if (!FABEF.isDemoMode && db && empresaId) {
-            await addDoc(collection(db, "empresas", empresaId, "pagamentos"), dados);
-        }
-        return true;
-    } catch (e) {
-        console.warn("Não foi possível registar o pedido de ativação:", e);
-        return false;
-    }
-}
-
-window.abrirWhatsAppSuporteAtivacao = function () {
-    const ref = (document.getElementById("subscricao-ref-sms")?.value || "").trim();
-    const texto = encodeURIComponent(
-        `Olá. Pretendo ativar o FABEF ERP PRO por 250 MT.\n` +
-        `Empresa: ${FABEF.empresa?.nome || "Não informado"}\n` +
-        (ref ? `Referência: ${ref}\n` : "") +
-        `Enviarei o comprovativo para validação.`
-    );
-    const url = `https://wa.me/?text=${texto}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-};
-
-window.submeterComprovativoPagamento = async function () {
-    const input = document.getElementById("subscricao-ref-sms");
-    const ref = (input?.value || "").trim();
-    if (!ref) {
-        alert("Introduza o código de transação recebido por SMS.");
-        input?.focus();
-        return;
-    }
-    const ok = await registarPedidoAtivacaoFABEF("CODIGO_TRANSACAO", 250);
-    if (ok) {
-        await gravarAuditoria(`Pedido de ativação enviado com referência ${ref}.`, "INFO");
-        alert("Código registado. A ativação ficará pendente de validação do pagamento.");
-    } else {
-        alert("Não foi possível registar o pedido neste momento. Verifique a ligação à internet e tente novamente.");
-    }
-};
-
-window.ativarLicencaPorChave = async function () {
-    const input = document.getElementById("subscricao-chave-licenca");
-    const chave = (input?.value || "").trim().toUpperCase();
-    if (!chave) {
-        alert("Introduza a chave de licença.");
-        input?.focus();
-        return;
-    }
-    const ok = await registarPedidoAtivacaoFABEF("CHAVE_LICENCA", 250);
-    if (ok) {
-        await gravarAuditoria(`Pedido de validação de chave de licença ${chave}.`, "INFO");
-        alert("Chave enviada para validação. A licença só será ativada após confirmação válida.");
-    } else {
-        alert("Não foi possível registar o pedido neste momento. Verifique a ligação à internet e tente novamente.");
-    }
-};
-window.verificarSubscricao = verificarSubscricao;
