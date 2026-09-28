@@ -1,4 +1,4 @@
-const CACHE_NAME = "fabef-erp-v9-9-20260928-1405";
+const CACHE_NAME = "fabef-erp-v9-9-buttons-fixed-20260928-1415";
 const APP_SHELL = ["./", "./index.html"];
 
 self.addEventListener("install", event => {
@@ -25,17 +25,14 @@ self.addEventListener("fetch", event => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-
-  // Never serve stale local JavaScript. Always try the network first.
   const isAppJs = url.pathname.endsWith("/app.js") || url.pathname.endsWith("/src/app.js");
+
   if (isAppJs) {
     event.respondWith(fetch(req, { cache: "no-store" }).catch(() => caches.match(req)));
     return;
   }
 
-  // Keep navigation usable offline, but refresh from network whenever possible.
   if (req.mode === "navigate") {
     event.respondWith(fetch(req, { cache: "no-store" }).catch(() => caches.match("./index.html")));
-    return;
   }
 });
