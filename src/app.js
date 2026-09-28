@@ -5865,7 +5865,7 @@ async function abrirCaixa() {
 }
 
 
-document.getElementById("btn-fechar-caixa").addEventListener("click", fecharCaixa);
+// O botão "btn-fechar-caixa" já abre o fecho cego via onclick no index.html (abrirModalFecharCaixaCego).
 document.getElementById("btn-sangria")?.addEventListener("click", registarSangria);
 document.getElementById("btn-reforco")?.addEventListener("click", registarReforco);
 
