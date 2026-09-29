@@ -749,6 +749,23 @@ function subRef(nome) {
 }
 
 
+/* Acrescenta um registo a uma lista local SEM duplicar.
+   O onSnapshot em tempo real já pode ter trazido o documento acabado de gravar;
+   se o id já existir, apenas atualiza esse item em vez de o inserir outra vez. */
+function incluirSemDuplicar(lista, item, noInicio) {
+    if (!Array.isArray(lista) || !item) return lista;
+    const idx = item.id != null ? lista.findIndex(x => x && x.id === item.id) : -1;
+    if (idx >= 0) {
+        lista[idx] = { ...lista[idx], ...item };
+    } else if (noInicio) {
+        lista.unshift(item);
+    } else {
+        lista.push(item);
+    }
+    return lista;
+}
+
+
 function produtoRef(id) {
     return doc(db, "empresas", FABEF.empresaId, "produtos", id);
 }
@@ -1696,6 +1713,13 @@ function escutarColecao(nome, estado) {
                     }
                 } catch(e){}
             }
+            // Rede de segurança: nunca deixar o mesmo id duas vezes na lista
+            const vistos = new Set();
+            for (let i = dados.length - 1; i >= 0; i--) {
+                const idd = dados[i]?.id;
+                if (idd == null) continue;
+                if (vistos.has(idd)) dados.splice(i, 1); else vistos.add(idd);
+            }
             if(COLECOES_POR_DIA.has(nome)){ FABEF._raw=FABEF._raw||{}; FABEF._raw[nome]=dados; } else FABEF[estado]=dados;
             aplicarFiltroDia();
             if(estado==="produtos") verificarReconciliacaoStock();
@@ -1776,6 +1800,10 @@ function aplicarRestricoesDeAcessoPorPapel() {
     document.querySelectorAll(".sidebar button[data-sec]").forEach(btn => {
         const permitido = ehGerente || SECOES_FUNCIONARIO.includes(btn.dataset.sec);
         btn.style.display = permitido ? "" : "none";
+    });
+    // A aba do Administrador só aparece na conta do administrador FABEF
+    document.querySelectorAll('.sidebar button[data-sec="admin"]').forEach(btn => {
+        btn.style.display = ehAdminFABEF() ? "" : "none";
     });
 
     // 1. ABA DE OPERAÇÕES & COMÉRCIO (Visível para Funcionário e Gerente)
@@ -1970,6 +1998,9 @@ function mostrarSecao(nome) {
     if (!ehUsuarioGerente() && !SECOES_FUNCIONARIO.includes(nome)) {
         nome = "inicio";
     }
+    if (nome === "admin" && !ehAdminFABEF()) {
+        nome = "inicio";
+    }
 
     // Remove o estado ativo de todas as secções
     document.querySelectorAll(".secao").forEach(s => s.classList.remove("active"));
@@ -1995,6 +2026,8 @@ function mostrarSecao(nome) {
     // Disparadores contextuais de atualização de tela
     if (nome === "inicio") {
         renderGraficoVendas(window.FABEF_GRAFICO_DIAS || 7);
+    } else if (nome === "admin") {
+        carregarPainelAdmin();
     } else if (nome === "ramos") {
         renderPastaRamos();
     } else if (nome === "subscricao") {
@@ -2517,7 +2550,7 @@ async function criarProdutoSugestao(nome, silencioso) {
         const ref = await addDoc(subRef("produtos"), payload);
 
         // Atualiza a memória local mantendo a integridade estrutural
-        FABEF.produtos.push({
+        incluirSemDuplicar(FABEF.produtos, {
             id: ref.id,
             nome: payload.nome,
             categoria: payload.categoria,
@@ -2636,7 +2669,7 @@ async function salvarProduto() {
         const ref = await addDoc(subRef("produtos"), payload);
 
         // Atualização síncrona da memória em cache do navegador
-        FABEF.produtos.push({
+        incluirSemDuplicar(FABEF.produtos, {
             id: ref.id,
             idPersonalizado: payload.idPersonalizado || ref.id,
             nome: payload.nome,
@@ -3277,7 +3310,7 @@ async function registarCompra() {
 
         // Grava o histórico de compras de forma isolada
         const ref = await addDoc(subRef("compras"), compra);
-        FABEF.compras.push({ id: ref.id, ...compra });
+        incluirSemDuplicar(FABEF.compras, { id: ref.id, ...compra });
 
         // Se a compra foi feita a crédito, regista/atualiza a dívida ao fornecedor
         if (pagamento === "Credito") {
@@ -3301,7 +3334,7 @@ async function registarCompra() {
                     criadoEm: serverTimestamp()
                 };
                 const refForn = await addDoc(subRef("fornecedores"), payloadFornecedor);
-                FABEF.fornecedores.push({ id: refForn.id, ...payloadFornecedor });
+                incluirSemDuplicar(FABEF.fornecedores, { id: refForn.id, ...payloadFornecedor });
             }
         }
 
@@ -3411,7 +3444,7 @@ async function ajustarDividaFornecedorPorNome(nome, delta, ramo) {
             criadoEm: serverTimestamp()
         };
         const ref = await addDoc(subRef("fornecedores"), payload);
-        FABEF.fornecedores.push({ id: ref.id, ...payload });
+        incluirSemDuplicar(FABEF.fornecedores, { id: ref.id, ...payload });
     }
 }
 
@@ -5172,7 +5205,7 @@ async function adicionarFornecedor() {
         const ref = await addDoc(subRef("fornecedores"), payload);
 
         // Alimenta de forma síncrona a cache interna local
-        FABEF.fornecedores.push({
+        incluirSemDuplicar(FABEF.fornecedores, {
             id: ref.id,
             idPersonalizado: payload.idPersonalizado || ref.id,
             nome: payload.nome,
@@ -5389,7 +5422,7 @@ async function adicionarCliente() {
         ramo: payload.ramo,
         data: payload.data
     };
-    FABEF.clientes.push(novoCliente);
+    incluirSemDuplicar(FABEF.clientes, novoCliente);
     guardarClientesLocalmente();
 
     // Varre e reinicializa todos os campos de texto do cliente
@@ -5586,7 +5619,7 @@ async function registrarOuAtualizarDivida(cliente, telefone, valor) {
             console.warn("Aviso ao salvar nova dívida no Firebase, gravando localmente:", error);
         }
 
-        FABEF.dividas.push({
+        incluirSemDuplicar(FABEF.dividas, {
             id: idGerado,
             cliente: payload.cliente,
             telefone: payload.telefone,
@@ -5643,7 +5676,7 @@ async function registarDivida() {
             } catch (err) {
                 console.warn("Aviso ao gravar dívida no Firebase:", err);
             }
-            FABEF.dividas.push({ id: idGerado, cliente, telefone, saldo: valor, limite, ramo: payload.ramo, data: payload.data });
+            incluirSemDuplicar(FABEF.dividas, { id: idGerado, cliente, telefone, saldo: valor, limite, ramo: payload.ramo, data: payload.data });
             guardarDividasLocalmente();
         } else {
             await registrarOuAtualizarDivida(cliente, telefone, valor);
@@ -6168,6 +6201,10 @@ window.toggleRevelarSaldoGerente = function() {
 };
 
 window.abrirModalFecharCaixaCego = function() {
+    if (!ehUsuarioGerente()) {
+        alert("🔒 Apenas o gerente pode fechar o caixa.\n\nPeça ao gerente para fazer o fecho do turno.");
+        return;
+    }
     if (!FABEF.turnoId) {
         alert("Não existe nenhum turno de caixa aberto no momento.");
         return;
@@ -6189,7 +6226,14 @@ window.abrirModalFecharCaixaCego = function() {
 };
 
 window.confirmarFechoCaixaCego = async function() {
-    if (!FABEF.turnoId) return;
+    if (!ehUsuarioGerente()) {
+        alert("🔒 Apenas o gerente pode fechar o caixa.");
+        return;
+    }
+    if (!FABEF.turnoId) {
+        alert("Não existe nenhum turno de caixa aberto no momento.");
+        return;
+    }
 
     const inputContado = document.getElementById("fecho-caixa-dinheiro-contado");
     const valorDigitado = inputContado ? inputContado.value.trim() : "";
@@ -6480,12 +6524,14 @@ function atualizarTelaCaixa() {
     document.getElementById("caixa-fecho")?.classList.toggle("hidden", !aberto);
     document.getElementById("aviso-pos-caixa")?.classList.toggle("hidden", aberto);
 
-    const ehGerenteCaixa = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const ehGerenteCaixa = ehUsuarioGerente();
     const btnAbrir = document.getElementById("btn-abrir-caixa");
     const btnFechar = document.getElementById("btn-fechar-caixa");
     const btnRevelar = document.getElementById("btn-revelar-saldo-caixa");
     if (btnAbrir) btnAbrir.style.display = ehGerenteCaixa ? "" : "none";
-    if (btnFechar) btnFechar.style.display = ""; // O operador pode fechar o turno com a contagem cega
+    if (btnFechar) btnFechar.style.display = ehGerenteCaixa ? "" : "none"; // Só o gerente fecha o caixa
+    const avisoFechoGerente = document.getElementById("aviso-fecho-so-gerente");
+    if (avisoFechoGerente) avisoFechoGerente.style.display = ehGerenteCaixa ? "none" : "";
     if (btnRevelar) btnRevelar.style.display = ehGerenteCaixa ? "inline-block" : "none";
 
     const avisoCaixaFuncionario = document.getElementById("aviso-caixa-funcionario");
@@ -6574,7 +6620,7 @@ async function registarDespesa() {
         id: docId,
         ...payload
     };
-    FABEF.despesas.unshift(novoItem);
+    incluirSemDuplicar(FABEF.despesas, novoItem, true);
     if (!FABEF._raw) FABEF._raw = {};
     if (!Array.isArray(FABEF._raw.despesas)) FABEF._raw.despesas = [];
     if (!FABEF._raw.despesas.some(d => d.id === docId)) {
@@ -8160,7 +8206,7 @@ async function cadastrarNovoFuncionario() {
         await setDoc(doc(db,"utilizadores",uidFuncionario),perfil);
         await setDoc(doc(db,"empresas",FABEF.empresaId,"funcionarios",uidFuncionario),perfil);
         if (ramoFunc === FABEF.ramo) {
-            FABEF.funcionarios.push({id:uidFuncionario,...perfil});
+            incluirSemDuplicar(FABEF.funcionarios, {id:uidFuncionario,...perfil});
         }
         ["func-nome","func-email","func-telefone","func-salario-mensal","func-senha","func-pin","func-foto"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
         renderFuncionarios();
@@ -8602,7 +8648,7 @@ window.salvarDispensa = async function() {
                 });
                 novoId = docRef.id;
             }
-            FABEF.dispensas.unshift({ id: novoId, ...payload });
+            incluirSemDuplicar(FABEF.dispensas, { id: novoId, ...payload }, true);
         }
 
         await gravarAuditoria(`🏖️ DISPENSA REGISTADA (${payload.funcionarioNome} - ${payload.tipo} - ${payload.dias} dias) por ${usuarioAtual}. Estado: ${payload.estado}.`, "INFO");
@@ -9050,6 +9096,353 @@ async function solicitarSubscricaoMovel(){
 document.getElementById("btn-solicitar-pagamento")?.addEventListener("click", solicitarSubscricaoMovel);
 
 document.getElementById("btn-cadastrar-funcionario")?.addEventListener("click", cadastrarNovoFuncionario);
+
+/* =====================================================
+   MÓDULO LÓGICO: PAINEL DO ADMINISTRADOR FABEF
+   - Só a conta do administrador vê a aba "Administrador".
+   - Os gerentes enviam um PEDIDO DE ATIVAÇÃO (coleção "pedidos_ativacao")
+     depois de pagar; o administrador confirma o pagamento e activa
+     a conta por 30 dias. Nada se activa sozinho.
+   - IMPORTANTE: a segurança real está nas regras do Firestore
+     (ver REGRAS-FIRESTORE-ADMIN.txt). Esconder o botão não chega.
+===================================================== */
+const ADMINS_FABEF = ["faruqueabilio95@gmail.com"];
+
+function ehAdminFABEF() {
+    if (window.FABEF?.isDemoMode) return false;
+    const email = String(auth.currentUser?.email || FABEF.user?.email || "").trim().toLowerCase();
+    return !!email && ADMINS_FABEF.includes(email);
+}
+window.ehAdminFABEF = ehAdminFABEF;
+
+const FABEF_ADMIN = { empresas: [], pedidos: [], carregado: false };
+
+function paraDataAdmin(v) {
+    if (!v) return null;
+    if (typeof v === "object" && typeof v.toDate === "function") return v.toDate();
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function estadoLicencaEmpresa(e) {
+    const agora = new Date();
+    const validade = paraDataAdmin(e.validade_subscricao);
+    if (e.estado_licenca === "ACTIVO" && validade && validade >= agora) {
+        const dias = Math.ceil((validade - agora) / 86400000);
+        return { codigo: "PAGO", rotulo: `✅ PAGO até ${validade.toLocaleDateString("pt-MZ")} (${dias} d)`, cor: "#15803d" };
+    }
+    if (e.estado_licenca === "ACTIVO") {
+        return { codigo: "EXPIRADO", rotulo: `⏰ Expirou em ${validade ? validade.toLocaleDateString("pt-MZ") : "—"}`, cor: "#b91c1c" };
+    }
+    if ((e.estado_licenca || "TESTE") === "TESTE") {
+        const origem = paraDataAdmin(e.data_registo) || paraDataAdmin(e.criadoEm) || agora;
+        const fim = new Date(origem); fim.setDate(fim.getDate() + 7);
+        if (agora <= fim) {
+            return { codigo: "TESTE", rotulo: `🧪 Teste (${Math.max(0, Math.ceil((fim - agora) / 86400000))} d restantes)`, cor: "#b45309" };
+        }
+    }
+    return { codigo: "GRATIS", rotulo: "🆓 Plano Grátis", cor: "#475569" };
+}
+
+async function carregarPainelAdmin() {
+    if (!ehAdminFABEF()) return;
+    const aviso = document.getElementById("admin-aviso");
+    if (aviso) { aviso.className = "alert alert-info"; aviso.textContent = "⏳ A carregar empresas e pedidos..."; }
+
+    const [rEmp, rPed] = await Promise.allSettled([
+        getDocs(collection(db, "empresas")),
+        getDocs(collection(db, "pedidos_ativacao"))
+    ]);
+
+    const erros = [];
+    if (rEmp.status === "fulfilled") {
+        FABEF_ADMIN.empresas = rEmp.value.docs.map(d => ({ id: d.id, ...d.data() }));
+    } else {
+        FABEF_ADMIN.empresas = [];
+        erros.push("empresas");
+        console.error("Admin: erro ao ler empresas:", rEmp.reason);
+    }
+    if (rPed.status === "fulfilled") {
+        FABEF_ADMIN.pedidos = rPed.value.docs.map(d => ({ id: d.id, ...d.data() }));
+    } else {
+        FABEF_ADMIN.pedidos = [];
+        erros.push("pedidos de ativação");
+        console.error("Admin: erro ao ler pedidos:", rPed.reason);
+    }
+    FABEF_ADMIN.carregado = true;
+
+    if (aviso) {
+        if (erros.length) {
+            aviso.className = "alert alert-danger";
+            aviso.innerHTML = `🔴 Sem permissão para ler: <strong>${erros.join(" e ")}</strong>. É preciso atualizar as regras do Firestore (ficheiro <code>REGRAS-FIRESTORE-ADMIN.txt</code> no pacote).`;
+        } else {
+            aviso.className = "";
+            aviso.innerHTML = "";
+        }
+    }
+    renderPainelAdmin();
+}
+window.carregarPainelAdmin = carregarPainelAdmin;
+
+function renderPainelAdmin() {
+    const corpoPed = document.getElementById("admin-tabela-pedidos");
+    const corpoEmp = document.getElementById("admin-tabela-empresas");
+    if (!corpoPed || !corpoEmp) return;
+
+    const pendentes = FABEF_ADMIN.pedidos
+        .filter(p => p.estado === "PENDENTE")
+        .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+
+    // KPIs
+    let pagas = 0, teste = 0, gratis = 0;
+    FABEF_ADMIN.empresas.forEach(e => {
+        const c = estadoLicencaEmpresa(e).codigo;
+        if (c === "PAGO") pagas++; else if (c === "TESTE") teste++; else gratis++;
+    });
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt("admin-kpi-total", FABEF_ADMIN.empresas.length);
+    setTxt("admin-kpi-pagas", pagas);
+    setTxt("admin-kpi-teste", teste);
+    setTxt("admin-kpi-gratis", gratis);
+    setTxt("admin-kpi-pendentes", pendentes.length);
+
+    // Contador no botão do menu
+    const btnMenu = document.getElementById("btn-sidebar-admin");
+    if (btnMenu) btnMenu.textContent = "🛡️ Ativar Contas" + (pendentes.length ? ` (${pendentes.length})` : "");
+
+    corpoPed.innerHTML = pendentes.map(p => {
+        const emp = FABEF_ADMIN.empresas.find(e => e.id === p.empresaId);
+        const nome = p.empresaNome || emp?.nome || p.empresaId;
+        return `
+        <tr>
+            <td>${dataTexto(p.data)}</td>
+            <td><strong>${escapeHTML(nome)}</strong><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.gerenteEmail || "")}${p.telefone ? " · " + escapeHTML(p.telefone) : ""}</span></td>
+            <td><code>${escapeHTML(p.referencia || "—")}</code><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.tipo === "CHAVE" ? "Chave de licença" : "Código SMS")}</span></td>
+            <td>${dinheiro(numero(p.valor) || 250)}</td>
+            <td style="white-space:nowrap;">
+                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa('${escapeHTML(p.empresaId)}', 30, '${escapeHTML(p.id)}')" style="width:auto;padding:5px 10px;font-size:12px;">✅ Ativar 30 dias</button>
+                <button type="button" class="btn btn-small btn-danger" onclick="window.adminRejeitarPedido('${escapeHTML(p.id)}')" style="width:auto;padding:5px 10px;font-size:12px;">❌ Rejeitar</button>
+            </td>
+        </tr>`;
+    }).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Nenhum pedido de ativação pendente.</td></tr>`;
+
+    const termo = (document.getElementById("admin-pesquisa")?.value || "").trim().toLowerCase();
+    const empresas = FABEF_ADMIN.empresas
+        .filter(e => !termo || [e.nome, e.id, e.telefone, e.idPersonalizado].some(v => String(v || "").toLowerCase().includes(termo)))
+        .sort((a, b) => (paraDataAdmin(b.data_registo || b.criadoEm)?.getTime() || 0) - (paraDataAdmin(a.data_registo || a.criadoEm)?.getTime() || 0));
+
+    corpoEmp.innerHTML = empresas.map(e => {
+        const st = estadoLicencaEmpresa(e);
+        const idSeg = escapeHTML(e.id);
+        return `
+        <tr>
+            <td><strong>${escapeHTML(e.nome || "—")}</strong><br><span style="font-size:11px;color:#64748b;">${escapeHTML(e.telefone || "")} · ${escapeHTML(e.id)}</span></td>
+            <td>${dataTexto(e.data_registo || e.criadoEm)}</td>
+            <td style="color:${st.cor};font-weight:700;">${st.rotulo}</td>
+            <td style="white-space:nowrap;">
+                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa('${idSeg}', 30)" style="width:auto;padding:5px 10px;font-size:12px;">✅ Ativar +30 d</button>
+                <button type="button" class="btn btn-small btn-light" onclick="window.adminDesativarEmpresa('${idSeg}')" style="width:auto;padding:5px 10px;font-size:12px;">⛔ Desativar</button>
+            </td>
+        </tr>`;
+    }).join("") || `<tr><td colspan="4" style="text-align:center;color:#64748b;">Nenhuma empresa encontrada.</td></tr>`;
+}
+window.renderPainelAdmin = renderPainelAdmin;
+
+let FABEF_adminAOcupar = false;
+
+window.adminAtivarEmpresa = async function (empresaId, dias, pedidoId) {
+    if (!ehAdminFABEF()) { alert("Operação negada: apenas o administrador pode ativar contas."); return; }
+    if (FABEF_adminAOcupar) return;
+    const emp = FABEF_ADMIN.empresas.find(e => e.id === empresaId);
+    const nome = emp?.nome || empresaId;
+
+    const agora = new Date();
+    const validadeAtual = paraDataAdmin(emp?.validade_subscricao);
+    const base = (emp?.estado_licenca === "ACTIVO" && validadeAtual && validadeAtual > agora) ? validadeAtual : agora;
+    const nova = new Date(base);
+    nova.setDate(nova.getDate() + (dias || 30));
+
+    if (!confirm(`Ativar a conta "${nome}" por mais ${dias || 30} dias?\n\nNova validade: ${nova.toLocaleDateString("pt-MZ")}\n\nConfirme que já recebeu o pagamento.`)) return;
+
+    FABEF_adminAOcupar = true;
+    try {
+        const adminEmail = auth.currentUser?.email || "";
+        await updateDoc(doc(db, "empresas", empresaId), {
+            estado_licenca: "ACTIVO",
+            subscricao_paga: true,
+            validade_subscricao: nova.toISOString(),
+            ativadoPor: adminEmail,
+            ativadoEm: serverTimestamp(),
+            atualizadoEm: serverTimestamp()
+        });
+
+        // Registo do pagamento na conta da empresa (não crítico)
+        try {
+            const ped = pedidoId ? FABEF_ADMIN.pedidos.find(p => p.id === pedidoId) : null;
+            await addDoc(collection(db, "empresas", empresaId, "pagamentos"), {
+                valor: numero(ped?.valor) || 250,
+                metodo: "MANUAL",
+                referencia: ped?.referencia || "Ativação manual pelo administrador",
+                estado: "CONFIRMADO",
+                dias: dias || 30,
+                confirmadoPor: adminEmail,
+                data: new Date().toISOString(),
+                criadoEm: serverTimestamp()
+            });
+        } catch (e) { console.warn("Aviso: não foi possível registar o pagamento:", e); }
+
+        if (pedidoId) {
+            await updateDoc(doc(db, "pedidos_ativacao", pedidoId), {
+                estado: "APROVADO",
+                resolvidoPor: adminEmail,
+                resolvidoEm: serverTimestamp()
+            });
+            const p = FABEF_ADMIN.pedidos.find(x => x.id === pedidoId);
+            if (p) p.estado = "APROVADO";
+        }
+
+        if (emp) {
+            emp.estado_licenca = "ACTIVO";
+            emp.subscricao_paga = true;
+            emp.validade_subscricao = nova.toISOString();
+        }
+        // Se for a própria empresa do administrador, atualiza o estado no ecrã
+        if (FABEF.empresa && FABEF.empresaId === empresaId) {
+            FABEF.empresa.estado_licenca = "ACTIVO";
+            FABEF.empresa.subscricao_paga = true;
+            FABEF.empresa.validade_subscricao = nova.toISOString();
+            verificarSubscricao();
+        }
+        renderPainelAdmin();
+        try { await gravarAuditoria(`Administrador ativou a conta "${nome}" até ${nova.toLocaleDateString("pt-MZ")}.`, "INFO"); } catch (_) {}
+        alert(`✅ Conta "${nome}" ativada até ${nova.toLocaleDateString("pt-MZ")}.`);
+    } catch (error) {
+        console.error("Erro ao ativar empresa:", error);
+        alert("Não foi possível ativar a conta:\n" + mensagemFirebase(error));
+    } finally {
+        FABEF_adminAOcupar = false;
+    }
+};
+
+window.adminDesativarEmpresa = async function (empresaId) {
+    if (!ehAdminFABEF()) { alert("Operação negada: apenas o administrador pode desativar contas."); return; }
+    const emp = FABEF_ADMIN.empresas.find(e => e.id === empresaId);
+    const nome = emp?.nome || empresaId;
+    if (!confirm(`Desativar a subscrição de "${nome}"?\n\nA conta passa para o Plano Grátis (com limites). Os dados NÃO são apagados.`)) return;
+    try {
+        await updateDoc(doc(db, "empresas", empresaId), {
+            estado_licenca: "EXPIRADO",
+            subscricao_paga: false,
+            desativadoPor: auth.currentUser?.email || "",
+            desativadoEm: serverTimestamp(),
+            atualizadoEm: serverTimestamp()
+        });
+        if (emp) { emp.estado_licenca = "EXPIRADO"; emp.subscricao_paga = false; }
+        if (FABEF.empresa && FABEF.empresaId === empresaId) {
+            FABEF.empresa.estado_licenca = "EXPIRADO";
+            FABEF.empresa.subscricao_paga = false;
+            verificarSubscricao();
+        }
+        renderPainelAdmin();
+        alert(`Conta "${nome}" passou para o Plano Grátis.`);
+    } catch (error) {
+        console.error("Erro ao desativar empresa:", error);
+        alert("Não foi possível desativar a conta:\n" + mensagemFirebase(error));
+    }
+};
+
+window.adminRejeitarPedido = async function (pedidoId) {
+    if (!ehAdminFABEF()) { alert("Operação negada."); return; }
+    if (!confirm("Rejeitar este pedido de ativação? (o pagamento não foi confirmado)")) return;
+    try {
+        await updateDoc(doc(db, "pedidos_ativacao", pedidoId), {
+            estado: "REJEITADO",
+            resolvidoPor: auth.currentUser?.email || "",
+            resolvidoEm: serverTimestamp()
+        });
+        const p = FABEF_ADMIN.pedidos.find(x => x.id === pedidoId);
+        if (p) p.estado = "REJEITADO";
+        renderPainelAdmin();
+    } catch (error) {
+        console.error("Erro ao rejeitar pedido:", error);
+        alert("Não foi possível rejeitar o pedido:\n" + mensagemFirebase(error));
+    }
+};
+
+document.getElementById("admin-pesquisa")?.addEventListener("input", renderPainelAdmin);
+
+/* -----------------------------------------------------
+   PEDIDO DE ATIVAÇÃO (lado do gerente/cliente)
+   As duas opções da aba Subscrição enviam um pedido ao
+   administrador. Nenhuma delas ativa a conta sozinha.
+----------------------------------------------------- */
+let FABEF_pedidoAEnviar = false;
+
+async function enviarPedidoAtivacao(tipo, textoReferencia) {
+    if (window.FABEF?.isDemoMode) {
+        alert("No modo demonstração não é possível enviar pedidos de ativação.");
+        return false;
+    }
+    if (!ehUsuarioGerente()) {
+        alert("Apenas o gerente pode pedir a ativação da conta.");
+        return false;
+    }
+    if (FABEF_pedidoAEnviar) return false;
+    FABEF_pedidoAEnviar = true;
+    try {
+        const extras = (typeof qtdFuncionariosExtras !== "undefined") ? numero(qtdFuncionariosExtras) : 0;
+        await addDoc(collection(db, "pedidos_ativacao"), {
+            empresaId: FABEF.empresaId,
+            empresaNome: FABEF.empresa?.nome || "",
+            gerenteNome: FABEF.userData?.nome || "",
+            gerenteEmail: FABEF.user?.email || "",
+            telefone: FABEF.userData?.telefone || FABEF.empresa?.telefone || "",
+            tipo: tipo,
+            referencia: textoReferencia,
+            valor: 250 + extras * 50,
+            estado: "PENDENTE",
+            data: new Date().toISOString(),
+            criadoPor: FABEF.user.uid,
+            criadoEm: serverTimestamp()
+        });
+        try { await gravarAuditoria("Enviou pedido de ativação da subscrição (" + tipo + ").", "INFO"); } catch (_) {}
+        return true;
+    } catch (error) {
+        console.error("Erro ao enviar pedido de ativação:", error);
+        alert("Não foi possível enviar o pedido:\n" + mensagemFirebase(error));
+        return false;
+    } finally {
+        FABEF_pedidoAEnviar = false;
+    }
+}
+
+window.submeterComprovativoPagamento = async function () {
+    const inp = document.getElementById("subscricao-ref-sms");
+    const ref = (inp?.value || "").trim();
+    if (ref.length < 6) {
+        alert("Introduza o código de transação completo que recebeu por SMS (M-Pesa / e-Mola).");
+        inp?.focus();
+        return;
+    }
+    if (await enviarPedidoAtivacao("SMS", ref)) {
+        if (inp) inp.value = "";
+        alert("✅ Pedido enviado!\n\nO administrador vai confirmar o pagamento e ativar a sua conta. Para ser mais rápido, envie também o comprovativo por WhatsApp.");
+    }
+};
+
+window.ativarLicencaPorChave = async function () {
+    const inp = document.getElementById("subscricao-chave-licenca");
+    const chave = (inp?.value || "").trim().toUpperCase();
+    if (chave.length < 4) {
+        alert("Introduza a chave de licença recebida do suporte.");
+        inp?.focus();
+        return;
+    }
+    if (await enviarPedidoAtivacao("CHAVE", chave)) {
+        if (inp) inp.value = "";
+        alert("✅ Chave enviada ao administrador para validação. A conta será ativada assim que for confirmada.");
+    }
+};
 
 /* =====================================================
    MÓDULO LÓGICO: GRÁFICO DE CONTROLO DE VENDAS DIÁRIAS (TELA PRINCIPAL)
@@ -10502,7 +10895,7 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
             role: "operador",
             estado: "ATIVO"
         };
-        FABEF.funcionarios.push(novoFunc);
+        incluirSemDuplicar(FABEF.funcionarios, novoFunc);
         try {
             localStorage.setItem("fabef_local_funcionarios_" + FABEF.empresaId, JSON.stringify(FABEF.funcionarios));
         } catch(e) {}
@@ -10548,7 +10941,7 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
         }
 
         if (!FABEF.gastosFuncionarios) FABEF.gastosFuncionarios = [];
-        FABEF.gastosFuncionarios.push({ id: idGasto, ...payloadGasto, criadoEm: undefined });
+        incluirSemDuplicar(FABEF.gastosFuncionarios, { id: idGasto, ...payloadGasto, criadoEm: undefined });
 
         // Guarda cópia no armazenamento local para resiliência imediata
         try {
@@ -10740,7 +11133,7 @@ async function registarDespesaLoja() {
         console.warn("Aviso ao guardar despesa no Firestore, mantendo offline:", error);
     }
 
-    FABEF.despesas.push({
+    incluirSemDuplicar(FABEF.despesas, {
         id: docId,
         descricao: payload.descricao,
         valor: payload.valor,
@@ -10840,7 +11233,7 @@ document.getElementById("btn-salvar-pos-rapido-cliente")?.addEventListener("clic
         const ref = await addDoc(subRef("clientes"), payload);
         const novoCli = { id: ref.id, ...payload, criadoEm: undefined };
         if (!FABEF.clientes) FABEF.clientes = [];
-        FABEF.clientes.push(novoCli);
+        incluirSemDuplicar(FABEF.clientes, novoCli);
 
         // Preenche automaticamente o campo no POS
         const campoPos = document.getElementById("pos-cliente-nome");
@@ -10885,7 +11278,7 @@ document.getElementById("btn-enviar-sugestao")?.addEventListener("click", async 
         };
         const ref = await addDoc(subRef("sugestoes"), payload);
         FABEF.sugestoes = FABEF.sugestoes || [];
-        FABEF.sugestoes.push({ id: ref.id, ...payload, criadoEm: undefined });
+        incluirSemDuplicar(FABEF.sugestoes, { id: ref.id, ...payload, criadoEm: undefined });
         document.getElementById("sugestao-texto").value = "";
         renderSugestoes();
         alert("Sugestão enviada ao gerente. Obrigado!");
@@ -11057,7 +11450,7 @@ async function entrarModoDemo() {
         gerenteId: "demo-user-01",
         ramo_ativo: "Mercearia / Minimercado",
         ramos_atividade: ["Mercearia / Minimercado", "Talho / Açougue", "Supermercado"],
-        estado_licenca: "ATIVO",
+        estado_licenca: "ACTIVO",
         subscricao_paga: true,
         validade_subscricao: "2030-12-31T23:59:59.000Z",
         valor_mensalidade_atual: 250
