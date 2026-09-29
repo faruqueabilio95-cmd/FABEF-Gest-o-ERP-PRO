@@ -430,8 +430,9 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
     <details style="margin-top:6px;border-left:3px solid #3b82f6;padding-left:4px;" open>
       <summary style="cursor:pointer;color:#93c5fd;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;letter-spacing:0.5px;">⚙️ Configurações & Sistema</summary>
-      <button data-sec="config" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
-      <button type="button" id="btn-sidebar-menu-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;display:flex;align-items:center;gap:6px;">🔢 Definir PIN de Segurança</button>
+      <button data-sec="config" id="btn-sidebar-config-empresa" style="background:#1e3a8a;color:#fff;font-weight:700;border:1px solid #3b82f6;">⚙️ Configurações da Empresa</button>
+      <button type="button" id="btn-sidebar-definir-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#0f172a;color:#93c5fd;font-weight:700;border:1px solid #1e40af;text-align:left;">🔢 Definir / Alterar PIN</button>
+      <button type="button" id="btn-sidebar-alterar-senha" style="background:#0f172a;color:#e2e8f0;font-weight:700;border:1px solid #334155;text-align:left;">🔑 Alterar Minha Senha</button>
       <button data-sec="despesas" style="background:#fff1f2;color:#991b1b;font-weight:700;border:1px solid #fecdd3;">⚡ Despesas do Negócio (Luz, Água, Renda)</button>
       <button data-sec="funcionarios">🧑‍💼 Equipa & Vales Salariais</button>
       <button data-sec="dispensas" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #fde68a;">🏖️ Dispensas Funcionários</button>
@@ -440,15 +441,12 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <button data-sec="subscricao">💳 Subscrição</button>
     </details>
 
+    <details style="margin-top:6px;border-left:3px solid #f59e0b;padding-left:4px;display:none;" open>
+      <summary style="cursor:pointer;color:#fbbf24;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;">🛡️ Administrador FABEF</summary>
+      <button data-sec="admin" id="btn-sidebar-admin" style="display:none;background:#78350f;color:#fff;font-weight:700;border:1px solid #f59e0b;">🛡️ Ativar Contas</button>
+    </details>
+
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:6px;">
-      <!-- ESPAÇO PARA O FUNCIONÁRIO / GERENTE DEFINIR O SEU PIN -->
-      <button id="btn-sidebar-definir-pin" onclick="window.abrirModalDefinirPin(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#1e293b;border:1.5px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
-        🔢 <span>Definir / Alterar Meu PIN</span>
-      </button>
-      <!-- PARTE DE DEFINIR / ALTERAR SENHA (MANTIDA NO MESMO LUGAR) -->
-      <button id="btn-sidebar-alterar-senha" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;font-size:12px;font-weight:600;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
-        🔑 <span>Alterar Minha Senha</span>
-      </button>
       <button id="btn-sidebar-instalar" style="background:#1e3a8a;border:1px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
         📲 <span>Instalar Aplicativo no Celular</span>
       </button>
@@ -922,7 +920,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Produto</th><th>Fornecedor</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th></tr></thead>
+          <thead><tr><th>Data</th><th>Produto</th><th>Fornecedor</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th><th id="th-acoes-compras">Ações</th></tr></thead>
           <tbody id="tabela-compras"></tbody>
         </table></div>
       </div>
@@ -1075,6 +1073,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
           <div id="caixa-movimentos" style="margin-bottom:16px;"></div>
 
+          <div id="aviso-fecho-so-gerente" class="alert alert-info" style="display:none;font-size:13px;font-weight:700;">🔒 Só o gerente pode fechar o caixa. No fim do turno, chame o gerente para fazer o fecho.</div>
           <button id="btn-fechar-caixa" class="btn btn-danger" type="button" onclick="window.abrirModalFecharCaixaCego()" style="width:auto;padding:12px 26px;font-weight:800;font-size:14px;box-shadow:0 2px 6px rgba(239,68,68,0.3);display:inline-flex;align-items:center;gap:8px;">
             🔒 Fechar Caixa (Conferência Cega)
           </button>
@@ -1141,11 +1140,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🧊 Compra de Gelo / Manutenção de Congelador', '🛠️ Manutenção (Frio, Balanças, Equipamento)')" style="border:1px solid #bae6fd;background:#e0f2fe;color:#0284c7;font-size:12px;font-weight:700;padding:5px 9px;">🧊 Gelo / Frio</button>
           <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🧹 Sabão, OMO, Desinfetante e Panos', '🧹 Material de Limpeza & Sacos Plásticos')" style="border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:12px;font-weight:700;padding:5px 9px;">🧹 Limpeza</button>
           <button type="button" class="btn btn-small btn-light" onclick="preencherDespesaRapida('🍲 Almoço / Alimentação de Serviço', '🍲 Alimentação e Café da Loja')" style="border:1px solid #fef08a;background:#fefce8;color:#a16207;font-size:12px;font-weight:700;padding:5px 9px;">🍲 Almoço / Lanche</button>
-        </div>
-
-        <!-- AVISO DE RESTRIÇÃO PARA O GERENTE -->
-        <div id="aviso-despesa-gerente-bloqueado" class="alert alert-warn" style="display:none;background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;font-size:13px;font-weight:700;margin-bottom:12px;">
-          🛡️ <strong>Modo Exclusivo de Supervisão:</strong> O perfil de Gerente é exclusivo para gestão, relatórios e contabilidade. Os lançamentos operacionais de despesas no caixa devem ser efetuados pelos funcionários.
         </div>
 
         <div class="grid">
@@ -1807,6 +1801,39 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </section>
 
     <!-- SUBSCRIÇÃO & ATIVAÇÃO DA LICENÇA -->
+    <section class="secao" id="sec-admin">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <h2 style="margin:0;">🛡️ Painel do Administrador FABEF</h2>
+          <p style="font-size:13px;color:#64748b;margin:2px 0 0;">Ative as contas depois de confirmar o pagamento da subscrição (M-Pesa / e-Mola).</p>
+        </div>
+        <button type="button" class="btn btn-light" onclick="window.carregarPainelAdmin()" style="padding:8px 14px;font-weight:700;">🔄 Atualizar</button>
+      </div>
+      <div id="admin-aviso"></div>
+      <div class="grid">
+        <div class="kpi"><div class="rotulo">Empresas</div><div class="valor" id="admin-kpi-total">0</div></div>
+        <div class="kpi"><div class="rotulo">Pagas (ativas)</div><div class="valor" id="admin-kpi-pagas">0</div></div>
+        <div class="kpi"><div class="rotulo">Em teste</div><div class="valor" id="admin-kpi-teste">0</div></div>
+        <div class="kpi"><div class="rotulo">Plano Grátis</div><div class="valor" id="admin-kpi-gratis">0</div></div>
+        <div class="kpi"><div class="rotulo">Pedidos pendentes</div><div class="valor" id="admin-kpi-pendentes" style="color:#dc2626;">0</div></div>
+      </div>
+      <div class="card" style="margin-top:14px;border-top:3px solid #f59e0b;">
+        <h3 style="margin-bottom:8px;">📥 Pedidos de ativação pendentes</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Data</th><th>Empresa / Gerente</th><th>Código / Chave</th><th>Valor</th><th>Ação</th></tr></thead>
+          <tbody id="admin-tabela-pedidos"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:8px;">🏢 Todas as empresas</h3>
+        <input type="text" id="admin-pesquisa" placeholder="🔍 Pesquisar por nome, telefone ou ID..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:12px;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Empresa</th><th>Registo</th><th>Estado da subscrição</th><th>Ação</th></tr></thead>
+          <tbody id="admin-tabela-empresas"></tbody>
+        </table></div>
+      </div>
+    </section>
+
     <section class="secao" id="sec-subscricao">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
         <div>
@@ -1816,32 +1843,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           </p>
         </div>
         <button type="button" class="btn btn-light" onclick="verificarSubscricao()" style="padding:8px 14px;font-weight:700;">🔄 Atualizar Estado</button>
-      </div>
-
-      <!-- SELETOR DE CONTA / RAMO PARA GESTÃO DE SUBSCRIÇÃO SEPARADA -->
-      <div class="card" style="background:#f8fafc; border:2px solid #3b82f6; border-radius:12px; margin-bottom:16px; padding:18px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
-          <div>
-            <div style="display:inline-block; background:#2563eb; color:#fff; font-size:11px; font-weight:800; padding:3px 8px; border-radius:12px; margin-bottom:4px; text-transform:uppercase;">
-              ⭐ Subscrições Separadas por Conta / Ramo
-            </div>
-            <h3 style="margin:0; font-size:16px; font-weight:800; color:#1e3a8a;">
-              🏬 Negócios & Ramos Cadastrados nesta Empresa
-            </h3>
-            <p style="font-size:12px; color:#475569; margin:3px 0 0 0;">
-              O Gerente pode gerir mais de 2 negócios. Cada conta/ramo tem pagamento e validade separados (250 MT). Se pagou um ramo e outro não, o ramo pago é exibido sem limites.
-            </p>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <label for="subscricao-seletor-ramo" style="font-size:13px; font-weight:800; color:#1e3a8a; margin:0;">Negócio em Análise:</label>
-            <select id="subscricao-seletor-ramo" onchange="window.mudarRamoSubscricao(this.value)" style="padding:8px 14px; font-size:14px; font-weight:800; border-radius:8px; border:2px solid #2563eb; background:#fff; color:#1d4ed8;"></select>
-          </div>
-        </div>
-
-        <!-- Grade de todas as contas e o estado individual de cada uma -->
-        <div id="subscricoes-grade-ramos" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px; margin-top:10px;">
-          <!-- Injetado dinamicamente: Cartão para cada ramo com o seu estado de subscrição individual -->
-        </div>
       </div>
 
       <!-- ESTADO ATUAL DO ESTABELECIMENTO -->
@@ -2084,25 +2085,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <input type="text" id="config-rodape" placeholder="Ex: Obrigado por cuidar da sua beleza no Salão Aurora! Volte sempre.">
         </div>
         <button id="btn-guardar-config" class="btn btn-entrar" style="width:auto;padding:12px 26px;font-weight:700;">💾 Guardar Configurações deste Ramo</button>
-      <div class="card">
-        <h3 style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
-          <span>🛡️</span> Segurança: Código PIN de Bloqueio & Senha da Conta
-        </h3>
-        <p style="font-size:13px;color:#64748b;margin-bottom:12px;">
-          Defina ou altere o seu código PIN de 4 a 6 dígitos para proteger o caixa e bloquear o aplicativo com facilidade. Pode também atualizar a sua senha de login sem sair do sistema.
-        </p>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-          <div>
-            <div style="font-size:12px;color:#64748b;">Estado da Proteção por PIN neste aparelho:</div>
-            <strong id="config-pin-estado" style="font-size:14px;color:#16a34a;">🟢 PIN ATIVO E PROTEGIDO</strong>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button id="btn-alterar-pin" class="btn btn-primary" type="button" onclick="window.abrirModalDefinirPin()" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">🔢 Definir / Alterar PIN</button>
-            <button id="btn-config-alterar-senha" class="btn" type="button" onclick="document.getElementById('modal-alterar-senha')?.classList.add('show')" style="width:auto;padding:8px 16px;font-size:13px;font-weight:700;background:#0f172a;color:#fff;">🔑 Alterar Senha</button>
-            <button id="btn-testar-bloqueio" class="btn btn-light" type="button" style="width:auto;padding:8px 16px;font-size:13px;font-weight:600;">🔒 Testar Bloqueio</button>
-          </div>
-        </div>
-      </div>
 
       <div class="card" style="border: 2px solid #3b82f6; background: #eff6ff;">
         <h3 style="color:#1e40af; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
@@ -2259,6 +2241,31 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
   </div>
 
+  <div class="modal-overlay" id="modal-editar-compra">
+    <div class="modal-box">
+      <h3>Editar Compra</h3>
+      <input type="hidden" id="edit-compra-id">
+      <p id="edit-compra-produto-nome" style="font-weight:700;margin-bottom:8px;"></p>
+      <div class="grid">
+        <div class="form-group"><label for="edit-compra-fornecedor">Fornecedor</label><input type="text" id="edit-compra-fornecedor" list="lista-fornecedores-compra"></div>
+        <div class="form-group"><label for="edit-compra-quantidade">Quantidade</label><input type="number" id="edit-compra-quantidade" min="0" step="any"></div>
+        <div class="form-group"><label for="edit-compra-custo">Custo unitário</label><input type="number" id="edit-compra-custo" min="0" step="0.01"></div>
+        <div class="form-group">
+          <label for="edit-compra-pagamento">Forma de pagamento</label>
+          <select id="edit-compra-pagamento">
+            <option value="Dinheiro">Pago (dinheiro/M-Pesa/etc.)</option>
+            <option value="Credito">A crédito (fica a dever ao fornecedor)</option>
+          </select>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#64748b;">O stock do produto e a dívida do fornecedor (se for a crédito) são ajustados automaticamente.</p>
+      <div class="modal-acoes">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-editar-compra')" style="flex:1;">Cancelar</button>
+        <button id="btn-salvar-edicao-compra" class="btn btn-entrar" type="button" onclick="window.salvarEdicaoCompra()" style="flex:1;">Guardar Alterações</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-editar-cliente">
     <div class="modal-box">
       <h3>Editar Cliente</h3>
@@ -2300,38 +2307,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div class="modal-acoes">
         <button class="btn btn-light" type="button" onclick="fecharModal('modal-alterar-senha')" style="flex:1;">Cancelar</button>
         <button id="btn-guardar-nova-senha" class="btn btn-entrar" style="flex:1;">Guardar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL DE RECUPERAR SENHA (POR E-MAIL OU TELEFONE DO NEGÓCIO) -->
-  <div class="modal-overlay" id="modal-recuperar-senha">
-    <div class="modal-box" style="max-width:440px;text-align:center;">
-      <div style="width:52px;height:52px;background:#eff6ff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 10px auto;border:2px solid #bfdbfe;">
-        🔑
-      </div>
-      <h3 style="color:#0f172a;margin-bottom:6px;">Recuperar Palavra-passe</h3>
-      <p style="font-size:13px;color:#64748b;margin-bottom:14px;line-height:1.5;">
-        Introduza o <strong>e-mail</strong> ou o <strong>número de telefone</strong> utilizado no registo da empresa (ex: <em>84 123 4567</em> ou <em>seu@email.com</em>).
-      </p>
-
-      <div class="form-group" style="text-align:left;">
-        <label for="recuperar-identificador" style="font-weight:700;color:#1e3a8a;">E-mail ou Telefone do Negócio *</label>
-        <input type="text" id="recuperar-identificador" placeholder="Ex: 84 123 4567 ou seu@email.com" style="font-size:15px;font-weight:600;padding:12px;border:2px solid #cbd5e1;border-radius:8px;width:100%;">
-      </div>
-
-      <div id="recuperar-status" class="status-msg" style="margin-bottom:12px;text-align:left;font-size:13px;min-height:20px;"></div>
-
-      <div class="modal-acoes" style="flex-direction:column;gap:8px;">
-        <button type="button" id="btn-confirmar-recuperar-senha" class="btn btn-entrar" style="width:100%;background:#2563eb;font-weight:700;font-size:14px;padding:12px;border:none;cursor:pointer;">
-          🔍 Enviar Link de Recuperação
-        </button>
-        <a id="btn-recuperar-whatsapp" href="https://wa.me/258840157474?text=Olá Faruque, preciso de recuperar o acesso à minha conta FABEF ERP" target="_blank" class="btn" style="width:100%;background:#25d366;color:#fff;font-weight:700;font-size:13px;text-decoration:none;padding:10px;display:none;border-radius:8px;align-items:center;justify-content:center;gap:6px;">
-          📱 Apoio Imediato via WhatsApp (+258 84 015 7474)
-        </a>
-        <button type="button" class="btn btn-light" onclick="fecharModal('modal-recuperar-senha')" style="width:100%;padding:10px;border-radius:8px;border:1px solid #cbd5e1;">
-          Cancelar
-        </button>
       </div>
     </div>
   </div>
