@@ -441,6 +441,11 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <button data-sec="subscricao">💳 Subscrição</button>
     </details>
 
+    <details style="margin-top:6px;border-left:3px solid #f59e0b;padding-left:4px;display:none;" open>
+      <summary style="cursor:pointer;color:#fbbf24;font-size:12px;font-weight:800;padding:8px 8px;text-transform:uppercase;">🛡️ Administrador FABEF</summary>
+      <button data-sec="admin" id="btn-sidebar-admin" style="display:none;background:#78350f;color:#fff;font-weight:700;border:1px solid #f59e0b;">🛡️ Ativar Contas</button>
+    </details>
+
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:6px;">
       <button id="btn-sidebar-instalar" style="background:#1e3a8a;border:1px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
         📲 <span>Instalar Aplicativo no Celular</span>
@@ -1068,6 +1073,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
 
           <div id="caixa-movimentos" style="margin-bottom:16px;"></div>
 
+          <div id="aviso-fecho-so-gerente" class="alert alert-info" style="display:none;font-size:13px;font-weight:700;">🔒 Só o gerente pode fechar o caixa. No fim do turno, chame o gerente para fazer o fecho.</div>
           <button id="btn-fechar-caixa" class="btn btn-danger" type="button" onclick="window.abrirModalFecharCaixaCego()" style="width:auto;padding:12px 26px;font-weight:800;font-size:14px;box-shadow:0 2px 6px rgba(239,68,68,0.3);display:inline-flex;align-items:center;gap:8px;">
             🔒 Fechar Caixa (Conferência Cega)
           </button>
@@ -1795,6 +1801,39 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </section>
 
     <!-- SUBSCRIÇÃO & ATIVAÇÃO DA LICENÇA -->
+    <section class="secao" id="sec-admin">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <h2 style="margin:0;">🛡️ Painel do Administrador FABEF</h2>
+          <p style="font-size:13px;color:#64748b;margin:2px 0 0;">Ative as contas depois de confirmar o pagamento da subscrição (M-Pesa / e-Mola).</p>
+        </div>
+        <button type="button" class="btn btn-light" onclick="window.carregarPainelAdmin()" style="padding:8px 14px;font-weight:700;">🔄 Atualizar</button>
+      </div>
+      <div id="admin-aviso"></div>
+      <div class="grid">
+        <div class="kpi"><div class="rotulo">Empresas</div><div class="valor" id="admin-kpi-total">0</div></div>
+        <div class="kpi"><div class="rotulo">Pagas (ativas)</div><div class="valor" id="admin-kpi-pagas">0</div></div>
+        <div class="kpi"><div class="rotulo">Em teste</div><div class="valor" id="admin-kpi-teste">0</div></div>
+        <div class="kpi"><div class="rotulo">Plano Grátis</div><div class="valor" id="admin-kpi-gratis">0</div></div>
+        <div class="kpi"><div class="rotulo">Pedidos pendentes</div><div class="valor" id="admin-kpi-pendentes" style="color:#dc2626;">0</div></div>
+      </div>
+      <div class="card" style="margin-top:14px;border-top:3px solid #f59e0b;">
+        <h3 style="margin-bottom:8px;">📥 Pedidos de ativação pendentes</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Data</th><th>Empresa / Gerente</th><th>Código / Chave</th><th>Valor</th><th>Ação</th></tr></thead>
+          <tbody id="admin-tabela-pedidos"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:8px;">🏢 Todas as empresas</h3>
+        <input type="text" id="admin-pesquisa" placeholder="🔍 Pesquisar por nome, telefone ou ID..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:12px;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Empresa</th><th>Registo</th><th>Estado da subscrição</th><th>Ação</th></tr></thead>
+          <tbody id="admin-tabela-empresas"></tbody>
+        </table></div>
+      </div>
+    </section>
+
     <section class="secao" id="sec-subscricao">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
         <div>
