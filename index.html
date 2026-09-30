@@ -790,6 +790,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- PRODUTOS -->
     <section class="secao" id="sec-produtos">
       <h2>Produtos</h2>
+      <div id="aviso-produtos-sem-produtos" class="alert alert-warn" style="display:none;background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;font-size:13px;font-weight:700;margin-bottom:12px;"></div>
       <div class="card">
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
           <input type="text" id="produto-pesquisa" placeholder="🔍 Pesquisar produto..." style="flex:1;min-width:180px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;">
@@ -877,6 +878,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     <!-- COMPRAS -->
     <section class="secao" id="sec-compras">
       <h2>Compras / Entradas</h2>
+      <div id="aviso-compras-sem-produtos" class="alert alert-warn" style="display:none;background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;font-size:13px;font-weight:700;margin-bottom:12px;"></div>
       <div class="card">
         <div class="grid">
           <div class="form-group"><label for="compra-produto">Produto</label><select id="compra-produto"></select></div>
