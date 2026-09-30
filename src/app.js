@@ -247,6 +247,10 @@ let FABEF_RELATORIO_ATUAL = null;
 /* =====================================================
    HELPER DE AUTORIZAÇÃO: VERIFICA SE É GERENTE / ADMIN
 ===================================================== */
+// Administrador FABEF (definido cedo de propósito: é lido no arranque da sessão).
+const ADMINS_FABEF = ["faruqueabilio95@gmail.com"];
+const FABEF_ADMIN = { empresas: [], pedidos: [], carregado: false };
+
 function ehUsuarioGerente() {
     if (window.FABEF?.isDemoMode) {
         return (window.FABEF.demoPerfil || "gerente") === "gerente";
@@ -1177,6 +1181,7 @@ function limparInterfaceFABEF() {
         });
         window.FABEF_ULTIMO_FECHO = null;
         window.FABEF_SALDO_REVELADO_GERENTE = false;
+        fecharMenuLateral();
         try { FABEF_ADMIN.empresas = []; FABEF_ADMIN.pedidos = []; FABEF_ADMIN.carregado = false; } catch (_) {}
     } catch (e) {
         console.warn("Aviso ao limpar a interface:", e);
@@ -1244,6 +1249,7 @@ async function iniciarSessaoFABEF(user) {
 
         // Abre o painel imediatamente para o utilizador aceder sem esperas
         abrirAplicacao();
+        atualizarAcessoAdminFABEF();
         FABEF.carregado = true;
 
         // Carrega os dados em segundo plano com escutas em tempo real
@@ -1940,6 +1946,7 @@ function abrirAplicacao() {
         headerUser.textContent = FABEF.userData?.nome || FABEF.user?.email || "Utilizador";
     }
 
+    fecharMenuLateral(); // o menu e os seus grupos entram sempre fechados
     aplicarRestricoesDeAcessoPorPapel();
     renderTudo();
     verificarSubscricao();
@@ -1983,10 +1990,6 @@ function aplicarRestricoesDeAcessoPorPapel() {
     document.querySelectorAll(".sidebar button[data-sec]").forEach(btn => {
         const permitido = ehGerente || SECOES_FUNCIONARIO.includes(btn.dataset.sec);
         btn.style.display = permitido ? "" : "none";
-    });
-    // A aba do Administrador só aparece na conta do administrador FABEF
-    document.querySelectorAll('.sidebar button[data-sec="admin"]').forEach(btn => {
-        btn.style.display = ehAdminFABEF() ? "" : "none";
     });
 
     // 1. ABA DE OPERAÇÕES & COMÉRCIO (Visível para Funcionário e Gerente)
@@ -2036,9 +2039,12 @@ function aplicarRestricoesDeAcessoPorPapel() {
 
     // Todos os grupos (details) da sidebar ficam visíveis
     document.querySelectorAll(".sidebar details").forEach(det => {
+        if (det.id === "grupo-admin-fabef") return; // tratado por atualizarAcessoAdminFABEF()
         const temVisivel = Array.from(det.querySelectorAll("button")).some(b => b.style.display !== "none");
         det.style.display = temVisivel ? "" : "none";
     });
+    // A aba do Administrador só aparece na conta do administrador FABEF
+    atualizarAcessoAdminFABEF();
 
     // Informação de administração da conta (ID da empresa, ramo activo) só para o gerente
     const kpiIdEmpresa = document.getElementById("inicio-id-empresa")?.closest(".kpi");
@@ -2137,12 +2143,18 @@ window.verificarAcessoPosGerente = verificarAcessoPosGerente;
    MÓDULO LÓGICO: COMPORTAMENTO DO MENU (SIDEBAR)
 ===================================================== */
 
+// Recolhe todos os grupos do menu: só abrem quando o utilizador tocar neles.
+function recolherGruposMenu() {
+    document.querySelectorAll("#sidebar details").forEach(d => { d.open = false; });
+}
+
 function fecharMenuLateral() {
     const sidebar = document.getElementById("sidebar");
     if (sidebar) {
         sidebar.classList.remove("open");
         sidebar.classList.add("closed");
     }
+    recolherGruposMenu();
     const overlay = document.getElementById("sidebar-overlay");
     if (overlay) overlay.classList.add("hidden");
     document.body.classList.remove("menu-aberto");
@@ -2208,11 +2220,6 @@ function mostrarSecao(nome) {
     document.querySelectorAll(".sidebar button[data-sec]").forEach(b => {
         b.classList.toggle("active", b.dataset.sec === nome);
     });
-
-    // Garante que o grupo (categoria) do botão ativo fica aberto/visível
-    const botaoAtivo = document.querySelector(`.sidebar button[data-sec="${nome}"]`);
-    const grupo = botaoAtivo?.closest("details");
-    if (grupo) grupo.open = true;
 
     // AO CLICAR NA OPÇÃO, OS DIZERES DOS 3 PONTOS (SIDEBAR) DESAPARECEM IMEDIATAMENTE
     // E A TELA PRINCIPAL EXIBE LIMPA A OPÇÃO SELECIONADA
@@ -9419,16 +9426,28 @@ document.getElementById("btn-cadastrar-funcionario")?.addEventListener("click", 
    - IMPORTANTE: a segurança real está nas regras do Firestore
      (ver REGRAS-FIRESTORE-ADMIN.txt). Esconder o botão não chega.
 ===================================================== */
-const ADMINS_FABEF = ["faruqueabilio95@gmail.com"];
 
 function ehAdminFABEF() {
     if (window.FABEF?.isDemoMode) return false;
-    const email = String(auth.currentUser?.email || FABEF.user?.email || "").trim().toLowerCase();
-    return !!email && ADMINS_FABEF.includes(email);
+    const email = String(auth.currentUser?.email || FABEF.user?.email || FABEF.userData?.email || "").trim().toLowerCase();
+    return !!email && ADMINS_FABEF.map(e => e.toLowerCase()).includes(email);
 }
+
+// Mostra/esconde TODOS os acessos do administrador (grupo do menu + botão do topo).
+// Corre de forma isolada: nada do resto pode impedir que o administrador o veja.
+function atualizarAcessoAdminFABEF() {
+    let eAdmin = false;
+    try { eAdmin = ehAdminFABEF(); } catch (e) { console.warn("Aviso (acesso admin):", e); }
+    const grupo = document.getElementById("grupo-admin-fabef");
+    if (grupo) grupo.style.display = eAdmin ? "" : "none";
+    const btnMenu = document.getElementById("btn-sidebar-admin");
+    if (btnMenu) btnMenu.style.display = eAdmin ? "" : "none";
+    const btnTopo = document.getElementById("btn-topo-admin");
+    if (btnTopo) btnTopo.style.display = eAdmin ? "inline-flex" : "none";
+}
+window.atualizarAcessoAdminFABEF = atualizarAcessoAdminFABEF;
 window.ehAdminFABEF = ehAdminFABEF;
 
-const FABEF_ADMIN = { empresas: [], pedidos: [], carregado: false };
 
 function paraDataAdmin(v) {
     if (!v) return null;
