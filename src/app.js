@@ -53,6 +53,7 @@ import {
     signOut,
     setPersistence,
     browserLocalPersistence,
+    browserSessionPersistence,
     sendPasswordResetEmail,
     updatePassword,
     reauthenticateWithCredential,
@@ -77,6 +78,8 @@ import {
     arrayUnion,
     increment,
     enableIndexedDbPersistence,
+    terminate,
+    clearIndexedDbPersistence,
     disableNetwork,
     enableNetwork
 } from "firebase/firestore";
@@ -182,12 +185,28 @@ const firebaseConfig = {
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
 
-// A sessão fica guardada no dispositivo (não expira ao fechar o navegador/app).
-// Isto é necessário para o aplicativo funcionar OFFLINE — sem isto, reabrir sem
-// internet obrigaria sempre a um novo login, que precisa de rede. A segurança de
-// "pedir sempre alguma coisa ao reabrir" passa a ser feita pelo ecrã de PIN local
-// (ver módulo PIN mais abaixo), que não depende de internet.
-setPersistence(auth, browserLocalPersistence).catch(err => console.error("Erro ao configurar persistência de sessão:", err));
+// SEGURANÇA DA SESSÃO
+// false (recomendado): a sessão termina quando se fecha o separador/aplicativo. Ao abrir
+//   de novo, pede SEMPRE e-mail e senha (precisa de internet para entrar).
+// true: guarda o login no aparelho (permite reabrir sem internet), mas quem pegar no
+//   telemóvel entra na conta sem senha, a não ser que tenha PIN.
+const PERSISTIR_SESSAO_NO_APARELHO = false;
+setPersistence(auth, PERSISTIR_SESSAO_NO_APARELHO ? browserLocalPersistence : browserSessionPersistence)
+    .catch(err => console.error("Erro ao configurar persistência de sessão:", err));
+
+// Primeiro arranque com esta versão: termina qualquer sessão antiga guardada no aparelho
+// e apaga a cache antiga, para todos voltarem a entrar com senha uma vez.
+let FABEF_primeiroArranqueSeguro = false;
+let FABEF_loginFresco = false;      // true quando a pessoa acabou de escrever e-mail e senha
+let FABEF_teveSessao = false;       // true depois de uma sessão ter sido iniciada
+let FABEF_msgLogin = "";            // mensagem a mostrar no ecrã de login (ex.: inatividade)
+try {
+    if (!localStorage.getItem("fabef_seguranca_v2")) {
+        localStorage.setItem("fabef_seguranca_v2", "1");
+        localStorage.setItem("fabef_cache_suja", "1");
+        FABEF_primeiroArranqueSeguro = true;
+    }
+} catch (_) {}
 
 const db = getFirestore(appFirebase);
 
@@ -847,6 +866,7 @@ async function executarLogin() {
 
     try {
         // Autentica no Firebase
+        FABEF_loginFresco = true;
         const credencial = await signInWithEmailAndPassword(auth, email, senha);
         if (status) {
             status.textContent = "🟢 Acesso autorizado! A abrir o painel...";
@@ -992,6 +1012,7 @@ if (btnRegistar && !btnRegistar.dataset.fabefBound) {
 }
 
 async function criarConta() {
+    FABEF_loginFresco = true;
     if (FABEF_registoEmCurso) return;
 
     const empresaNome = elAuth("reg-empresa")?.value?.trim() || "";
@@ -1084,6 +1105,51 @@ async function criarConta() {
         FABEF_registoEmCurso = false;
         if (btnRegistar) btnRegistar.disabled = false;
     }
+}
+
+// Apaga TUDO o que a conta deixou no aparelho e reinicia a aplicação em branco.
+let FABEF_aApagar = false;
+function limparArmazenamentoLocalSessao() {
+    try {
+        const remover = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith("fabef_local_") || k === "fabef_empresa_cache")) remover.push(k);
+        }
+        remover.forEach(k => localStorage.removeItem(k));
+    } catch (_) {}
+}
+async function apagarDadosLocaisEReiniciar() {
+    if (FABEF_aApagar) return;
+    FABEF_aApagar = true;
+    const msg = FABEF_msgLogin;
+    try { limparArmazenamentoLocalSessao(); } catch (_) {}
+    try { (FABEF.listeners || []).forEach(u => { try { u(); } catch (_) {} }); } catch (_) {}
+    try { await terminate(db); } catch (_) {}
+    try { await clearIndexedDbPersistence(db); } catch (e) { console.warn("Aviso ao limpar a cache offline:", e); }
+    try {
+        localStorage.removeItem("fabef_cache_suja");
+        sessionStorage.clear();
+        if (msg) sessionStorage.setItem("fabef_msg_login", msg);
+    } catch (_) {}
+    location.reload();
+}
+
+// Avisos VISÍVEIS quando o Firestore recusa ler dados (antes só aparecia na consola).
+const FABEF_errosLeitura = new Set();
+function mostrarAvisoLeitura(nome, erro) {
+    if (!erro || erro.code !== "permission-denied") return;
+    FABEF_errosLeitura.add(nome);
+    let b = document.getElementById("aviso-leitura-firestore");
+    if (!b) {
+        b = document.createElement("div");
+        b.id = "aviso-leitura-firestore";
+        b.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:99999;background:#7f1d1d;color:#fff;padding:12px 14px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.35);";
+        document.body.appendChild(b);
+    }
+    b.innerHTML = "🔴 Sem permissão para ler: <u>" + Array.from(FABEF_errosLeitura).join(", ") +
+        "</u>.<br><span style='font-weight:400'>Por isso esses dados não aparecem. Causa provável: as regras do Firestore ou esta conta não pertence a esta empresa. Envie uma captura deste aviso ao suporte.</span> " +
+        "<button type='button' onclick=\"this.parentNode.remove()\" style='margin-left:6px;background:#fff;color:#7f1d1d;border:none;border-radius:6px;padding:3px 8px;font-weight:800;'>OK</button>";
 }
 
 const IDS_LISTAS_DINAMICAS = [
@@ -1181,6 +1247,13 @@ function limparInterfaceFABEF() {
         });
         window.FABEF_ULTIMO_FECHO = null;
         window.FABEF_SALDO_REVELADO_GERENTE = false;
+        FABEF_errosLeitura.clear();
+        document.getElementById("aviso-leitura-firestore")?.remove();
+        ["aviso-compras-sem-produtos", "aviso-produtos-sem-produtos"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.style.display = "none"; el.dataset.pronto = ""; el.innerHTML = ""; }
+        });
+        FABEF_diagRamoFeito = "";
         fecharMenuLateral();
         try { FABEF_ADMIN.empresas = []; FABEF_ADMIN.pedidos = []; FABEF_ADMIN.carregado = false; } catch (_) {}
     } catch (e) {
@@ -1224,12 +1297,16 @@ async function limparEstadoFABEF() {
     FABEF._raw = {};
     FABEF.carregado = false;
     FABEF.ramo = "";
+    limparArmazenamentoLocalSessao();
     limparInterfaceFABEF();
 }
 
 async function iniciarSessaoFABEF(user) {
     if (FABEF_arranqueEmCurso) return;
     FABEF_arranqueEmCurso = true;
+    FABEF_teveSessao = true;
+    FABEF_msgLogin = "";
+    try { localStorage.setItem("fabef_cache_suja", "1"); } catch (_) {}
 
     const loginStatus = elAuth("login-status");
     try {
@@ -1607,6 +1684,24 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
+/* =====================================================
+   SAÍDA AUTOMÁTICA POR INATIVIDADE
+   Sem tocar no ecrã durante este tempo, a sessão termina e o aparelho é limpo.
+===================================================== */
+const MINUTOS_INATIVIDADE_SAIR = 20;
+let FABEF_ultimaAtividade = Date.now();
+["pointerdown", "keydown", "touchstart", "wheel", "scroll"].forEach(ev =>
+    window.addEventListener(ev, () => { FABEF_ultimaAtividade = Date.now(); }, { passive: true, capture: true }));
+async function verificarInatividade() {
+    if (!auth.currentUser || window.FABEF?.isDemoMode) return;
+    if (Date.now() - FABEF_ultimaAtividade < MINUTOS_INATIVIDADE_SAIR * 60000) return;
+    FABEF_ultimaAtividade = Date.now();
+    FABEF_msgLogin = "⏱️ Sessão terminada por inatividade. Entre novamente.";
+    try { await signOut(auth); } catch (e) { console.warn("Erro ao sair por inatividade:", e); }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) verificarInatividade(); });
+setInterval(verificarInatividade, 30000);
+
 // Botão de bloqueio instantâneo no topo do sistema
 document.getElementById("btn-bloquear-ecra")?.addEventListener("click", () => {
     sessionStorage.removeItem("fabef_sessao_desbloqueada");
@@ -1634,13 +1729,35 @@ onAuthStateChanged(auth, async user => {
         elAuth("login-form")?.classList.remove("hidden");
         elAuth("registo-form")?.classList.add("hidden");
         const status = elAuth("login-status");
-        if (status) status.textContent = "";
+        let msgPendente = FABEF_msgLogin || "";
+        try { msgPendente = msgPendente || sessionStorage.getItem("fabef_msg_login") || ""; sessionStorage.removeItem("fabef_msg_login"); } catch (_) {}
+        if (status) { status.textContent = msgPendente; status.style.color = "#b45309"; }
         const btnLogin = elAuth("btn-login");
         if (btnLogin) btnLogin.disabled = false;
         const senhaInput = elAuth("login-senha");
         if (senhaInput) senhaInput.value = "";
+
+        // Saiu (manual, automática ou sessão terminada): apaga TUDO o que ficou no aparelho
+        // (cache local e cache offline do Firestore) e recomeça em branco.
+        let suja = FABEF_teveSessao;
+        try { suja = suja || localStorage.getItem("fabef_cache_suja") === "1"; } catch (_) {}
+        if (suja) {
+            FABEF_teveSessao = false;
+            if (status && !msgPendente) { status.textContent = "🧹 A limpar os dados deste aparelho..."; }
+            FABEF_msgLogin = msgPendente;
+            await apagarDadosLocaisEReiniciar();
+        }
         return;
     }
+
+    // Sessão antiga guardada no aparelho (versão anterior): terminar e pedir senha.
+    if (FABEF_primeiroArranqueSeguro && !FABEF_loginFresco) {
+        FABEF_primeiroArranqueSeguro = false;
+        FABEF_msgLogin = "🔒 Por segurança, entre novamente com o e-mail e a senha.";
+        await signOut(auth);
+        return;
+    }
+    FABEF_primeiroArranqueSeguro = false;
 
     // Se saiu manualmente através do botão Sair, deve pedir e-mail e senha
     if (sessionStorage.getItem("fabef_saiu_manual") === "true") {
@@ -1913,7 +2030,7 @@ function escutarColecao(nome, estado) {
             aplicarFiltroDia();
             if(estado==="produtos") verificarReconciliacaoStock();
             if(primeiraVez){primeiraVez=false;resolve();} else pedirRenderTudo();
-        }, (erro)=>{ console.error(`Erro ao escutar a colecção "${nome}":`,erro); if(primeiraVez){primeiraVez=false;resolve();} });
+        }, (erro)=>{ console.error(`Erro ao escutar a colecção "${nome}":`,erro); mostrarAvisoLeitura(nome, erro); if(primeiraVez){primeiraVez=false;resolve();} });
         FABEF.listeners.push(unsub);
     });
 }
@@ -3055,6 +3172,7 @@ document.getElementById("btn-eliminar-produto")?.addEventListener("click",elimin
 
 function renderProdutos() {
     const pesquisa = document.getElementById("produto-pesquisa").value.toLowerCase();
+    diagnosticarSemProdutos("aviso-produtos-sem-produtos", FABEF.produtos.filter(p => p.ramo === FABEF.ramo).length);
 
     // Filtra primeiro pelo ramo activo, depois pela pesquisa de nome/código
     const produtosFiltrados = FABEF.produtos.filter(p => {
@@ -3364,6 +3482,41 @@ window.abrirRastreabilidadeDeLotes = function (idProduto, nomeProduto) {
    MÓDULO LÓGICO: GESTão E FILTRAGEM DE COMPRAS / ENTRADAS
 ===================================================== */
 
+let FABEF_diagRamoFeito = "";
+async function diagnosticarSemProdutos(idAviso, qtd) {
+    const el = document.getElementById(idAviso);
+    if (!el) return;
+    if (qtd > 0 || !FABEF.carregado || window.FABEF?.isDemoMode || !FABEF.empresaId) {
+        el.style.display = "none";
+        if (qtd > 0) FABEF_diagRamoFeito = "";
+        return;
+    }
+    const chave = FABEF.empresaId + "|" + (FABEF.ramo || "");
+    if (FABEF_diagRamoFeito === chave) { el.style.display = ""; return; }
+    FABEF_diagRamoFeito = chave;
+    el.style.display = "";
+    el.innerHTML = "⏳ A verificar porque não há produtos neste ramo...";
+    try {
+        const snap = await getDocs(subRef("produtos"));
+        const cont = {};
+        snap.docs.forEach(d => { const r = d.data().ramo || "(sem ramo)"; cont[r] = (cont[r] || 0) + 1; });
+        const outros = Object.entries(cont).filter(([r]) => r !== FABEF.ramo);
+        let html = `⚠️ Não há produtos no ramo <strong>${escapeHTML(FABEF.ramo || "—")}</strong>.`;
+        if (obterPlanoAtual(FABEF.ramo) === "BLOQUEADO") html += " 🔒 Este ramo ainda não tem subscrição.";
+        if (outros.length) {
+            html += "<br>Existem produtos noutros ramos: " + outros.map(([r, n]) =>
+                `<button type="button" class="btn btn-light btn-small" style="width:auto;padding:4px 10px;margin:2px;" onclick="mudarRamo('${escapeHTML(r)}')">${escapeHTML(r)} (${n})</button>`).join(" ");
+        } else if (snap.size === 0) {
+            html += "<br>Ainda não registou nenhum produto. Registe-os na aba Produtos.";
+        }
+        el.innerHTML = html;
+    } catch (e) {
+        el.innerHTML = e.code === "permission-denied"
+            ? "🔴 Sem permissão para ler os produtos desta empresa. Verifique as regras do Firestore e se entrou com a conta certa."
+            : "⚠️ Não foi possível verificar os produtos: " + mensagemFirebase(e);
+    }
+}
+
 function preencherProdutosCompra() {
     const select = document.getElementById("compra-produto");
     if (!select) return;
@@ -3388,6 +3541,7 @@ function preencherProdutosCompra() {
             .join("");
     }
 
+    diagnosticarSemProdutos("aviso-compras-sem-produtos", FABEF.produtos.filter(p => p.ramo === FABEF.ramo).length);
     renderSugestoesComprasRamo();
 }
 
