@@ -2089,14 +2089,15 @@ function abrirAplicacao() {
    Só as contas de funcionário têm acesso à página "Vender".
 ===================================================== */
 // Secções que o FUNCIONÁRIO pode abrir (tudo o resto é exclusivo do gerente):
-//  Operações & Comercial: pos, vendas, caixa, despesas, clientes, dividas, encomendas
-//  Stock: produtos, inventario, compras, fornecedores
+//  Operações & Comercial: pos, vendas, despesas, clientes, dividas (fiado), encomendas
+//     (SEM caixa: o caixa abre sozinho na 1.ª venda e só o gerente o fecha)
+//  Stock: produtos (só ver), inventario (só ver). SEM compras e SEM fornecedores.
 //  Gestão & Relatórios: relatorios, metas, dispensas, sugestoes
 //  Configurações: despesas, dispensas (+ Definir/Alterar PIN e Alterar Senha, que são modais)
 const SECOES_FUNCIONARIO = [
     "inicio",
-    "pos", "vendas", "caixa", "despesas", "clientes", "dividas", "encomendas",
-    "produtos", "inventario", "compras", "fornecedores",
+    "pos", "vendas", "despesas", "clientes", "dividas", "encomendas",
+    "produtos", "inventario",
     "relatorios", "metas", "dispensas", "sugestoes"
 ];
 
@@ -2109,29 +2110,9 @@ function aplicarRestricoesDeAcessoPorPapel() {
         btn.style.display = permitido ? "" : "none";
     });
 
-    // 1. ABA DE OPERAÇÕES & COMÉRCIO (Visível para Funcionário e Gerente)
-    // POS (Vender), Vendas, Caixa / Turnos, Despesas, Clientes, Fiado / Dívidas, Encomendas
-    ["pos", "vendas", "caixa", "despesas", "clientes", "dividas", "encomendas"].forEach(sec => {
-        document.querySelectorAll(`.sidebar button[data-sec="${sec}"]`).forEach(btn => {
-            btn.style.display = "";
-        });
-    });
+    // (A visibilidade de cada botão do menu já foi decidida acima pela lista SECOES_FUNCIONARIO.
+    //  Não voltar a mostrar aqui botões que o funcionário não pode usar.)
 
-    // 2. ABA DE STOCK (Visível para Funcionário e Gerente)
-    // Produtos, Inventário, Compras, Fornecedores
-    ["produtos", "inventario", "compras", "fornecedores"].forEach(sec => {
-        document.querySelectorAll(`.sidebar button[data-sec="${sec}"]`).forEach(btn => {
-            btn.style.display = "";
-        });
-    });
-
-    // 3. ABA DE GESTÃO & RELATÓRIOS
-    // Para Funcionário: Relatórios, Metas, Dispensas e Sugestões
-    ["relatorios", "metas", "dispensas", "sugestoes"].forEach(sec => {
-        document.querySelectorAll(`.sidebar button[data-sec="${sec}"]`).forEach(btn => {
-            btn.style.display = "";
-        });
-    });
     // Reservado EXCLUSIVAMENTE ao Gerente em Gestão & Relatórios:
     // Lucro Real (DRE) e Desempenho individual
     ["lucro", "desempenho"].forEach(sec => {
@@ -3084,6 +3065,7 @@ document.getElementById("produto-pesquisa").addEventListener("input", renderProd
 
 
 window.abrirModalEditarProduto = function(id) {
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente altera produtos. O funcionário apenas consulta."); return; }
     const gerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
     if (!gerente && !window.FABEF?.isDemoMode) {
         alert("Operação negada: Apenas o Gerente tem autorização para editar produtos.");
@@ -3315,7 +3297,7 @@ function renderInventario() {
                         '<span class="badge badge-green">NORMAL</span>')
                 }
             </td>
-            <td><button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock('${escapeHTML(p.id)}')">⚙️  Ajustar</button></td>
+            <td>${(ehUsuarioGerente() || window.FABEF?.isDemoMode) ? `<button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock('${escapeHTML(p.id)}')">⚙️  Ajustar</button>` : `<span style="color:#94a3b8;font-size:12px;font-weight:600;">🔒 Só Gerente</span>`}</td>
         </tr>
         `;
     }).join("") || `
@@ -3653,6 +3635,7 @@ document.getElementById("btn-registar-compra").addEventListener("click", regista
 ===================================================== */
 
 async function registarCompra() {
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente regista compras."); return; }
     const produtoId = document.getElementById("compra-produto").value;
     const fornecedor = document.getElementById("compra-fornecedor").value.trim();
     const quantidade = numero(document.getElementById("compra-quantidade").value);
@@ -5287,7 +5270,6 @@ function renderLinhaVendaHTML(v) {
                     ${!ehFalhada ? `
                         <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:12px;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;border-radius:6px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar ao Gerente</button>
                     ` : ""}
-                    <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); apagarVenda('${escapeHTML(v.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;" title="Apagar definitivamente e repor stock">🗑️ Apagar Venda</button>
                     ` : ""}
                 </div>
             </details>
@@ -10650,11 +10632,11 @@ window.abrirModalEditarVenda = function(vendaId) {
     if (elPagamento) elPagamento.value = v.pagamento || "Dinheiro";
     if (elCliente) elCliente.value = v.clienteNome || v.cliente || "";
     if (elNuit) elNuit.value = v.nuitCliente || "";
-    if (elJust) elJust.value = v.justificativaGerente || "";
+    if (elJust) elJust.value = ""; // cada edição exige uma justificação NOVA
 
     const btnApagarModal = document.getElementById("btn-modal-apagar-venda");
     if (btnApagarModal) {
-        btnApagarModal.onclick = () => window.apagarVenda(v.id);
+        btnApagarModal.style.display = "none"; // vendas não se apagam: editam-se com justificação
     }
 
     modal.classList.add("show");
@@ -10695,7 +10677,17 @@ window.salvarEdicaoVenda = async function() {
         const totalAntigo = numero(v.total);
         const diferenca = novoTotal - totalAntigo;
 
+        const registoEdicao = {
+            em: new Date().toISOString(),
+            por: usuarioNome,
+            totalAntes: totalAntigo,
+            totalDepois: novoTotal,
+            pagamentoAntes: v.pagamento || "",
+            pagamentoDepois: novoPagamento,
+            justificativa: justificativa
+        };
         const updateData = {
+            historicoEdicoes: arrayUnion(registoEdicao),
             total: novoTotal,
             totalOriginal: v.totalOriginal || totalAntigo,
             pagamento: novoPagamento,
@@ -10727,7 +10719,7 @@ window.salvarEdicaoVenda = async function() {
             await updateDoc(doc(db, "empresas", FABEF.empresaId, "vendas", vendaId), updateData);
         }
 
-        Object.assign(v, updateData);
+        Object.assign(v, updateData, { historicoEdicoes: [...(v.historicoEdicoes || []), registoEdicao] });
 
         await gravarAuditoria(`✏️ VENDA EDITADA (#${v.id.slice(0, 8)}) por ${usuarioNome}. Novo total: ${dinheiro(novoTotal)} (Antes: ${dinheiro(totalAntigo)}). Motivo: "${justificativa}"`, "ALERTA");
 
@@ -10745,6 +10737,10 @@ window.salvarEdicaoVenda = async function() {
 document.getElementById("btn-guardar-edicao-venda")?.addEventListener("click", window.salvarEdicaoVenda);
 
 window.apagarVenda = async function(vendaId) {
+    if (!window.FABEF?.isDemoMode) {
+        alert("🔒 As vendas não se apagam, para manter o histórico. Use 'Editar' (com justificação) ou marque como falhada.");
+        return;
+    }
     if (!podeOperarVendasEDespesas()) { avisoSoFuncionario("Apagar vendas"); return; }
     const v = (FABEF.vendas || []).find(x => x.id === vendaId) || (FABEF._raw?.vendas || []).find(x => x.id === vendaId);
     if (!v) {
