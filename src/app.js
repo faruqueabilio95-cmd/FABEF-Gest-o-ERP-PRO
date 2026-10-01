@@ -183,7 +183,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v8-20260930";
+const FABEF_BUILD = "v9-20260930";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -1169,6 +1169,8 @@ const IDS_LISTAS_DINAMICAS = [
     "caixa-movimentos",
     "carrinho-corpo",
     "compra-produto",
+    "compra-lista-produtos",
+    "compra-produto-escolhido",
     "config-ramos-tabs-bar",
     "config-seletor-ramo",
     "container-grafico-vendas",
@@ -1688,77 +1690,6 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
-
-/* =====================================================
-   DIAGNÓSTICO / VERSÃO (mostra factos, em vez de adivinhar)
-===================================================== */
-let FABEF_diagProdutosTexto = "";
-async function textoDiagnosticoFABEF() {
-    const L = [];
-    const meta = document.querySelector('meta[name="fabef-build"]')?.content || "?";
-    L.push("VERSÕES");
-    L.push(`  index.html : ${meta}`);
-    L.push(`  app.js     : ${FABEF_BUILD}${meta === FABEF_BUILD ? "  ✔ iguais" : "  ✘ DIFERENTES (ficheiros desencontrados)"}`);
-    try { const ks = await caches.keys(); L.push("  cache      : " + (ks.join(", ") || "nenhuma")); } catch (_) {}
-    L.push("");
-    L.push("SESSÃO");
-    const email = auth.currentUser?.email || FABEF.user?.email || "—";
-    L.push(`  e-mail     : ${email}`);
-    L.push(`  perfil     : ${FABEF.userData?.perfil ?? "?"} / ${FABEF.userData?.role ?? "?"}   estado: ${FABEF.userData?.estado ?? "?"}`);
-    L.push(`  é gerente  : ${ehUsuarioGerente() ? "sim" : "não"}`);
-    L.push(`  administrador FABEF: ${ehAdminFABEF() ? "SIM" : "NÃO"}  (conta de administrador: ${ADMINS_FABEF.join(", ")})`);
-    L.push(`  empresa    : ${FABEF.empresa?.nome ?? "?"}  (id ${String(FABEF.empresaId || "").slice(0, 6)}…, ${FABEF.empresaId === auth.currentUser?.uid ? "igual" : "DIFERENTE"} ao id da conta)`);
-    L.push("");
-    L.push("RAMOS E SUBSCRIÇÃO");
-    L.push(`  ramo ativo : ${FABEF.ramo || "(nenhum)"}`);
-    try {
-        nomesRamosEmpresa(FABEF.empresa).forEach(r => {
-            const info = rotuloPlanoRamo(r);
-            L.push(`  - ${r}: ${info.txt.replace(/^[^\wÀ-ú]+/, "")}${ramoDisponivel(r) ? "" : "  [ESCONDIDO]"}${r === FABEF.ramo ? "  ◀ ativo" : ""}`);
-        });
-    } catch (e) { L.push("  (erro ao ler ramos: " + e.message + ")"); }
-    L.push("");
-    L.push("DADOS");
-    const doRamo = (FABEF.produtos || []).filter(p => p.ramo === FABEF.ramo).length;
-    L.push(`  produtos no ramo ativo: ${doRamo}   (em memória: ${(FABEF.produtos || []).length})`);
-    L.push(`  dados carregados: ${FABEF.carregado ? "sim" : "não"}   internet: ${navigator.onLine ? "sim" : "não"}`);
-    L.push(`  erros de leitura (Firestore): ${FABEF_errosLeitura.size ? Array.from(FABEF_errosLeitura).join(", ") : "nenhum"}`);
-    if (FABEF_diagProdutosTexto) { L.push(""); L.push("PRODUTOS POR RAMO (na base de dados)"); L.push(FABEF_diagProdutosTexto); }
-    return L.join("\n");
-}
-async function atualizarJanelaDiagnostico() {
-    const el = document.getElementById("diag-texto");
-    if (el) el.textContent = await textoDiagnosticoFABEF();
-}
-window.abrirDiagnosticoFABEF = async function () {
-    FABEF_diagProdutosTexto = "";
-    document.getElementById("modal-diagnostico")?.classList.add("show");
-    await atualizarJanelaDiagnostico();
-};
-window.verificarProdutosTodosRamos = async function () {
-    FABEF_diagProdutosTexto = "  ⏳ a contar...";
-    await atualizarJanelaDiagnostico();
-    try {
-        const snap = await getDocs(subRef("produtos"));
-        const cont = {};
-        snap.docs.forEach(d => { const r = d.data().ramo || "(sem ramo)"; cont[r] = (cont[r] || 0) + 1; });
-        const linhas = Object.entries(cont).map(([r, n]) => `  - ${r}: ${n} produto(s)${r === FABEF.ramo ? "  ◀ ramo ativo" : ""}`);
-        FABEF_diagProdutosTexto = linhas.length ? linhas.join("\n") : "  (a empresa não tem nenhum produto registado)";
-    } catch (e) {
-        FABEF_diagProdutosTexto = e.code === "permission-denied"
-            ? "  ✘ SEM PERMISSÃO para ler produtos (regras do Firestore ou conta de outra empresa)"
-            : "  ✘ erro: " + (e.message || e);
-    }
-    await atualizarJanelaDiagnostico();
-};
-window.copiarDiagnosticoFABEF = async function () {
-    try {
-        await navigator.clipboard.writeText(document.getElementById("diag-texto")?.textContent || "");
-        alert("Diagnóstico copiado. Cole-o na conversa.");
-    } catch (_) {
-        alert("Não foi possível copiar. Tire uma captura de ecrã desta janela.");
-    }
-};
 
 /* =====================================================
    SAÍDA AUTOMÁTICA POR INATIVIDADE
@@ -3575,9 +3506,74 @@ async function diagnosticarSemProdutos(idAviso, qtd) {
     }
 }
 
+function normalizarBusca(t) {
+    return String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+// Lista de produtos do ramo ativo, filtrada pelo que o gerente escreve na pesquisa.
+function renderListaProdutosCompra() {
+    const lista = document.getElementById("compra-lista-produtos");
+    const select = document.getElementById("compra-produto");
+    if (!lista || !select) return;
+
+    const termo = normalizarBusca(document.getElementById("compra-pesquisa")?.value);
+    const selecionado = select.value;
+    const todos = (FABEF.produtos || [])
+        .filter(p => p.ramo === FABEF.ramo)
+        .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt"));
+    const achados = termo
+        ? todos.filter(p => [p.nome, p.idPersonalizado, p.codigo].some(v => normalizarBusca(v).includes(termo)))
+        : todos;
+
+    const LIMITE = 40;
+    let html = achados.slice(0, LIMITE).map(p => {
+        const ativo = p.id === selecionado;
+        return `<button type="button" onclick="window.escolherProdutoCompra('${escapeHTML(p.id)}')"
+            style="display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border:none;border-bottom:1px solid #f1f5f9;background:${ativo ? "#dcfce7" : "#fff"};cursor:pointer;font-size:14px;">
+            <span style="font-weight:${ativo ? 800 : 600};color:#0f172a;">${ativo ? "✔ " : ""}${escapeHTML(p.nome || "—")}</span>
+            <span style="font-size:12px;color:#64748b;white-space:nowrap;">stock ${numero(p.stock)}${p.custo ? " · custo " + dinheiro(p.custo) : ""}</span>
+        </button>`;
+    }).join("");
+    if (achados.length > LIMITE) {
+        html += `<div style="padding:8px 12px;font-size:12px;color:#64748b;">A mostrar ${LIMITE} de ${achados.length}. Escreva mais letras para refinar a pesquisa.</div>`;
+    }
+    if (!achados.length) {
+        html = `<div style="padding:12px;color:#64748b;font-size:13px;">${todos.length ? "Nenhum produto encontrado para a pesquisa." : "Este ramo ainda não tem produtos."}</div>`;
+    }
+    lista.innerHTML = html;
+
+    const resumo = document.getElementById("compra-produto-escolhido");
+    if (resumo) {
+        const p = todos.find(x => x.id === selecionado);
+        resumo.innerHTML = p
+            ? `✔ Selecionado: <strong>${escapeHTML(p.nome || "—")}</strong> · stock atual ${numero(p.stock)}`
+            : "Nenhum produto selecionado. Pesquise e toque no produto.";
+    }
+}
+window.renderListaProdutosCompra = renderListaProdutosCompra;
+
+window.escolherProdutoCompra = function (id) {
+    const select = document.getElementById("compra-produto");
+    if (!select) return;
+    if (select.value !== id) {
+        // Outro produto: não arrastar o custo e o fornecedor do produto anterior
+        const c = document.getElementById("compra-custo");
+        const f = document.getElementById("compra-fornecedor");
+        if (c) c.value = "";
+        if (f) f.value = "";
+    }
+    select.value = id;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    renderListaProdutosCompra();
+    document.getElementById("compra-quantidade")?.focus();
+};
+
+document.getElementById("compra-pesquisa")?.addEventListener("input", renderListaProdutosCompra);
+
 function preencherProdutosCompra() {
     const select = document.getElementById("compra-produto");
     if (!select) return;
+    const valorAnterior = select.value; // não perder o produto escolhido quando os dados atualizam
 
     // Filtra estritamente os produtos pertencentes ao ramo de atividade atual
     select.innerHTML = `
@@ -3589,6 +3585,8 @@ function preencherProdutosCompra() {
             ${escapeHTML(p.nome)}
         </option>
         `).join("");
+    if (valorAnterior && Array.from(select.options).some(o => o.value === valorAnterior)) select.value = valorAnterior;
+    renderListaProdutosCompra();
 
     // Sugestões de fornecedores isoladas e filtradas ESTRITAMENTE para este ramo (não mistura fornecedores)
     const listaFornecedores = document.getElementById("lista-fornecedores-compra");
@@ -3690,6 +3688,9 @@ window.renderSugestoesComprasRamo = function() {
 window.prepararCompraArtigo = function(produtoId, fornecedorNome, custoUnit, qtd) {
     const selProd = document.getElementById("compra-produto");
     if (selProd) selProd.value = produtoId;
+    const pesq = document.getElementById("compra-pesquisa");
+    if (pesq) pesq.value = "";
+    renderListaProdutosCompra();
     const inputForn = document.getElementById("compra-fornecedor");
     if (inputForn) inputForn.value = fornecedorNome;
     const inputCusto = document.getElementById("compra-custo");
@@ -3699,7 +3700,7 @@ window.prepararCompraArtigo = function(produtoId, fornecedorNome, custoUnit, qtd
         inputQtd.value = qtd || 1;
         inputQtd.focus();
     }
-    document.getElementById("compra-produto")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("compra-pesquisa")?.scrollIntoView({ behavior: "smooth", block: "center" });
 };
 
 
@@ -3796,6 +3797,9 @@ async function registarCompra() {
         document.getElementById("compra-fornecedor").value = "";
         document.getElementById("compra-quantidade").value = "";
         document.getElementById("compra-custo").value = "";
+        document.getElementById("compra-produto").value = "";
+        const pesqCompra = document.getElementById("compra-pesquisa");
+        if (pesqCompra) pesqCompra.value = "";
 
         renderTudo();
 
