@@ -182,6 +182,10 @@ const firebaseConfig = {
 };
 
 
+// Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
+const FABEF_BUILD = "v8-20260930";
+window.FABEF_BUILD = FABEF_BUILD;
+
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
 
@@ -1683,6 +1687,78 @@ document.addEventListener("visibilitychange", () => {
         }
     }
 });
+
+
+/* =====================================================
+   DIAGNÓSTICO / VERSÃO (mostra factos, em vez de adivinhar)
+===================================================== */
+let FABEF_diagProdutosTexto = "";
+async function textoDiagnosticoFABEF() {
+    const L = [];
+    const meta = document.querySelector('meta[name="fabef-build"]')?.content || "?";
+    L.push("VERSÕES");
+    L.push(`  index.html : ${meta}`);
+    L.push(`  app.js     : ${FABEF_BUILD}${meta === FABEF_BUILD ? "  ✔ iguais" : "  ✘ DIFERENTES (ficheiros desencontrados)"}`);
+    try { const ks = await caches.keys(); L.push("  cache      : " + (ks.join(", ") || "nenhuma")); } catch (_) {}
+    L.push("");
+    L.push("SESSÃO");
+    const email = auth.currentUser?.email || FABEF.user?.email || "—";
+    L.push(`  e-mail     : ${email}`);
+    L.push(`  perfil     : ${FABEF.userData?.perfil ?? "?"} / ${FABEF.userData?.role ?? "?"}   estado: ${FABEF.userData?.estado ?? "?"}`);
+    L.push(`  é gerente  : ${ehUsuarioGerente() ? "sim" : "não"}`);
+    L.push(`  administrador FABEF: ${ehAdminFABEF() ? "SIM" : "NÃO"}  (conta de administrador: ${ADMINS_FABEF.join(", ")})`);
+    L.push(`  empresa    : ${FABEF.empresa?.nome ?? "?"}  (id ${String(FABEF.empresaId || "").slice(0, 6)}…, ${FABEF.empresaId === auth.currentUser?.uid ? "igual" : "DIFERENTE"} ao id da conta)`);
+    L.push("");
+    L.push("RAMOS E SUBSCRIÇÃO");
+    L.push(`  ramo ativo : ${FABEF.ramo || "(nenhum)"}`);
+    try {
+        nomesRamosEmpresa(FABEF.empresa).forEach(r => {
+            const info = rotuloPlanoRamo(r);
+            L.push(`  - ${r}: ${info.txt.replace(/^[^\wÀ-ú]+/, "")}${ramoDisponivel(r) ? "" : "  [ESCONDIDO]"}${r === FABEF.ramo ? "  ◀ ativo" : ""}`);
+        });
+    } catch (e) { L.push("  (erro ao ler ramos: " + e.message + ")"); }
+    L.push("");
+    L.push("DADOS");
+    const doRamo = (FABEF.produtos || []).filter(p => p.ramo === FABEF.ramo).length;
+    L.push(`  produtos no ramo ativo: ${doRamo}   (em memória: ${(FABEF.produtos || []).length})`);
+    L.push(`  dados carregados: ${FABEF.carregado ? "sim" : "não"}   internet: ${navigator.onLine ? "sim" : "não"}`);
+    L.push(`  erros de leitura (Firestore): ${FABEF_errosLeitura.size ? Array.from(FABEF_errosLeitura).join(", ") : "nenhum"}`);
+    if (FABEF_diagProdutosTexto) { L.push(""); L.push("PRODUTOS POR RAMO (na base de dados)"); L.push(FABEF_diagProdutosTexto); }
+    return L.join("\n");
+}
+async function atualizarJanelaDiagnostico() {
+    const el = document.getElementById("diag-texto");
+    if (el) el.textContent = await textoDiagnosticoFABEF();
+}
+window.abrirDiagnosticoFABEF = async function () {
+    FABEF_diagProdutosTexto = "";
+    document.getElementById("modal-diagnostico")?.classList.add("show");
+    await atualizarJanelaDiagnostico();
+};
+window.verificarProdutosTodosRamos = async function () {
+    FABEF_diagProdutosTexto = "  ⏳ a contar...";
+    await atualizarJanelaDiagnostico();
+    try {
+        const snap = await getDocs(subRef("produtos"));
+        const cont = {};
+        snap.docs.forEach(d => { const r = d.data().ramo || "(sem ramo)"; cont[r] = (cont[r] || 0) + 1; });
+        const linhas = Object.entries(cont).map(([r, n]) => `  - ${r}: ${n} produto(s)${r === FABEF.ramo ? "  ◀ ramo ativo" : ""}`);
+        FABEF_diagProdutosTexto = linhas.length ? linhas.join("\n") : "  (a empresa não tem nenhum produto registado)";
+    } catch (e) {
+        FABEF_diagProdutosTexto = e.code === "permission-denied"
+            ? "  ✘ SEM PERMISSÃO para ler produtos (regras do Firestore ou conta de outra empresa)"
+            : "  ✘ erro: " + (e.message || e);
+    }
+    await atualizarJanelaDiagnostico();
+};
+window.copiarDiagnosticoFABEF = async function () {
+    try {
+        await navigator.clipboard.writeText(document.getElementById("diag-texto")?.textContent || "");
+        alert("Diagnóstico copiado. Cole-o na conversa.");
+    } catch (_) {
+        alert("Não foi possível copiar. Tire uma captura de ecrã desta janela.");
+    }
+};
 
 /* =====================================================
    SAÍDA AUTOMÁTICA POR INATIVIDADE
@@ -3484,7 +3560,7 @@ async function diagnosticarSemProdutos(idAviso, qtd) {
         snap.docs.forEach(d => { const r = d.data().ramo || "(sem ramo)"; cont[r] = (cont[r] || 0) + 1; });
         const outros = Object.entries(cont).filter(([r]) => r !== FABEF.ramo);
         let html = `⚠️ Não há produtos no ramo <strong>${escapeHTML(FABEF.ramo || "—")}</strong>.`;
-        if (obterPlanoAtual(FABEF.ramo) === "BLOQUEADO") html += " 🔒 Este ramo ainda não tem subscrição.";
+        if (obterPlanoAtual(FABEF.ramo) === "BLOQUEADO") html += " 🔒 Este ramo está por pagar (outro ramo já está pago).";
         if (outros.length) {
             html += "<br>Existem produtos noutros ramos: " + outros.map(([r, n]) =>
                 `<button type="button" class="btn btn-light btn-small" style="width:auto;padding:4px 10px;margin:2px;" onclick="mudarRamo('${escapeHTML(r)}')">${escapeHTML(r)} (${n})</button>`).join(" ");
@@ -9318,13 +9394,12 @@ function obterLicencaRamo(ramo, emp) {
     return { origem: "NENHUMA", estado_licenca: "SEM_LICENCA", validade_subscricao: null, data_registo: null };
 }
 
-function obterPlanoAtual(ramo, emp) {
+// Plano "de base" do ramo (sem a regra de esconder).
+function planoBaseRamo(ramo, emp) {
     if (window.FABEF?.isDemoMode) return "PAGO";
     const e = emp || FABEF.empresa;
     if (!e) return "GRATIS";
     const lic = obterLicencaRamo(ramo || FABEF.ramo, e);
-    if (lic.estado_licenca === "SEM_LICENCA") return "BLOQUEADO";
-
     const validade = lic.validade_subscricao;
     const expirada = validade ? new Date() > new Date(validade) : false;
     if (lic.estado_licenca === "ACTIVO" && !expirada) return "PAGO";
@@ -9339,17 +9414,23 @@ function obterPlanoAtual(ramo, emp) {
     return "GRATIS";
 }
 
-// Um ramo está "disponível" (visível e utilizável) se estiver pago / em teste.
-// Se NENHUM ramo estiver pago ou em teste, o ramo principal continua a funcionar
-// no Plano Grátis (com limites). Ramos sem pagamento ficam bloqueados.
+// Regra: cada ramo paga à parte. Se ALGUM ramo está realmente pago, os ramos que não
+// pagaram ficam escondidos ("mostra-se o ramo pago"). Se nenhum está pago, todos
+// continuam a funcionar no Plano Grátis (nunca se perdem os dados por falta de pagamento).
+function obterPlanoAtual(ramo, emp) {
+    if (window.FABEF?.isDemoMode) return "PAGO";
+    const e = emp || FABEF.empresa;
+    if (!e) return "GRATIS";
+    const base = planoBaseRamo(ramo || FABEF.ramo, e);
+    if (base !== "GRATIS") return base;
+    const outroPago = nomesRamosEmpresa(e).some(r =>
+        chaveRamo(r) !== chaveRamo(ramo || FABEF.ramo) && planoBaseRamo(r, e) === "PAGO");
+    return outroPago ? "BLOQUEADO" : "GRATIS";
+}
+
 function ramoDisponivel(ramo, emp) {
     if (window.FABEF?.isDemoMode) return true;
-    const e = emp || FABEF.empresa;
-    const plano = obterPlanoAtual(ramo, e);
-    if (plano === "PAGO" || plano === "TRIAL") return true;
-    if (plano === "BLOQUEADO") return false;
-    return !nomesRamosEmpresa(e).some(r =>
-        chaveRamo(r) !== chaveRamo(ramo) && ["PAGO", "TRIAL"].includes(obterPlanoAtual(r, e)));
+    return obterPlanoAtual(ramo, emp || FABEF.empresa) !== "BLOQUEADO";
 }
 
 function ramosDisponiveis(emp) {
@@ -9414,7 +9495,7 @@ function rotuloPlanoRamo(ramo, emp) {
         const dias = Math.max(0, Math.ceil((fim - Date.now()) / 86400000));
         return { plano, cls: "alert-warning", txt: `🧪 Período de teste (restam ~${dias} dia(s))` };
     }
-    if (plano === "BLOQUEADO") return { plano, cls: "alert-danger", txt: "🔒 Por pagar — ramo bloqueado" };
+    if (plano === "BLOQUEADO") return { plano, cls: "alert-danger", txt: "🔒 Por pagar — escondido (outro ramo já está pago)" };
     return { plano, cls: "alert-warning", txt: "🆓 Plano Grátis (com limites)" };
 }
 
