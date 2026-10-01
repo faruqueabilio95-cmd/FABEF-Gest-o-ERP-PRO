@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="fabef-build" content="v8-20260930">
+<meta name="fabef-build" content="v9-20260930">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script type="importmap">
 {
@@ -326,7 +326,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         🔄 Sincronizar / Atualizar Aplicativo
       </button>
       <div style="font-size:11px;color:#64748b;margin-top:6px;">Toque para carregar a versão mais recente e limpar cache local</div>
-      <div id="login-build" style="font-size:11px;color:#94a3b8;margin-top:8px;text-align:center;"></div>
     </div>
   </div>
 </div>
@@ -450,7 +449,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </details>
 
     <div style="border-top:1px solid #334155;margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:6px;">
-      <button type="button" id="btn-sidebar-diagnostico" onclick="window.abrirDiagnosticoFABEF(); if (typeof fecharMenuLateral==='function') fecharMenuLateral();" style="background:#0f172a;border:1px dashed #475569;color:#94a3b8;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;">ℹ️ Diagnóstico / Versão</button>
       <button id="btn-sidebar-instalar" style="background:#1e3a8a;border:1px solid #3b82f6;color:#93c5fd;font-size:12px;font-weight:700;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
         📲 <span>Instalar Aplicativo no Celular</span>
       </button>
@@ -884,7 +882,13 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div id="aviso-compras-sem-produtos" class="alert alert-warn" style="display:none;background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;font-size:13px;font-weight:700;margin-bottom:12px;"></div>
       <div class="card">
         <div class="grid">
-          <div class="form-group"><label for="compra-produto">Produto</label><select id="compra-produto"></select></div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label for="compra-pesquisa">Produto</label>
+            <input type="search" id="compra-pesquisa" autocomplete="off" placeholder="🔍 Pesquisar produto por nome ou código...">
+            <div id="compra-lista-produtos" style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;margin-top:6px;background:#fff;"></div>
+            <div id="compra-produto-escolhido" style="margin-top:6px;font-size:13px;color:#475569;"></div>
+            <select id="compra-produto" style="display:none;" aria-hidden="true" tabindex="-1"></select>
+          </div>
           <div class="form-group"><label for="compra-fornecedor">Fornecedor</label><input type="text" id="compra-fornecedor" list="lista-fornecedores-compra" placeholder="Nome do fornecedor"><datalist id="lista-fornecedores-compra"></datalist></div>
           <div class="form-group"><label for="compra-quantidade">Quantidade</label><input type="number" id="compra-quantidade" min="0"></div>
           <div class="form-group"><label for="compra-custo">Custo unitário</label><input type="number" id="compra-custo" min="0" step="0.01"></div>
@@ -2277,18 +2281,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-diagnostico">
-    <div class="modal-box" style="max-width:560px;">
-      <h3>ℹ️ Diagnóstico da aplicação</h3>
-      <pre id="diag-texto" style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.5;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;max-height:55vh;overflow:auto;">A carregar...</pre>
-      <div class="modal-acoes" style="flex-wrap:wrap;">
-        <button class="btn btn-light" type="button" onclick="window.verificarProdutosTodosRamos()" style="flex:1;">🔎 Contar produtos por ramo</button>
-        <button class="btn btn-light" type="button" onclick="window.copiarDiagnosticoFABEF()" style="flex:1;">📋 Copiar</button>
-        <button class="btn btn-entrar" type="button" onclick="fecharModal('modal-diagnostico')" style="flex:1;">Fechar</button>
-      </div>
-    </div>
-  </div>
-
   <div class="modal-overlay" id="modal-editar-cliente">
     <div class="modal-box">
       <h3>Editar Cliente</h3>
@@ -2856,7 +2848,7 @@ function definirAbaVenda(p) {
 <script>
 window.FABEF_CARREGADO = false;
 </script>
-<script type="module" charset="UTF-8" src="./src/app.js?v=v8-20260930" onload="window.FABEF_CARREGADO=true;" onerror="
+<script type="module" charset="UTF-8" src="./src/app.js?v=v9-20260930" onload="window.FABEF_CARREGADO=true;" onerror="
   if (!window.FABEF_CARREGADO) {
     console.warn('Ficheiro ./src/app.js não encontrado. A carregar ./app.js da mesma pasta...');
     const s = document.createElement('script');
@@ -2872,8 +2864,6 @@ window.FABEF_CARREGADO = false;
   var esperado = (document.querySelector('meta[name="fabef-build"]') || {}).content || "";
   function mostrar() {
     var real = window.FABEF_BUILD || "";
-    var el = document.getElementById("login-build");
-    if (el) el.textContent = "Versão: index " + esperado + " · app " + (real || "ANTIGA");
     if (real === esperado) return;
     if (document.getElementById("aviso-versao")) return;
     var b = document.createElement("div");
