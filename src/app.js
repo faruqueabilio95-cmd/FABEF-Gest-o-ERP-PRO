@@ -1,6 +1,4 @@
-import confetti from "canvas-confetti";
 if (typeof window !== "undefined") {
-    window.confetti = confetti;
     window.FABEF_CARREGADO = true;
     if (!window.forcarAtualizacaoSistema) {
         window.forcarAtualizacaoSistema = async function() {
@@ -55,6 +53,7 @@ import {
     browserLocalPersistence,
     browserSessionPersistence,
     sendPasswordResetEmail,
+    sendEmailVerification,
     updatePassword,
     reauthenticateWithCredential,
     EmailAuthProvider
@@ -183,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v9-20260930";
+const FABEF_BUILD = "v10-20261002";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -272,6 +271,9 @@ let FABEF_RELATORIO_ATUAL = null;
 ===================================================== */
 // Administrador FABEF (definido cedo de propósito: é lido no arranque da sessão).
 const ADMINS_FABEF = ["faruqueabilio95@gmail.com"];
+// Mais seguro: cole aqui o seu UID (Firebase -> Authentication -> Utilizadores).
+// Enquanto estiver vazio vale o e-mail acima. Cole o MESMO UID em firestore.rules (uidAdmin).
+const ADMIN_UIDS_FABEF = [];
 const FABEF_ADMIN = { empresas: [], pedidos: [], carregado: false };
 
 function ehUsuarioGerente() {
@@ -714,6 +716,12 @@ function escapeHTML(v) {
         .replace(/'/g, "&#39;");
 }
 
+
+// Texto seguro para usar DENTRO de onclick="fn(...)": o escapeHTML sozinho NÃO chega
+// (o navegador decodifica &#39; antes de executar o JavaScript e a aspa volta).
+function jsArg(v) {
+    return escapeHTML(JSON.stringify(String(v ?? "")));
+}
 
 function dataTexto(v) {
     if (!v) return "—";
@@ -1498,8 +1506,25 @@ async function validarEEntrarPin() {
         return;
     }
 
+    // Limite de tentativas: bloqueia por instantes e, ao fim de 10 erros, obriga a entrar com a senha
+    const agoraPin = Date.now();
+    let bloqueadoAte = 0, falhasPin = 0;
+    try {
+        bloqueadoAte = Number(sessionStorage.getItem("fabef_pin_bloqueado_ate") || 0);
+        falhasPin = Number(sessionStorage.getItem("fabef_pin_falhas") || 0);
+    } catch (_) {}
+    if (bloqueadoAte > agoraPin) {
+        if (input) input.value = "";
+        if (statusPin) {
+            statusPin.textContent = `⏳ Demasiadas tentativas. Aguarde ${Math.ceil((bloqueadoAte - agoraPin) / 1000)} s.`;
+            statusPin.style.color = "#b45309";
+        }
+        return;
+    }
+
     const hashDigitado = await calcularHashPin(pinDigitado);
     if (hashDigitado === hashGuardado) {
+        try { sessionStorage.removeItem("fabef_pin_falhas"); sessionStorage.removeItem("fabef_pin_bloqueado_ate"); } catch (_) {}
         if (statusPin) {
             statusPin.textContent = "🟢 PIN correto! A abrir o sistema...";
             statusPin.style.color = "#16a34a";
@@ -1512,8 +1537,23 @@ async function validarEEntrarPin() {
         }, 150);
     } else {
         if (input) input.value = "";
+        falhasPin += 1;
+        let espera = 0;
+        if (falhasPin >= 3) espera = Math.min(300, 15 * Math.pow(2, falhasPin - 3)); // 15 s, 30 s, 60 s, ... máx. 5 min
+        try {
+            sessionStorage.setItem("fabef_pin_falhas", String(falhasPin));
+            if (espera) sessionStorage.setItem("fabef_pin_bloqueado_ate", String(Date.now() + espera * 1000));
+        } catch (_) {}
+        if (falhasPin >= 10) {
+            try { sessionStorage.removeItem("fabef_pin_falhas"); sessionStorage.removeItem("fabef_pin_bloqueado_ate"); } catch (_) {}
+            FABEF_msgLogin = "🔒 PIN errado demasiadas vezes. Entre novamente com a senha.";
+            try { await signOut(auth); } catch (_) {}
+            return;
+        }
         if (statusPin) {
-            statusPin.textContent = "🔴 PIN incorreto. Tente novamente ou use a palavra-passe.";
+            statusPin.textContent = espera
+                ? `🔴 PIN incorreto (${falhasPin} erros). Aguarde ${espera} s antes de tentar de novo.`
+                : `🔴 PIN incorreto (${falhasPin}/10). Tente novamente ou use a palavra-passe.`;
             statusPin.style.color = "#dc2626";
         }
         setTimeout(() => input?.focus(), 100);
@@ -2582,8 +2622,8 @@ function renderVisaoGeralRamos() {
                         <p style="font-size:13px;margin:6px 0;">Hoje: <strong>${dinheiro(vendasHojeRamo)}</strong></p>
                         <p style="font-size:13px;margin:6px 0;">Este mês: <strong>${dinheiro(vendasMesRamo)}</strong></p>
                         ${!ativo ? (ramoDisponivel(ramo)
-                            ? `<button class="btn btn-light btn-small" type="button" onclick="mudarRamo('${escapeHTML(ramo)}')">Ver este ramo</button>`
-                            : `<button class="btn btn-small" type="button" onclick="mudarRamo('${escapeHTML(ramo)}')" style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">🔒 Por pagar</button>`) : ""}
+                            ? `<button class="btn btn-light btn-small" type="button" onclick="mudarRamo(${jsArg(ramo)})">Ver este ramo</button>`
+                            : `<button class="btn btn-small" type="button" onclick="mudarRamo(${jsArg(ramo)})" style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">🔒 Por pagar</button>`) : ""}
                     </div>`;
                 }).join("")}
             </div>
@@ -3219,7 +3259,7 @@ function renderProdutos() {
             </td>
             <td>
                 ${ehGerente ? `
-                    <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarProduto('${escapeHTML(p.id)}')">✏️ Editar</button>
+                    <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarProduto(${jsArg(p.id)})">✏️ Editar</button>
                 ` : `
                     <span style="color:#94a3b8;font-size:12px;font-weight:600;">🔒 Só Gerente</span>
                 `}
@@ -3304,7 +3344,7 @@ function renderInventario() {
                         '<span class="badge badge-green">NORMAL</span>')
                 }
             </td>
-            <td>${(ehUsuarioGerente() || window.FABEF?.isDemoMode) ? `<button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock('${escapeHTML(p.id)}')">⚙️  Ajustar</button>` : `<span style="color:#94a3b8;font-size:12px;font-weight:600;">🔒 Só Gerente</span>`}</td>
+            <td>${(ehUsuarioGerente() || window.FABEF?.isDemoMode) ? `<button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock(${jsArg(p.id)})">⚙️  Ajustar</button>` : `<span style="color:#94a3b8;font-size:12px;font-weight:600;">🔒 Só Gerente</span>`}</td>
         </tr>
         `;
     }).join("") || `
@@ -3494,7 +3534,7 @@ async function diagnosticarSemProdutos(idAviso, qtd) {
         if (obterPlanoAtual(FABEF.ramo) === "BLOQUEADO") html += " 🔒 Este ramo está por pagar (outro ramo já está pago).";
         if (outros.length) {
             html += "<br>Existem produtos noutros ramos: " + outros.map(([r, n]) =>
-                `<button type="button" class="btn btn-light btn-small" style="width:auto;padding:4px 10px;margin:2px;" onclick="mudarRamo('${escapeHTML(r)}')">${escapeHTML(r)} (${n})</button>`).join(" ");
+                `<button type="button" class="btn btn-light btn-small" style="width:auto;padding:4px 10px;margin:2px;" onclick="mudarRamo(${jsArg(r)})">${escapeHTML(r)} (${n})</button>`).join(" ");
         } else if (snap.size === 0) {
             html += "<br>Ainda não registou nenhum produto. Registe-os na aba Produtos.";
         }
@@ -3528,7 +3568,7 @@ function renderListaProdutosCompra() {
     const LIMITE = 40;
     let html = achados.slice(0, LIMITE).map(p => {
         const ativo = p.id === selecionado;
-        return `<button type="button" onclick="window.escolherProdutoCompra('${escapeHTML(p.id)}')"
+        return `<button type="button" onclick="window.escolherProdutoCompra(${jsArg(p.id)})"
             style="display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border:none;border-bottom:1px solid #f1f5f9;background:${ativo ? "#dcfce7" : "#fff"};cursor:pointer;font-size:14px;">
             <span style="font-weight:${ativo ? 800 : 600};color:#0f172a;">${ativo ? "✔ " : ""}${escapeHTML(p.nome || "—")}</span>
             <span style="font-size:12px;color:#64748b;white-space:nowrap;">stock ${numero(p.stock)}${p.custo ? " · custo " + dinheiro(p.custo) : ""}</span>
@@ -3676,7 +3716,7 @@ window.renderSugestoesComprasRamo = function() {
                 <td><span style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;">${escapeHTML(fornecedorSugerido)}</span></td>
                 <td>${dinheiro(custoSugerido)}</td>
                 <td>
-                    <button class="btn btn-primary btn-small" type="button" onclick="prepararCompraArtigo('${escapeHTML(p.id)}', '${escapeHTML(fornecedorSugerido)}', ${custoSugerido}, ${qtdSugerida})" style="background:#2563eb;color:#fff;font-weight:700;padding:5px 10px;font-size:12px;border:none;border-radius:6px;cursor:pointer;">
+                    <button class="btn btn-primary btn-small" type="button" onclick="prepararCompraArtigo(${jsArg(p.id)}, ${jsArg(fornecedorSugerido)}, ${custoSugerido}, ${qtdSugerida})" style="background:#2563eb;color:#fff;font-weight:700;padding:5px 10px;font-size:12px;border:none;border-radius:6px;cursor:pointer;">
                         🛒 Preparar Compra (${qtdSugerida} un)
                     </button>
                 </td>
@@ -3840,8 +3880,8 @@ function renderCompras() {
         <td>${dinheiro(c.custoUnitario)}</td>
         <td>${dinheiro(numero(c.quantidade) * numero(c.custoUnitario))}</td>
         ${podeGerir ? `<td style="white-space:nowrap;">
-            <button type="button" class="btn btn-small" onclick="window.abrirModalEditarCompra('${c.id}')" style="width:auto;padding:5px 10px;font-size:12px;">✏️ Editar</button>
-            <button type="button" class="btn btn-small btn-danger" onclick="window.apagarCompra('${c.id}')" style="width:auto;padding:5px 10px;font-size:12px;">🗑️ Apagar</button>
+            <button type="button" class="btn btn-small" onclick="window.abrirModalEditarCompra(${jsArg(c.id)})" style="width:auto;padding:5px 10px;font-size:12px;">✏️ Editar</button>
+            <button type="button" class="btn btn-small btn-danger" onclick="window.apagarCompra(${jsArg(c.id)})" style="width:auto;padding:5px 10px;font-size:12px;">🗑️ Apagar</button>
         </td>` : ""}
     </tr>
     `).join("") || `
@@ -4105,8 +4145,8 @@ function renderPOS() {
 
         const botoesOpcaoVenda = ehPesavel ? `
             <div style="display:flex;gap:4px;width:100%;margin-top:6px;z-index:2;" onclick="event.stopPropagation();">
-                <button type="button" class="btn btn-small btn-primary" onclick="abrirModalVendaFracionadaById('${escapeHTML(p.id)}', 'peso')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o peso exato na balança em KG ou Gramas">⚖️ Pesar KG</button>
-                <button type="button" class="btn btn-small btn-light" onclick="abrirModalVendaFracionadaById('${escapeHTML(p.id)}', 'valor')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;color:#1e3a8a;border:1px solid #93c5fd;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o valor em Meticais (calcula os KG automaticamente)">💵 Digitar MT</button>
+                <button type="button" class="btn btn-small btn-primary" onclick="abrirModalVendaFracionadaById(${jsArg(p.id)}, 'peso')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o peso exato na balança em KG ou Gramas">⚖️ Pesar KG</button>
+                <button type="button" class="btn btn-small btn-light" onclick="abrirModalVendaFracionadaById(${jsArg(p.id)}, 'valor')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;color:#1e3a8a;border:1px solid #93c5fd;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o valor em Meticais (calcula os KG automaticamente)">💵 Digitar MT</button>
             </div>
         ` : "";
 
@@ -4453,8 +4493,8 @@ function renderCarrinho() {
 
         const ehPesavel = ehArtigoPesavel(item);
         const qtdFormatada = ehPesavel ?
-            `${numero(item.quantidade).toFixed(3)} ${item.unidade || "kg"}` :
-            `${numero(item.quantidade)} ${item.unidade || "un"}`;
+            `${numero(item.quantidade).toFixed(3)} ${escapeHTML(item.unidade || "kg")}` :
+            `${numero(item.quantidade)} ${escapeHTML(item.unidade || "un")}`;
 
         const atributos = [];
         if (item.tamanho) atributos.push(`Tam: ${escapeHTML(item.tamanho)}`);
@@ -4475,7 +4515,7 @@ function renderCarrinho() {
                 <button 
                     class="btn btn-light btn-small" 
                     style="padding: 2px 6px; font-size: 11px; border: 1px solid #cbd5e1;" 
-                    onclick="abrirModalVendaFracionadaById('${escapeHTML(item.produtoId)}', 'peso')"
+                    onclick="abrirModalVendaFracionadaById(${jsArg(item.produtoId)}, 'peso')"
                     type="button"
                     title="Ajustar peso ou valor da pesagem"
                 >
@@ -4534,7 +4574,23 @@ document.getElementById("btn-finalizar-venda").addEventListener("click", finaliz
 ===================================================== */
 let LEITOR_CODIGO_ATIVO = null;
 
+// Biblioteca externa carregada SÓ quando o gerente/funcionário abre o leitor (versão fixa).
+function carregarScriptExterno(url) {
+    return new Promise((resolve, reject) => {
+        const el = document.createElement("script");
+        el.src = url;
+        el.crossOrigin = "anonymous";
+        el.referrerPolicy = "no-referrer";
+        el.onload = () => resolve();
+        el.onerror = () => reject(new Error("Falha ao carregar " + url));
+        document.head.appendChild(el);
+    });
+}
+
 window.abrirLeitorCodigoBarras = async function() {
+    if (typeof Html5Qrcode === "undefined") {
+        try { await carregarScriptExterno("https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"); } catch (e) { console.warn(e); }
+    }
     if (typeof Html5Qrcode === "undefined") {
         alert("A biblioteca de leitura de código de barras não carregou. Verifique a ligação à internet e recarregue a página.");
         return;
@@ -5100,7 +5156,7 @@ function renderVendas() {
                     <td style="text-align:right;font-weight:600;color:#0369a1;">${dinheiro(item.outros)}</td>
                     <td style="text-align:right;font-weight:600;">${dinheiro(ticketDia)}</td>
                     <td style="text-align:center;">
-                        <button type="button" class="btn btn-small btn-light" onclick="filtrarDiaEspecifico('${item.dia}')" style="padding:4px 10px;font-size:11px;font-weight:700;border:1px solid #cbd5e1;background:#fff;" title="Ver detalhes das vendas deste dia">
+                        <button type="button" class="btn btn-small btn-light" onclick="filtrarDiaEspecifico(${jsArg(item.dia)})" style="padding:4px 10px;font-size:11px;font-weight:700;border:1px solid #cbd5e1;background:#fff;" title="Ver detalhes das vendas deste dia">
                             👁️ Ver Vendas
                         </button>
                     </td>
@@ -5183,7 +5239,7 @@ function renderVendas() {
         } else if (periodo === "ontem") {
             msgVazia = `🗓️ Nenhuma venda registada no dia de ontem (${formatarDataExtensa(ontemStr)}).`;
         } else if (periodo === "custom") {
-            msgVazia = `📅 Nenhuma venda localizada para o dia ${dataEspecifica || ''}.`;
+            msgVazia = `📅 Nenhuma venda localizada para o dia ${escapeHTML(dataEspecifica || '')}.`;
         }
         tabelaCorpo.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#64748b;padding:24px;line-height:1.6;">${msgVazia}</td></tr>`;
         return;
@@ -5308,7 +5364,7 @@ window.renderVendas = renderVendas;
 function renderLinhaVendaHTML(v) {
     const itensMapeados = (v.itens || v.items || []).map(x => {
         const qtd = numero(x.quantidade || x.qty);
-        const un = (x.unidade && x.unidade !== "unidade") ? ` ${x.unidade}` : "";
+        const un = (x.unidade && x.unidade !== "unidade") ? ` ${escapeHTML(x.unidade)}` : "";
         const atributos = [];
         if (x.tamanho) atributos.push(`Tam: ${escapeHTML(x.tamanho)}`);
         if (x.cor) atributos.push(`Cor: ${escapeHTML(x.cor)}`);
@@ -5343,12 +5399,12 @@ function renderLinhaVendaHTML(v) {
                     📁 Opções ▾
                 </summary>
                 <div style="position:absolute;right:0;top:calc(100% + 4px);z-index:90;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);min-width:190px;padding:6px;display:flex;flex-direction:column;gap:5px;">
-                    <button class="btn btn-light btn-small" onclick="this.closest('details').removeAttribute('open'); imprimirReciboVenda('${escapeHTML(v.id)}')" type="button" style="text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;" title="Imprimir Recibo Térmico ou A4">🖨️ Imprimir Recibo</button>
-                    <button class="btn btn-success btn-small" onclick="this.closest('details').removeAttribute('open'); enviarReciboWhatsApp('${escapeHTML(v.id)}')" type="button" style="background-color:#25d366;color:#fff;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;border:none;" title="Enviar Recibo pelo WhatsApp">📱 Enviar WhatsApp</button>
+                    <button class="btn btn-light btn-small" onclick="this.closest('details').removeAttribute('open'); imprimirReciboVenda(${jsArg(v.id)})" type="button" style="text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;" title="Imprimir Recibo Térmico ou A4">🖨️ Imprimir Recibo</button>
+                    <button class="btn btn-success btn-small" onclick="this.closest('details').removeAttribute('open'); enviarReciboWhatsApp(${jsArg(v.id)})" type="button" style="background-color:#25d366;color:#fff;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;border:none;" title="Enviar Recibo pelo WhatsApp">📱 Enviar WhatsApp</button>
                     ${podeOperarVendasEDespesas() ? `
-                    <button class="btn btn-primary btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalEditarVenda('${escapeHTML(v.id)}')" type="button" style="background:#2563eb;color:#fff;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;border:none;" title="Editar valor, forma de pagamento ou cliente">✏️ Editar Venda</button>
+                    <button class="btn btn-primary btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalEditarVenda(${jsArg(v.id)})" type="button" style="background:#2563eb;color:#fff;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;border:none;" title="Editar valor, forma de pagamento ou cliente">✏️ Editar Venda</button>
                     ${!ehFalhada ? `
-                        <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalVendaFalhada('${escapeHTML(v.id)}')" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:12px;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;border-radius:6px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar ao Gerente</button>
+                        <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalVendaFalhada(${jsArg(v.id)})" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:12px;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;border-radius:6px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar ao Gerente</button>
                     ` : ""}
                     ` : ""}
                 </div>
@@ -5373,7 +5429,7 @@ window.imprimirReciboVenda = function(vendaId) {
 
     const itensHtml = (v.itens || []).map(i => {
         const ehFracionado = i.unidade === "kg" || i.unidade === "litro" || i.unidade === "g";
-        const qtdDesc = ehFracionado ? `${numero(i.quantidade).toFixed(3)} ${i.unidade}` : `${numero(i.quantidade)} ${i.unidade || "un"}`;
+        const qtdDesc = ehFracionado ? `${numero(i.quantidade).toFixed(3)} ${escapeHTML(i.unidade)}` : `${numero(i.quantidade)} ${escapeHTML(i.unidade || "un")}`;
         return `
         <tr>
             <td style="padding: 4px 2px; font-weight: 600; border-bottom: 1px dashed #cbd5e1;">${escapeHTML(i.nome)}</td>
@@ -5724,10 +5780,10 @@ function renderFornecedores() {
         <td>${compras.length}</td>
         <td>
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button class="btn btn-light btn-small" type="button" onclick="verComprasFornecedor('${escapeHTML(f.nome)}')">📦 Compras</button>
-                <button class="btn btn-light btn-small" type="button" onclick="amortizarDividaFornecedorPrompt('${escapeHTML(f.id)}','${escapeHTML(f.nome)}')" ${divida > 0 ? '' : 'disabled'}>💳 Pagar</button>
+                <button class="btn btn-light btn-small" type="button" onclick="verComprasFornecedor(${jsArg(f.nome)})">📦 Compras</button>
+                <button class="btn btn-light btn-small" type="button" onclick="amortizarDividaFornecedorPrompt(${jsArg(f.id)},${jsArg(f.nome)})" ${divida > 0 ? '' : 'disabled'}>💳 Pagar</button>
                 ${ehGerente ? `
-                    <button class="btn btn-light btn-small" type="button" style="color:#ef4444;" onclick="apagarFornecedor('${escapeHTML(f.id)}','${escapeHTML(f.nome)}')">🗑️ Apagar</button>
+                    <button class="btn btn-light btn-small" type="button" style="color:#ef4444;" onclick="apagarFornecedor(${jsArg(f.id)},${jsArg(f.nome)})">🗑️ Apagar</button>
                 ` : ''}
             </div>
         </td>
@@ -5959,8 +6015,8 @@ function renderClientes() {
         <td style="color:${saldo > 0 ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(saldo)}</td>
         <td>
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button class="btn btn-light btn-small" type="button" onclick="verDetalheCliente('${escapeHTML(c.id)}')">👁️ Detalhes</button>
-                <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarCliente('${escapeHTML(c.id)}')">✏️ Editar</button>
+                <button class="btn btn-light btn-small" type="button" onclick="verDetalheCliente(${jsArg(c.id)})">👁️ Detalhes</button>
+                <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarCliente(${jsArg(c.id)})">✏️ Editar</button>
             </div>
         </td>
     </tr>
@@ -6007,7 +6063,7 @@ window.verDetalheCliente = function(id) {
             '</ul>' : '<p style="color:#64748b;">Ainda não há compras registadas para este cliente.</p>'}
         <p style="margin-top:10px;"><strong>Encomendas registadas:</strong> ${encomendasCliente.length}</p>
         ${encomendasCliente.length ? '<ul style="margin-top:6px;padding-left:18px;">' +
-            encomendasCliente.map(e => `<li>${escapeHTML(e.produto)} — x${e.quantidade} — ${escapeHTML(e.estado || 'Pendente')}</li>`).join("") +
+            encomendasCliente.map(e => `<li>${escapeHTML(e.produto)} — x${numero(e.quantidade)} — ${escapeHTML(e.estado || 'Pendente')}</li>`).join("") +
             '</ul>' : ''}
     `;
     document.getElementById("modal-detalhe-cliente")?.classList.add("show");
@@ -6161,9 +6217,9 @@ function renderDividas() {
     tabelaCorpo.innerHTML = FABEF.dividas.map(d => {
         const possuiDivida = numero(d.saldo) > 0;
         const botaoCobrar = possuiDivida
-            ? `<button class="btn btn-success btn-small" onclick="enviarLembreteDivida('${escapeHTML(d.id)}')" type="button" style="background-color:#25d366;">📱 Cobrar</button>`
+            ? `<button class="btn btn-success btn-small" onclick="enviarLembreteDivida(${jsArg(d.id)})" type="button" style="background-color:#25d366;">📱 Cobrar</button>`
             : `<button class="btn btn-secondary btn-small" type="button" disabled style="opacity:.4;">📱 Pago</button>`;
-        return `<tr><td><strong>${escapeHTML(d.cliente)}</strong></td><td>${escapeHTML(d.telefone || "—")}</td><td style="color:${possuiDivida ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(d.saldo)}</td><td>${dinheiro(d.limite)}</td><td><div style="display:flex;gap:5px;"><button class="btn btn-light btn-small" onclick="amortizarDividaPrompt('${escapeHTML(d.id)}','${escapeHTML(d.cliente)}')" type="button" ${possuiDivida ? '' : 'disabled'}>Amortizar</button>${botaoCobrar}</div></td></tr>`;
+        return `<tr><td><strong>${escapeHTML(d.cliente)}</strong></td><td>${escapeHTML(d.telefone || "—")}</td><td style="color:${possuiDivida ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(d.saldo)}</td><td>${dinheiro(d.limite)}</td><td><div style="display:flex;gap:5px;"><button class="btn btn-light btn-small" onclick="amortizarDividaPrompt(${jsArg(d.id)},${jsArg(d.cliente)})" type="button" ${possuiDivida ? '' : 'disabled'}>Amortizar</button>${botaoCobrar}</div></td></tr>`;
     }).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Nenhum registo de fiado ativo localizado.</td></tr>`;
 }
 
@@ -6325,18 +6381,18 @@ function renderEncomendas() {
 
         let botoesAcao = "";
         if (e.estado === "PENDENTE") {
-            botoesAcao = `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','EM_PREPARACAO')" type="button">🛠️ Em preparação</button>`;
+            botoesAcao = `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'EM_PREPARACAO')" type="button">🛠️ Em preparação</button>`;
         } else if (e.estado === "EM_PREPARACAO") {
-            botoesAcao = `<button class="btn btn-success btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','PRONTA')" type="button">✔️ Marcar pronta</button>`;
+            botoesAcao = `<button class="btn btn-success btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'PRONTA')" type="button">✔️ Marcar pronta</button>`;
         } else if (e.estado === "PRONTA") {
-            botoesAcao = `<button class="btn btn-danger btn-small" onclick="mudarEstadoEncomenda('${escapeHTML(e.id)}','ENTREGUE')" type="button">📦 Entregar</button>`;
+            botoesAcao = `<button class="btn btn-danger btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'ENTREGUE')" type="button">📦 Entregar</button>`;
         } else {
             botoesAcao = `<span style="color:#64748b;font-size:12px;font-weight:600;">${e.estado === "CANCELADA" ? "Cancelada" : "Concluída"}</span>`;
         }
 
         if (e.estado !== "ENTREGUE" && e.estado !== "CANCELADA") {
-            botoesAcao += `<button class="btn btn-success btn-small" onclick="enviarAvisoEncomenda('${escapeHTML(e.id)}')" type="button" style="background-color:#25d366;">📱 Lembrete</button>`;
-            botoesAcao += `<button class="btn btn-small" onclick="abrirModalEncomendaFalhada('${escapeHTML(e.id)}')" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:600;" title="Cancelar encomenda com justificativa obrigatória ao Gerente">⚠️ Falhou / Cancelar</button>`;
+            botoesAcao += `<button class="btn btn-success btn-small" onclick="enviarAvisoEncomenda(${jsArg(e.id)})" type="button" style="background-color:#25d366;">📱 Lembrete</button>`;
+            botoesAcao += `<button class="btn btn-small" onclick="abrirModalEncomendaFalhada(${jsArg(e.id)})" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:600;" title="Cancelar encomenda com justificativa obrigatória ao Gerente">⚠️ Falhou / Cancelar</button>`;
         }
 
         return `<tr>
@@ -7200,8 +7256,8 @@ function renderDespesas() {
         <td style="font-size:12px;color:#475569;">${escapeHTML(d.utilizadorNome || "—")}</td>
         <td>
             <div style="display:flex;gap:4px;align-items:center;">
-                <button type="button" class="btn btn-light btn-small" onclick="imprimirComprovativoDespesa('${escapeHTML(d.id)}')" style="padding:4px 8px;font-size:11px;font-weight:700;" title="Imprimir Comprovativo / Recibo de Despesa">🖨️ Recibo</button>
-                <button type="button" class="btn btn-small" onclick="eliminarDespesa('${escapeHTML(d.id)}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;font-size:11px;font-weight:700;" title="Eliminar despesa">🗑️</button>
+                <button type="button" class="btn btn-light btn-small" onclick="imprimirComprovativoDespesa(${jsArg(d.id)})" style="padding:4px 8px;font-size:11px;font-weight:700;" title="Imprimir Comprovativo / Recibo de Despesa">🖨️ Recibo</button>
+                <button type="button" class="btn btn-small" onclick="eliminarDespesa(${jsArg(d.id)})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;font-size:11px;font-weight:700;" title="Eliminar despesa">🗑️</button>
             </div>
         </td>
     </tr>
@@ -8370,13 +8426,13 @@ function renderConfiguracoes() {
             const isOperacionalAtivo = r.nome === FABEF.ramo;
             const cfg = (FABEF.empresa?.ramos_configuracoes || {})[r.nome] || {};
             const nomeExibicao = cfg.nome || r.nome;
-            const icone = r.icone || "🏬";
+            const icone = escapeHTML(r.icone || "🏬");
 
             return `
             <button 
                 type="button" 
                 class="btn btn-small" 
-                onclick="selecionarRamoParaConfigurar('${escapeHTML(r.nome)}')"
+                onclick="selecionarRamoParaConfigurar(${jsArg(r.nome)})"
                 style="
                     display:flex;
                     align-items:center;
@@ -8694,8 +8750,8 @@ function renderFuncionarios(){
 
     const acoesGerente = souGerente ? `
         <div style="display:flex;gap:5px;flex-wrap:wrap;">
-            <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial('${escapeHTML(gerenteId)}')" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale) do Gerente">💸 Vale</button>
-            <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario('${escapeHTML(gerenteId)}')" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales do Gerente">➕ Gasto</button>
+            <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial(${jsArg(gerenteId)})" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale) do Gerente">💸 Vale</button>
+            <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario(${jsArg(gerenteId)})" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales do Gerente">➕ Gasto</button>
         </div>` : "—";
 
     const gerente = `
@@ -8724,10 +8780,10 @@ function renderFuncionarios(){
 
         const acoes = souGerente ? `
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial('${escapeHTML(f.id)}')" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale)">💸 Vale</button>
-                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario('${escapeHTML(f.id)}')" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales na conta">➕ Gasto</button>
-                <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario('${escapeHTML(f.id)}')">✏️ Editar</button>
-                <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario('${escapeHTML(f.id)}')">${ativo ? '🚫 Desativar' : '✅ Reativar'}</button>
+                <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial(${jsArg(f.id)})" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale)">💸 Vale</button>
+                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario(${jsArg(f.id)})" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales na conta">➕ Gasto</button>
+                <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario(${jsArg(f.id)})">✏️ Editar</button>
+                <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario(${jsArg(f.id)})">${ativo ? '🚫 Desativar' : '✅ Reativar'}</button>
             </div>` : "—";
 
         return `
@@ -8931,12 +8987,12 @@ function renderDispensas() {
             <td>
                 <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
                     ${(ehGerente && est === "PENDENTE") ? `
-                        <button class="btn btn-success btn-small" type="button" onclick="aprovarDispensa('${escapeHTML(d.id)}')" style="background:#10b981;color:#fff;font-weight:700;padding:4px 8px;" title="Aprovar formalmente esta dispensa">✅ Aprovar</button>
-                        <button class="btn btn-danger btn-small" type="button" onclick="recusarDispensa('${escapeHTML(d.id)}')" style="background:#ef4444;color:#fff;font-weight:700;padding:4px 8px;" title="Recusar pedido de dispensa">❌ Recusar</button>
+                        <button class="btn btn-success btn-small" type="button" onclick="aprovarDispensa(${jsArg(d.id)})" style="background:#10b981;color:#fff;font-weight:700;padding:4px 8px;" title="Aprovar formalmente esta dispensa">✅ Aprovar</button>
+                        <button class="btn btn-danger btn-small" type="button" onclick="recusarDispensa(${jsArg(d.id)})" style="background:#ef4444;color:#fff;font-weight:700;padding:4px 8px;" title="Recusar pedido de dispensa">❌ Recusar</button>
                     ` : ""}
-                    <button class="btn btn-light btn-small" type="button" onclick="imprimirGuiaDispensa('${escapeHTML(d.id)}')" style="padding:4px 8px;" title="Imprimir Guia de Dispensa / Comprovativo">🖨️ Guia</button>
+                    <button class="btn btn-light btn-small" type="button" onclick="imprimirGuiaDispensa(${jsArg(d.id)})" style="padding:4px 8px;" title="Imprimir Guia de Dispensa / Comprovativo">🖨️ Guia</button>
                     ${ehGerente ? `
-                        <button class="btn btn-small" type="button" onclick="apagarDispensa('${escapeHTML(d.id)}')" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;" title="Eliminar registo de dispensa">🗑️</button>
+                        <button class="btn btn-small" type="button" onclick="apagarDispensa(${jsArg(d.id)})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;" title="Eliminar registo de dispensa">🗑️</button>
                     ` : ""}
                 </div>
             </td>
@@ -8976,10 +9032,10 @@ window.abrirModalNovaDispensa = function() {
         const funcs = FABEF.funcionarios || [];
         let html = "";
         if (ehUsuarioGerente()) {
-            html += `<option value="GERENTE:${FABEF.empresa?.donoNome || 'Gerente / Proprietário'}">👑 ${FABEF.empresa?.donoNome || 'Gerente / Proprietário'} (Gerência)</option>`;
+            html += `<option value="GERENTE:${escapeHTML(FABEF.empresa?.donoNome || 'Gerente / Proprietário')}">👑 ${escapeHTML(FABEF.empresa?.donoNome || 'Gerente / Proprietário')} (Gerência)</option>`;
         }
         funcs.forEach(f => {
-            html += `<option value="${f.id}:${escapeHTML(f.nome || 'Funcionário')}">${escapeHTML(f.nome || 'Funcionário')} (${f.ramo || 'Geral'})</option>`;
+            html += `<option value="${f.id}:${escapeHTML(f.nome || 'Funcionário')}">${escapeHTML(f.nome || 'Funcionário')} (${escapeHTML(f.ramo || 'Geral')})</option>`;
         });
         if (!html) {
             html = `<option value="FUNC:Funcionário Geral">Funcionário Geral</option>`;
@@ -9650,8 +9706,12 @@ document.getElementById("btn-cadastrar-funcionario")?.addEventListener("click", 
 
 function ehAdminFABEF() {
     if (window.FABEF?.isDemoMode) return false;
-    const email = String(auth.currentUser?.email || FABEF.user?.email || FABEF.userData?.email || "").trim().toLowerCase();
-    return !!email && ADMINS_FABEF.map(e => e.toLowerCase()).includes(email);
+    const u = auth.currentUser;
+    const email = String(u?.email || FABEF.user?.email || FABEF.userData?.email || "").trim().toLowerCase();
+    if (!email || !ADMINS_FABEF.map(e => e.toLowerCase()).includes(email)) return false;
+    // Se o UID do administrador estiver configurado, tem de coincidir.
+    if (ADMIN_UIDS_FABEF.length && !ADMIN_UIDS_FABEF.includes(u?.uid)) return false;
+    return true;
 }
 
 // Mostra/esconde TODOS os acessos do administrador (grupo do menu + botão do topo).
@@ -9684,8 +9744,61 @@ function estadoLicencaRamoAdmin(emp, ramo) {
     return { plano: info.plano, rotulo: info.txt, cor: cores[info.plano] || "#475569" };
 }
 
+function renderContaAdmin() {
+    const el = document.getElementById("admin-conta");
+    const u = auth.currentUser;
+    if (!el || !u) return;
+    const verif = !!u.emailVerified;
+    const uidCfg = ADMIN_UIDS_FABEF.length > 0;
+    el.innerHTML = `
+        <div style="font-size:13px;line-height:1.6;">
+            <div><strong>Conta:</strong> ${escapeHTML(u.email || "")}</div>
+            <div><strong>E-mail verificado:</strong> ${verif
+                ? '<span style="color:#15803d;font-weight:800;">✔ sim</span>'
+                : '<span style="color:#b91c1c;font-weight:800;">✘ NÃO — o servidor recusa ações de administrador até verificar</span>'}</div>
+            <div style="word-break:break-all;"><strong>O seu UID:</strong> <code id="admin-uid-texto">${escapeHTML(u.uid)}</code></div>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;">${uidCfg
+                ? "UID de administrador configurado na aplicação."
+                : "Recomendado: copie este UID para <b>firestore.rules</b> (função uidAdmin) e para <b>ADMIN_UIDS_FABEF</b> no app.js. Assim só esta conta é administradora."}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                <button type="button" class="btn btn-light btn-small" style="width:auto;padding:5px 10px;" onclick="window.adminCopiarUid()">📋 Copiar UID</button>
+                ${verif ? "" : `<button type="button" class="btn btn-small btn-entrar" style="width:auto;padding:5px 10px;" onclick="window.adminEnviarVerificacao()">✉️ Enviar e-mail de verificação</button>
+                <button type="button" class="btn btn-light btn-small" style="width:auto;padding:5px 10px;" onclick="window.adminAtualizarVerificacao()">🔄 Já verifiquei</button>`}
+            </div>
+        </div>`;
+}
+
+window.adminCopiarUid = async function () {
+    try {
+        await navigator.clipboard.writeText(auth.currentUser?.uid || "");
+        alert("UID copiado.");
+    } catch (_) {
+        alert("Não foi possível copiar. O UID está escrito no painel.");
+    }
+};
+window.adminEnviarVerificacao = async function () {
+    try {
+        await sendEmailVerification(auth.currentUser);
+        alert("✉️ Enviámos um e-mail de verificação para " + (auth.currentUser?.email || "") + ".\nAbra a mensagem, toque no link e depois toque em “Já verifiquei”.");
+    } catch (e) {
+        alert("Não foi possível enviar o e-mail de verificação:\n" + mensagemFirebase(e));
+    }
+};
+window.adminAtualizarVerificacao = async function () {
+    try {
+        await auth.currentUser.reload();
+        await auth.currentUser.getIdToken(true); // renova o token para as regras do servidor
+        renderContaAdmin();
+        if (auth.currentUser.emailVerified) { alert("✔ E-mail verificado."); carregarPainelAdmin(); }
+        else alert("Ainda não aparece como verificado. Abra o link do e-mail e tente outra vez.");
+    } catch (e) {
+        alert("Não foi possível atualizar:\n" + mensagemFirebase(e));
+    }
+};
+
 async function carregarPainelAdmin() {
     if (!ehAdminFABEF()) return;
+    renderContaAdmin();
     const aviso = document.getElementById("admin-aviso");
     if (aviso) { aviso.className = "alert alert-info"; aviso.textContent = "⏳ A carregar empresas e pedidos..."; }
 
@@ -9714,7 +9827,9 @@ async function carregarPainelAdmin() {
     if (aviso) {
         if (erros.length) {
             aviso.className = "alert alert-danger";
-            aviso.innerHTML = `🔴 Sem permissão para ler: <strong>${erros.join(" e ")}</strong>. É preciso atualizar as regras do Firestore (ficheiro <code>REGRAS-FIRESTORE-ADMIN.txt</code> no pacote).`;
+            aviso.innerHTML = `🔴 Sem permissão para ler: <strong>${erros.join(" e ")}</strong>. ` + (auth.currentUser?.emailVerified
+                ? "Verifique se publicou o <code>firestore.rules</code> mais recente e se o UID das regras é o seu (ver acima)."
+                : "O seu <strong>e-mail ainda não está verificado</strong>: use o botão “Enviar e-mail de verificação” acima.");
         } else {
             aviso.className = "";
             aviso.innerHTML = "";
@@ -9724,7 +9839,15 @@ async function carregarPainelAdmin() {
 }
 window.carregarPainelAdmin = carregarPainelAdmin;
 
+window.copiarUidAdmin = async function () {
+    const uid = auth.currentUser?.uid || "";
+    try { await navigator.clipboard.writeText(uid); alert("UID copiado:\n" + uid); }
+    catch (_) { alert("O seu UID é:\n" + uid); }
+};
+
 function renderPainelAdmin() {
+    const infoUid = document.getElementById("admin-uid-valor");
+    if (infoUid) infoUid.textContent = auth.currentUser?.uid || "—";
     const corpoPed = document.getElementById("admin-tabela-pedidos");
     const corpoEmp = document.getElementById("admin-tabela-empresas");
     if (!corpoPed || !corpoEmp) return;
@@ -9763,8 +9886,8 @@ function renderPainelAdmin() {
             <td><code>${escapeHTML(p.referencia || "—")}</code><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.tipo === "CHAVE" ? "Chave de licença" : "Código SMS")}</span></td>
             <td>${dinheiro(numero(p.valor) || 250)}</td>
             <td style="white-space:nowrap;">
-                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa('${escapeHTML(p.empresaId)}', 30, '${escapeHTML(p.id)}', '${chave}')" style="width:auto;padding:5px 10px;font-size:12px;">✅ Ativar este ramo (30 d)</button>
-                <button type="button" class="btn btn-small btn-danger" onclick="window.adminRejeitarPedido('${escapeHTML(p.id)}')" style="width:auto;padding:5px 10px;font-size:12px;">❌ Rejeitar</button>
+                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa(${jsArg(p.empresaId)}, 30, ${jsArg(p.id)}, ${jsArg(chave)})" style="width:auto;padding:5px 10px;font-size:12px;">✅ Ativar este ramo (30 d)</button>
+                <button type="button" class="btn btn-small btn-danger" onclick="window.adminRejeitarPedido(${jsArg(p.id)})" style="width:auto;padding:5px 10px;font-size:12px;">❌ Rejeitar</button>
             </td>
         </tr>`;
     }).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Nenhum pedido de ativação pendente.</td></tr>`;
@@ -9787,8 +9910,8 @@ function renderPainelAdmin() {
             <td>${dataTexto(e.data_registo || e.criadoEm)}</td>
             <td style="color:${st.cor};font-weight:700;">${escapeHTML(st.rotulo)}</td>
             <td style="white-space:nowrap;">
-                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa('${idSeg}', 30, '', '${ch}')" style="width:auto;padding:5px 10px;font-size:12px;">✅ Ativar +30 d</button>
-                <button type="button" class="btn btn-small btn-light" onclick="window.adminDesativarEmpresa('${idSeg}', '${ch}')" style="width:auto;padding:5px 10px;font-size:12px;">⛔ Desativar</button>
+                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa(${jsArg(e.id)}, 30, '', ${jsArg(ch)})" style="width:auto;padding:5px 10px;font-size:12px;">✅ Ativar +30 d</button>
+                <button type="button" class="btn btn-small btn-light" onclick="window.adminDesativarEmpresa(${jsArg(e.id)}, ${jsArg(ch)})" style="width:auto;padding:5px 10px;font-size:12px;">⛔ Desativar</button>
             </td>
         </tr>`);
         });
@@ -10270,23 +10393,23 @@ function renderPastaRamos() {
                             ✔ Ramo Selecionado Agora
                         </button>
                     ` : (!ramoDisponivel(r.nome) ? `
-                        <button class="btn btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:8px;cursor:pointer;" onclick="mudarRamo('${escapeHTML(r.nome)}')">
+                        <button class="btn btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:8px;cursor:pointer;" onclick="mudarRamo(${jsArg(r.nome)})">
                             🔒 Por pagar — ativar este ramo (250 MT)
                         </button>
                     ` : `
-                        <button class="btn btn-primary btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;" onclick="alternarRamoPasta('${escapeHTML(r.nome)}')">
+                        <button class="btn btn-primary btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;" onclick="alternarRamoPasta(${jsArg(r.nome)})">
                             📂 Alternar para este Ramo
                         </button>
                     `)}
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <button class="btn btn-light btn-small" type="button" style="flex:1;min-width:120px;font-size:12px;font-weight:700;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;padding:8px 10px;border-radius:6px;cursor:pointer;" onclick="abrirConfiguracoesRamo('${escapeHTML(r.nome)}')">
+                        <button class="btn btn-light btn-small" type="button" style="flex:1;min-width:120px;font-size:12px;font-weight:700;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;padding:8px 10px;border-radius:6px;cursor:pointer;" onclick="abrirConfiguracoesRamo(${jsArg(r.nome)})">
                             ⚙️ Configurar Ramo
                         </button>
-                        <button class="btn btn-light btn-small" type="button" style="font-size:12px;font-weight:600;padding:8px 10px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;border-radius:6px;cursor:pointer;" onclick="alterarPinRamo('${escapeHTML(r.nome)}')">
+                        <button class="btn btn-light btn-small" type="button" style="font-size:12px;font-weight:600;padding:8px 10px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;border-radius:6px;cursor:pointer;" onclick="alterarPinRamo(${jsArg(r.nome)})">
                             🔑 ${temSenha ? 'Alterar PIN' : 'Definir PIN'}
                         </button>
                         ${!ehAtivo ? `
-                        <button class="btn btn-light btn-small" type="button" style="color:#ef4444;font-size:13px;font-weight:600;padding:8px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:6px;cursor:pointer;" onclick="removerRamoPasta('${escapeHTML(r.nome)}')" title="Remover este ramo da pasta">
+                        <button class="btn btn-light btn-small" type="button" style="color:#ef4444;font-size:13px;font-weight:600;padding:8px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:6px;cursor:pointer;" onclick="removerRamoPasta(${jsArg(r.nome)})" title="Remover este ramo da pasta">
                             🗑️
                         </button>
                         ` : ''}
@@ -10581,7 +10704,7 @@ document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click"
     const justificativa = (document.getElementById("falha-venda-justificativa")?.value || "").trim();
     const reporStock = Boolean(document.getElementById("falha-venda-repor-stock")?.checked);
 
-    if (!justificativa) {
+    if (!justificativa || justificativa.trim().length < 3) {
         alert("⚠️ Justificativa Obrigatória:\nPor favor, escreva a justificativa detalhada para o Gerente explicando o motivo da alteração ou anulação desta venda.");
         document.getElementById("falha-venda-justificativa")?.focus();
         return;
@@ -10751,7 +10874,7 @@ window.salvarEdicaoVenda = async function() {
         return;
     }
 
-    if (!justificativa) {
+    if (!justificativa || justificativa.trim().length < 3) {
         alert("⚠️ Justificativa Obrigatória:\nPor favor, informe a justificativa da alteração para o histórico do Gerente.");
         document.getElementById("edit-venda-justificativa")?.focus();
         return;
@@ -10933,7 +11056,7 @@ document.getElementById("btn-confirmar-encomenda-falhada")?.addEventListener("cl
     const encomendaId = document.getElementById("falha-encomenda-id")?.value;
     const justificativa = (document.getElementById("falha-encomenda-justificativa")?.value || "").trim();
 
-    if (!justificativa) {
+    if (!justificativa || justificativa.trim().length < 3) {
         alert("⚠️ Campo Obrigatório:\nPor favor, escreva a justificativa para o Gerente explicando porque a encomenda falhou ou foi cancelada.");
         document.getElementById("falha-encomenda-justificativa")?.focus();
         return;
@@ -11198,7 +11321,7 @@ function renderMetas() {
             return `<tr>
                 <td><strong>${escapeHTML(f.nome)}</strong></td>
                 <td style="max-width:180px;">
-                    ${souGerente ? `<input type="number" min="0" step="0.01" value="${metaFunc || ""}" style="width:110px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;" onchange="salvarMetaFuncionario('${escapeHTML(f.id)}', this.value)">` : dinheiro(metaFunc)}
+                    ${souGerente ? `<input type="number" min="0" step="0.01" value="${metaFunc || ""}" style="width:110px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;" onchange="salvarMetaFuncionario(${jsArg(f.id)}, this.value)">` : dinheiro(metaFunc)}
                 </td>
                 <td style="min-width:160px;">${barraHtml(totalFunc, metaFunc)}</td>
             </tr>`;
@@ -11287,7 +11410,7 @@ function renderDesempenho() {
         const avaliacaoAtual = func.avaliacaoGerente || "Bom / Satisfatório";
 
         const seletorAvaliacao = souGerente ? `
-            <select style="font-size:12px;padding:4px 8px;border-radius:6px;border:1.5px solid #cbd5e1;font-weight:700;background:#fff;" onchange="salvarAvaliacaoFuncionario('${escapeHTML(func.id)}', this.value)">
+            <select style="font-size:12px;padding:4px 8px;border-radius:6px;border:1.5px solid #cbd5e1;font-weight:700;background:#fff;" onchange="salvarAvaliacaoFuncionario(${jsArg(func.id)}, this.value)">
                 <option value="🌟 Excelente" ${avaliacaoAtual.includes('Excelente') ? 'selected' : ''}>🌟 Excelente</option>
                 <option value="👍 Muito Bom" ${avaliacaoAtual.includes('Muito Bom') ? 'selected' : ''}>👍 Muito Bom</option>
                 <option value="🆗 Bom / Satisfatório" ${avaliacaoAtual.includes('Satisfatório') || avaliacaoAtual === 'Bom' ? 'selected' : ''}>🆗 Bom / Satisfatório</option>
@@ -11617,7 +11740,7 @@ function renderGastosFuncionarios() {
             <td>${escapeHTML(g.descricao || "—")}</td>
             <td>${escapeHTML(g.registadoPor || "—")}</td>
             <td>${souGerente ? `
-                <button class="btn btn-danger btn-small" type="button" onclick="eliminarGastoFuncionario('${escapeHTML(g.id)}')" title="Eliminar registo de vale">🗑️</button>
+                <button class="btn btn-danger btn-small" type="button" onclick="eliminarGastoFuncionario(${jsArg(g.id)})" title="Eliminar registo de vale">🗑️</button>
             ` : "—"}</td>
         </tr>
     `).join("") || `<tr><td colspan="7" style="text-align:center;color:#64748b;padding:14px;">Ainda não há vales ou adiantamentos registados na conta dos funcionários.</td></tr>`;
@@ -11919,8 +12042,8 @@ function renderSugestoes() {
             <td>${escapeHTML(s.texto)}</td>
             <td><span class="badge ${s.estado === 'ADICIONADA' ? 'badge-green' : (s.estado === 'REJEITADA' ? 'badge-red' : 'badge-yellow')}">${escapeHTML(s.estado || "NOVA")}</span></td>
             <td>${souGerente && s.estado === "NOVA" ? `
-                <button class="btn btn-success btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','ADICIONADA')">✔️ Adicionar ao catálogo</button>
-                <button class="btn btn-light btn-small" type="button" onclick="marcarSugestao('${escapeHTML(s.id)}','REJEITADA')">✖️ Rejeitar</button>
+                <button class="btn btn-success btn-small" type="button" onclick="marcarSugestao(${jsArg(s.id)},'ADICIONADA')">✔️ Adicionar ao catálogo</button>
+                <button class="btn btn-light btn-small" type="button" onclick="marcarSugestao(${jsArg(s.id)},'REJEITADA')">✖️ Rejeitar</button>
             ` : "—"}</td>
         </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Ainda não há sugestões enviadas.</td></tr>`;
 }
