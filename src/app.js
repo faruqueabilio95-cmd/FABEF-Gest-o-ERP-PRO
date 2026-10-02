@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v10-20261002";
+const FABEF_BUILD = "v11-20261002";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -273,7 +273,7 @@ let FABEF_RELATORIO_ATUAL = null;
 const ADMINS_FABEF = ["faruqueabilio95@gmail.com"];
 // Mais seguro: cole aqui o seu UID (Firebase -> Authentication -> Utilizadores).
 // Enquanto estiver vazio vale o e-mail acima. Cole o MESMO UID em firestore.rules (uidAdmin).
-const ADMIN_UIDS_FABEF = [];
+const ADMIN_UIDS_FABEF = ["0JhOHZPJYDUcizKNkuB3wAiAvjp1"];
 const FABEF_ADMIN = { empresas: [], pedidos: [], carregado: false };
 
 function ehUsuarioGerente() {
