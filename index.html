@@ -2,15 +2,14 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="fabef-build" content="v9-20260930">
+<meta name="fabef-build" content="v10-20261002">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script type="importmap">
 {
   "imports": {
     "firebase/app": "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js",
-    "canvas-confetti": "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/+esm"
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js"
   }
 }
 </script>
@@ -1820,7 +1819,13 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         </div>
         <button type="button" class="btn btn-light" onclick="window.carregarPainelAdmin()" style="padding:8px 14px;font-weight:700;">🔄 Atualizar</button>
       </div>
+      <div id="admin-conta" class="card" style="border-left:4px solid #f59e0b;margin-bottom:12px;"></div>
       <div id="admin-aviso"></div>
+      <div class="alert alert-info" style="font-size:12px;">
+        🔐 <strong>Reforço de segurança:</strong> o seu UID de administrador é <code id="admin-uid-valor" style="word-break:break-all;">—</code>
+        <button type="button" class="btn btn-light btn-small" onclick="window.copiarUidAdmin()" style="width:auto;padding:3px 10px;margin-left:6px;">Copiar</button><br>
+        Cole-o na função <code>adminUids()</code> das regras do Firestore. Assim, mesmo que alguém crie outra conta com o seu e-mail, nunca será administrador.
+      </div>
       <div class="grid">
         <div class="kpi"><div class="rotulo">Empresas</div><div class="valor" id="admin-kpi-total">0</div></div>
         <div class="kpi"><div class="rotulo">Ramos pagos</div><div class="valor" id="admin-kpi-pagas">0</div></div>
@@ -2843,12 +2848,10 @@ function definirAbaVenda(p) {
 }
 </script>
 <!-- Biblioteca de leitura de código de barras/QR por câmara — funciona em Chrome, Safari (iOS) e Firefox, porque faz a descodificação em JavaScript puro, sem depender de nenhuma função nativa do navegador -->
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 window.FABEF_CARREGADO = false;
 </script>
-<script type="module" charset="UTF-8" src="./src/app.js?v=v9-20260930" onload="window.FABEF_CARREGADO=true;" onerror="
+<script type="module" charset="UTF-8" src="./src/app.js?v=v10-20261002" onload="window.FABEF_CARREGADO=true;" onerror="
   if (!window.FABEF_CARREGADO) {
     console.warn('Ficheiro ./src/app.js não encontrado. A carregar ./app.js da mesma pasta...');
     const s = document.createElement('script');
