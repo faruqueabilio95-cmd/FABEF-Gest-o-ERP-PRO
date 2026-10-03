@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="fabef-build" content="v11-20261002">
+<meta name="fabef-build" content="v12-20261002">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script type="importmap">
 {
@@ -1821,11 +1821,6 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
       <div id="admin-conta" class="card" style="border-left:4px solid #f59e0b;margin-bottom:12px;"></div>
       <div id="admin-aviso"></div>
-      <div class="alert alert-info" style="font-size:12px;">
-        🔐 <strong>Reforço de segurança:</strong> o seu UID de administrador é <code id="admin-uid-valor" style="word-break:break-all;">—</code>
-        <button type="button" class="btn btn-light btn-small" onclick="window.copiarUidAdmin()" style="width:auto;padding:3px 10px;margin-left:6px;">Copiar</button><br>
-        Cole-o na função <code>adminUids()</code> das regras do Firestore. Assim, mesmo que alguém crie outra conta com o seu e-mail, nunca será administrador.
-      </div>
       <div class="grid">
         <div class="kpi"><div class="rotulo">Empresas</div><div class="valor" id="admin-kpi-total">0</div></div>
         <div class="kpi"><div class="rotulo">Ramos pagos</div><div class="valor" id="admin-kpi-pagas">0</div></div>
@@ -2851,7 +2846,7 @@ function definirAbaVenda(p) {
 <script>
 window.FABEF_CARREGADO = false;
 </script>
-<script type="module" charset="UTF-8" src="./src/app.js?v=v11-20261002" onload="window.FABEF_CARREGADO=true;" onerror="
+<script type="module" charset="UTF-8" src="./src/app.js?v=v12-20261002" onload="window.FABEF_CARREGADO=true;" onerror="
   if (!window.FABEF_CARREGADO) {
     console.warn('Ficheiro ./src/app.js não encontrado. A carregar ./app.js da mesma pasta...');
     const s = document.createElement('script');
