@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v11-20261002";
+const FABEF_BUILD = "v12-20261002";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -9748,22 +9748,13 @@ function renderContaAdmin() {
     const el = document.getElementById("admin-conta");
     const u = auth.currentUser;
     if (!el || !u) return;
-    const verif = !!u.emailVerified;
-    const uidCfg = ADMIN_UIDS_FABEF.length > 0;
     el.innerHTML = `
         <div style="font-size:13px;line-height:1.6;">
             <div><strong>Conta:</strong> ${escapeHTML(u.email || "")}</div>
-            <div><strong>E-mail verificado:</strong> ${verif
-                ? '<span style="color:#15803d;font-weight:800;">✔ sim</span>'
-                : '<span style="color:#b91c1c;font-weight:800;">✘ NÃO — o servidor recusa ações de administrador até verificar</span>'}</div>
             <div style="word-break:break-all;"><strong>O seu UID:</strong> <code id="admin-uid-texto">${escapeHTML(u.uid)}</code></div>
-            <div style="font-size:12px;color:#64748b;margin-top:2px;">${uidCfg
-                ? "UID de administrador configurado na aplicação."
-                : "Recomendado: copie este UID para <b>firestore.rules</b> (função uidAdmin) e para <b>ADMIN_UIDS_FABEF</b> no app.js. Assim só esta conta é administradora."}</div>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;">Esta conta é identificada como administradora pelo UID (nas regras do Firestore e na aplicação).</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
                 <button type="button" class="btn btn-light btn-small" style="width:auto;padding:5px 10px;" onclick="window.adminCopiarUid()">📋 Copiar UID</button>
-                ${verif ? "" : `<button type="button" class="btn btn-small btn-entrar" style="width:auto;padding:5px 10px;" onclick="window.adminEnviarVerificacao()">✉️ Enviar e-mail de verificação</button>
-                <button type="button" class="btn btn-light btn-small" style="width:auto;padding:5px 10px;" onclick="window.adminAtualizarVerificacao()">🔄 Já verifiquei</button>`}
             </div>
         </div>`;
 }
@@ -9774,25 +9765,6 @@ window.adminCopiarUid = async function () {
         alert("UID copiado.");
     } catch (_) {
         alert("Não foi possível copiar. O UID está escrito no painel.");
-    }
-};
-window.adminEnviarVerificacao = async function () {
-    try {
-        await sendEmailVerification(auth.currentUser);
-        alert("✉️ Enviámos um e-mail de verificação para " + (auth.currentUser?.email || "") + ".\nAbra a mensagem, toque no link e depois toque em “Já verifiquei”.");
-    } catch (e) {
-        alert("Não foi possível enviar o e-mail de verificação:\n" + mensagemFirebase(e));
-    }
-};
-window.adminAtualizarVerificacao = async function () {
-    try {
-        await auth.currentUser.reload();
-        await auth.currentUser.getIdToken(true); // renova o token para as regras do servidor
-        renderContaAdmin();
-        if (auth.currentUser.emailVerified) { alert("✔ E-mail verificado."); carregarPainelAdmin(); }
-        else alert("Ainda não aparece como verificado. Abra o link do e-mail e tente outra vez.");
-    } catch (e) {
-        alert("Não foi possível atualizar:\n" + mensagemFirebase(e));
     }
 };
 
@@ -9827,9 +9799,7 @@ async function carregarPainelAdmin() {
     if (aviso) {
         if (erros.length) {
             aviso.className = "alert alert-danger";
-            aviso.innerHTML = `🔴 Sem permissão para ler: <strong>${erros.join(" e ")}</strong>. ` + (auth.currentUser?.emailVerified
-                ? "Verifique se publicou o <code>firestore.rules</code> mais recente e se o UID das regras é o seu (ver acima)."
-                : "O seu <strong>e-mail ainda não está verificado</strong>: use o botão “Enviar e-mail de verificação” acima.");
+            aviso.innerHTML = `🔴 Sem permissão para ler: <strong>${erros.join(" e ")}</strong>. Confirme que publicou o <code>firestore.rules</code> mais recente e que o UID nas regras é o mesmo que está escrito acima.`;
         } else {
             aviso.className = "";
             aviso.innerHTML = "";
