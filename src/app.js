@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v12-20261002";
+const FABEF_BUILD = "v13-20261003";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -1147,21 +1147,12 @@ async function apagarDadosLocaisEReiniciar() {
     location.reload();
 }
 
-// Avisos VISÍVEIS quando o Firestore recusa ler dados (antes só aparecia na consola).
+// Quando o Firestore recusa ler uma coleção, apenas se regista na consola (sem avisos no ecrã).
 const FABEF_errosLeitura = new Set();
 function mostrarAvisoLeitura(nome, erro) {
     if (!erro || erro.code !== "permission-denied") return;
     FABEF_errosLeitura.add(nome);
-    let b = document.getElementById("aviso-leitura-firestore");
-    if (!b) {
-        b = document.createElement("div");
-        b.id = "aviso-leitura-firestore";
-        b.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:99999;background:#7f1d1d;color:#fff;padding:12px 14px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.35);";
-        document.body.appendChild(b);
-    }
-    b.innerHTML = "🔴 Sem permissão para ler: <u>" + Array.from(FABEF_errosLeitura).join(", ") +
-        "</u>.<br><span style='font-weight:400'>Por isso esses dados não aparecem. Causa provável: as regras do Firestore ou esta conta não pertence a esta empresa. Envie uma captura deste aviso ao suporte.</span> " +
-        "<button type='button' onclick=\"this.parentNode.remove()\" style='margin-left:6px;background:#fff;color:#7f1d1d;border:none;border-radius:6px;padding:3px 8px;font-weight:800;'>OK</button>";
+    console.warn(`Sem permissão para ler "${nome}" (normal se esta coleção é só do gerente).`);
 }
 
 const IDS_LISTAS_DINAMICAS = [
@@ -1268,6 +1259,9 @@ function limparInterfaceFABEF() {
             if (el) { el.style.display = "none"; el.dataset.pronto = ""; el.innerHTML = ""; }
         });
         FABEF_diagRamoFeito = "";
+        FABEF_produtosTodosRamos = [];
+        FABEF_todosRamosChave = "";
+        FABEF_compraProdutoPendente = null;
         fecharMenuLateral();
         try { FABEF_ADMIN.empresas = []; FABEF_ADMIN.pedidos = []; FABEF_ADMIN.carregado = false; } catch (_) {}
     } catch (e) {
@@ -1908,21 +1902,28 @@ async function carregarEmpresa() {
     }
 }
 
+// Coleções que só o gerente pode ler (as regras do Firestore recusam o funcionário).
+// O funcionário nem tenta ler: assim não há erros de permissão.
+function escutarSoGerente(nome, estado) {
+    if (ehUsuarioGerente() || window.FABEF?.isDemoMode) return escutarColecao(nome, estado);
+    return Promise.resolve();
+}
+
 async function carregarDados() {
     await Promise.all([
         escutarColecao("produtos", "produtos"),
         escutarColecao("clientes", "clientes"),
-        escutarColecao("fornecedores", "fornecedores"),
-        escutarColecao("compras", "compras"),
+        escutarSoGerente("fornecedores", "fornecedores"),
+        escutarSoGerente("compras", "compras"),
         escutarColecao("vendas", "vendas"),
         escutarColecao("despesas", "despesas"),
         escutarColecao("dividas", "dividas"),
         escutarColecao("encomendas", "encomendas"),
         escutarColecao("funcionarios", "funcionarios"),
-        escutarColecao("gastos_funcionarios", "gastosFuncionarios"),
+        escutarSoGerente("gastos_funcionarios", "gastosFuncionarios"),
         escutarColecao("dispensas", "dispensas"),
-        escutarColecao("pagamentos", "pagamentos"),
-        escutarColecao("auditoria_logs", "auditoria"),
+        escutarSoGerente("pagamentos", "pagamentos"),
+        escutarSoGerente("auditoria_logs", "auditoria"),
         escutarColecao("sugestoes", "sugestoes")
     ]);
     await ouvirCaixa();
@@ -3571,7 +3572,7 @@ function renderListaProdutosCompra() {
         return `<button type="button" onclick="window.escolherProdutoCompra(${jsArg(p.id)})"
             style="display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border:none;border-bottom:1px solid #f1f5f9;background:${ativo ? "#dcfce7" : "#fff"};cursor:pointer;font-size:14px;">
             <span style="font-weight:${ativo ? 800 : 600};color:#0f172a;">${ativo ? "✔ " : ""}${escapeHTML(p.nome || "—")}</span>
-            <span style="font-size:12px;color:#64748b;white-space:nowrap;">stock ${numero(p.stock)}${p.custo ? " · custo " + dinheiro(p.custo) : ""}</span>
+            <span style="font-size:13px;font-weight:700;color:${numero(p.stock) <= 0 ? "#b91c1c" : "#15803d"};white-space:nowrap;">Stock: ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</span>
         </button>`;
     }).join("");
     if (achados.length > LIMITE) {
@@ -3579,6 +3580,21 @@ function renderListaProdutosCompra() {
     }
     if (!achados.length) {
         html = `<div style="padding:12px;color:#64748b;font-size:13px;">${todos.length ? "Nenhum produto encontrado para a pesquisa." : "Este ramo ainda não tem produtos."}</div>`;
+    }
+
+    // Produtos dos OUTROS ramos da empresa (tocar muda para esse ramo)
+    const outrosTodos = (FABEF_produtosTodosRamos || []).filter(p => p.ramo && p.ramo !== FABEF.ramo);
+    const outros = (termo
+        ? outrosTodos.filter(p => [p.nome, p.idPersonalizado, p.codigo].some(v => normalizarBusca(v).includes(termo)))
+        : outrosTodos
+    ).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt"));
+    if (outros.length) {
+        html += `<div style="padding:8px 12px;background:#eff6ff;font-size:12px;font-weight:800;color:#1e3a8a;">Produtos de outros ramos — toque para mudar para esse ramo</div>`;
+        html += outros.slice(0, LIMITE).map(p => `<button type="button" onclick="window.escolherProdutoCompra(${jsArg(p.id)}, ${jsArg(p.ramo)})"
+            style="display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border:none;border-bottom:1px solid #f1f5f9;background:#fff;cursor:pointer;font-size:14px;">
+            <span style="font-weight:600;color:#0f172a;">${escapeHTML(p.nome || "—")}<br><span style="font-size:11px;font-weight:700;color:#1d4ed8;">Ramo: ${escapeHTML(p.ramo)}</span></span>
+            <span style="font-size:13px;font-weight:700;color:${numero(p.stock) <= 0 ? "#b91c1c" : "#15803d"};white-space:nowrap;">Stock: ${numero(p.stock)}</span>
+        </button>`).join("");
     }
     lista.innerHTML = html;
 
@@ -3592,9 +3608,17 @@ function renderListaProdutosCompra() {
 }
 window.renderListaProdutosCompra = renderListaProdutosCompra;
 
-window.escolherProdutoCompra = function (id) {
+window.escolherProdutoCompra = async function (id, ramoDoProduto) {
     const select = document.getElementById("compra-produto");
     if (!select) return;
+    if (ramoDoProduto && ramoDoProduto !== FABEF.ramo) {
+        FABEF_compraProdutoPendente = id;
+        FABEF_compraPendenteAte = Date.now() + 20000;
+        await mudarRamo(ramoDoProduto);          // pede confirmação e carrega o outro ramo
+        aplicarCompraPendente();
+        renderListaProdutosCompra();
+        return;
+    }
     if (select.value !== id) {
         // Outro produto: não arrastar o custo e o fornecedor do produto anterior
         const c = document.getElementById("compra-custo");
@@ -3609,6 +3633,40 @@ window.escolherProdutoCompra = function (id) {
 };
 
 document.getElementById("compra-pesquisa")?.addEventListener("input", renderListaProdutosCompra);
+
+/* Produtos de TODOS os ramos da empresa (lidos uma vez), para o gerente os ver na lista
+   de Compras com o respetivo stock. Tocar num produto de outro ramo muda para esse ramo. */
+let FABEF_produtosTodosRamos = [];
+let FABEF_todosRamosChave = "";
+async function carregarProdutosTodosRamos() {
+    if (window.FABEF?.isDemoMode || !FABEF.empresaId || !ehUsuarioGerente()) return;
+    const chave = FABEF.empresaId + "|" + (FABEF.ramo || "");
+    if (FABEF_todosRamosChave === chave) return;
+    FABEF_todosRamosChave = chave;
+    try {
+        const snap = await getDocs(subRef("produtos"));
+        FABEF_produtosTodosRamos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderListaProdutosCompra();
+    } catch (e) {
+        FABEF_todosRamosChave = "";
+        console.warn("Não foi possível ler os produtos de outros ramos:", e);
+    }
+}
+
+// Produto escolhido num ramo diferente: aplica-se assim que o novo ramo carregar.
+let FABEF_compraProdutoPendente = null;
+let FABEF_compraPendenteAte = 0;
+function aplicarCompraPendente() {
+    if (!FABEF_compraProdutoPendente) return;
+    if (Date.now() > FABEF_compraPendenteAte) { FABEF_compraProdutoPendente = null; return; }
+    const select = document.getElementById("compra-produto");
+    if (select && Array.from(select.options).some(o => o.value === FABEF_compraProdutoPendente)) {
+        const id = FABEF_compraProdutoPendente;
+        FABEF_compraProdutoPendente = null;
+        select.value = id;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+}
 
 function preencherProdutosCompra() {
     const select = document.getElementById("compra-produto");
@@ -3626,7 +3684,9 @@ function preencherProdutosCompra() {
         </option>
         `).join("");
     if (valorAnterior && Array.from(select.options).some(o => o.value === valorAnterior)) select.value = valorAnterior;
+    aplicarCompraPendente();
     renderListaProdutosCompra();
+    carregarProdutosTodosRamos();
 
     // Sugestões de fornecedores isoladas e filtradas ESTRITAMENTE para este ramo (não mistura fornecedores)
     const listaFornecedores = document.getElementById("lista-fornecedores-compra");
