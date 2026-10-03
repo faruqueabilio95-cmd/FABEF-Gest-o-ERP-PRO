@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v13-20261003";
+const FABEF_BUILD = "v14-20261003";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -275,6 +275,12 @@ const ADMINS_FABEF = ["faruqueabilio95@gmail.com"];
 // Enquanto estiver vazio vale o e-mail acima. Cole o MESMO UID em firestore.rules (uidAdmin).
 const ADMIN_UIDS_FABEF = ["0JhOHZPJYDUcizKNkuB3wAiAvjp1"];
 const FABEF_ADMIN = { empresas: [], pedidos: [], carregado: false };
+
+// Ramo a que pertence um registo. Os registos antigos, sem ramo gravado, pertencem ao
+// ramo principal da empresa (e NÃO aparecem em todos os ramos).
+function ramoDoRegisto(x) {
+    return (x && x.ramo) || ramoPrincipalEmpresa(FABEF.empresa || {}) || "";
+}
 
 function ehUsuarioGerente() {
     if (window.FABEF?.isDemoMode) {
@@ -1259,9 +1265,6 @@ function limparInterfaceFABEF() {
             if (el) { el.style.display = "none"; el.dataset.pronto = ""; el.innerHTML = ""; }
         });
         FABEF_diagRamoFeito = "";
-        FABEF_produtosTodosRamos = [];
-        FABEF_todosRamosChave = "";
-        FABEF_compraProdutoPendente = null;
         fecharMenuLateral();
         try { FABEF_ADMIN.empresas = []; FABEF_ADMIN.pedidos = []; FABEF_ADMIN.carregado = false; } catch (_) {}
     } catch (e) {
@@ -3582,20 +3585,6 @@ function renderListaProdutosCompra() {
         html = `<div style="padding:12px;color:#64748b;font-size:13px;">${todos.length ? "Nenhum produto encontrado para a pesquisa." : "Este ramo ainda não tem produtos."}</div>`;
     }
 
-    // Produtos dos OUTROS ramos da empresa (tocar muda para esse ramo)
-    const outrosTodos = (FABEF_produtosTodosRamos || []).filter(p => p.ramo && p.ramo !== FABEF.ramo);
-    const outros = (termo
-        ? outrosTodos.filter(p => [p.nome, p.idPersonalizado, p.codigo].some(v => normalizarBusca(v).includes(termo)))
-        : outrosTodos
-    ).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt"));
-    if (outros.length) {
-        html += `<div style="padding:8px 12px;background:#eff6ff;font-size:12px;font-weight:800;color:#1e3a8a;">Produtos de outros ramos — toque para mudar para esse ramo</div>`;
-        html += outros.slice(0, LIMITE).map(p => `<button type="button" onclick="window.escolherProdutoCompra(${jsArg(p.id)}, ${jsArg(p.ramo)})"
-            style="display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border:none;border-bottom:1px solid #f1f5f9;background:#fff;cursor:pointer;font-size:14px;">
-            <span style="font-weight:600;color:#0f172a;">${escapeHTML(p.nome || "—")}<br><span style="font-size:11px;font-weight:700;color:#1d4ed8;">Ramo: ${escapeHTML(p.ramo)}</span></span>
-            <span style="font-size:13px;font-weight:700;color:${numero(p.stock) <= 0 ? "#b91c1c" : "#15803d"};white-space:nowrap;">Stock: ${numero(p.stock)}</span>
-        </button>`).join("");
-    }
     lista.innerHTML = html;
 
     const resumo = document.getElementById("compra-produto-escolhido");
@@ -3608,17 +3597,9 @@ function renderListaProdutosCompra() {
 }
 window.renderListaProdutosCompra = renderListaProdutosCompra;
 
-window.escolherProdutoCompra = async function (id, ramoDoProduto) {
+window.escolherProdutoCompra = function (id) {
     const select = document.getElementById("compra-produto");
     if (!select) return;
-    if (ramoDoProduto && ramoDoProduto !== FABEF.ramo) {
-        FABEF_compraProdutoPendente = id;
-        FABEF_compraPendenteAte = Date.now() + 20000;
-        await mudarRamo(ramoDoProduto);          // pede confirmação e carrega o outro ramo
-        aplicarCompraPendente();
-        renderListaProdutosCompra();
-        return;
-    }
     if (select.value !== id) {
         // Outro produto: não arrastar o custo e o fornecedor do produto anterior
         const c = document.getElementById("compra-custo");
@@ -3633,40 +3614,6 @@ window.escolherProdutoCompra = async function (id, ramoDoProduto) {
 };
 
 document.getElementById("compra-pesquisa")?.addEventListener("input", renderListaProdutosCompra);
-
-/* Produtos de TODOS os ramos da empresa (lidos uma vez), para o gerente os ver na lista
-   de Compras com o respetivo stock. Tocar num produto de outro ramo muda para esse ramo. */
-let FABEF_produtosTodosRamos = [];
-let FABEF_todosRamosChave = "";
-async function carregarProdutosTodosRamos() {
-    if (window.FABEF?.isDemoMode || !FABEF.empresaId || !ehUsuarioGerente()) return;
-    const chave = FABEF.empresaId + "|" + (FABEF.ramo || "");
-    if (FABEF_todosRamosChave === chave) return;
-    FABEF_todosRamosChave = chave;
-    try {
-        const snap = await getDocs(subRef("produtos"));
-        FABEF_produtosTodosRamos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderListaProdutosCompra();
-    } catch (e) {
-        FABEF_todosRamosChave = "";
-        console.warn("Não foi possível ler os produtos de outros ramos:", e);
-    }
-}
-
-// Produto escolhido num ramo diferente: aplica-se assim que o novo ramo carregar.
-let FABEF_compraProdutoPendente = null;
-let FABEF_compraPendenteAte = 0;
-function aplicarCompraPendente() {
-    if (!FABEF_compraProdutoPendente) return;
-    if (Date.now() > FABEF_compraPendenteAte) { FABEF_compraProdutoPendente = null; return; }
-    const select = document.getElementById("compra-produto");
-    if (select && Array.from(select.options).some(o => o.value === FABEF_compraProdutoPendente)) {
-        const id = FABEF_compraProdutoPendente;
-        FABEF_compraProdutoPendente = null;
-        select.value = id;
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-}
 
 function preencherProdutosCompra() {
     const select = document.getElementById("compra-produto");
@@ -3684,15 +3631,13 @@ function preencherProdutosCompra() {
         </option>
         `).join("");
     if (valorAnterior && Array.from(select.options).some(o => o.value === valorAnterior)) select.value = valorAnterior;
-    aplicarCompraPendente();
     renderListaProdutosCompra();
-    carregarProdutosTodosRamos();
 
     // Sugestões de fornecedores isoladas e filtradas ESTRITAMENTE para este ramo (não mistura fornecedores)
     const listaFornecedores = document.getElementById("lista-fornecedores-compra");
     if (listaFornecedores) {
         listaFornecedores.innerHTML = (FABEF.fornecedores || [])
-            .filter(f => !f.ramo || f.ramo === FABEF.ramo)
+            .filter(f => ramoDoRegisto(f) === FABEF.ramo)
             .map(f => `<option value="${escapeHTML(f.nome)}">`)
             .join("");
     }
@@ -3716,12 +3661,12 @@ document.getElementById("compra-produto")?.addEventListener("change", (e) => {
     const inputForn = document.getElementById("compra-fornecedor");
     if (inputForn && !inputForn.value) {
         const ultCompra = (FABEF.compras || [])
-            .filter(c => c.produtoId === prod.id && (!c.ramo || c.ramo === FABEF.ramo))
+            .filter(c => c.produtoId === prod.id && ramoDoRegisto(c) === FABEF.ramo)
             .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))[0];
         if (ultCompra && ultCompra.fornecedorNome) {
             inputForn.value = ultCompra.fornecedorNome;
         } else {
-            const primeiroFornRamo = (FABEF.fornecedores || []).find(f => !f.ramo || f.ramo === FABEF.ramo);
+            const primeiroFornRamo = (FABEF.fornecedores || []).find(f => ramoDoRegisto(f) === FABEF.ramo);
             if (primeiroFornRamo) inputForn.value = primeiroFornRamo.nome;
         }
     }
@@ -3754,13 +3699,13 @@ window.renderSugestoesComprasRamo = function() {
         return;
     }
 
-    const fornecedoresDoRamo = (FABEF.fornecedores || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
+    const fornecedoresDoRamo = (FABEF.fornecedores || []).filter(f => ramoDoRegisto(f) === FABEF.ramo);
 
     tbody.innerHTML = produtosSugeridos.map(p => {
         const stockAtual = numero(p.stock);
         const stockMin = numero(p.minimo || p.stockMinimo || 5);
         const comprasDoProduto = (FABEF.compras || [])
-            .filter(c => c.produtoId === p.id && (!c.ramo || c.ramo === FABEF.ramo))
+            .filter(c => c.produtoId === p.id && ramoDoRegisto(c) === FABEF.ramo)
             .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
 
         const ultCompra = comprasDoProduto[0];
@@ -3920,7 +3865,7 @@ async function registarCompra() {
 
 function renderCompras() {
     const lista = FABEF.compras
-        .filter(c => !c.ramo || c.ramo === FABEF.ramo)
+        .filter(c => ramoDoRegisto(c) === FABEF.ramo)
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
 
     const tabelaCorpo = document.getElementById("tabela-compras");
@@ -5823,11 +5768,11 @@ function renderFornecedores() {
     const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
 
     // Fornecedores isolados para o respetivo ramo (não mistura fornecedores)
-    const fornecedoresDoRamo = (FABEF.fornecedores || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
+    const fornecedoresDoRamo = (FABEF.fornecedores || []).filter(f => ramoDoRegisto(f) === FABEF.ramo);
 
     tabelaCorpo.innerHTML = fornecedoresDoRamo.map(f => {
         const divida = numero(f.divida);
-        const compras = (FABEF.compras || []).filter(c => (!c.ramo || c.ramo === FABEF.ramo) && (c.fornecedorNome || "").toLowerCase() === (f.nome || "").toLowerCase());
+        const compras = (FABEF.compras || []).filter(c => ramoDoRegisto(c) === FABEF.ramo && (c.fornecedorNome || "").toLowerCase() === (f.nome || "").toLowerCase());
         return `
     <tr>
         <td>
@@ -11403,7 +11348,7 @@ function renderDesempenho() {
     if (!corpo) return;
 
     const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
-    const listaFuncionarios = (FABEF.funcionarios || []).filter(f => !f.ramo || f.ramo === FABEF.ramo);
+    const listaFuncionarios = (FABEF.funcionarios || []).filter(f => ramoDoRegisto(f) === FABEF.ramo);
 
     const todasVendas = (FABEF.vendas && FABEF.vendas.length > 0) ? FABEF.vendas : (FABEF._raw?.vendas || []);
 
