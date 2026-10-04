@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v16-20261004";
+const FABEF_BUILD = "v17-20261004";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -2542,6 +2542,14 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
 
 
 document.getElementById("btn-logout")?.addEventListener("click", async () => {
+    // Antes de sair, o gerente tem a oportunidade de fechar o caixa de hoje.
+    if (ehUsuarioGerente() && !window.FABEF?.isDemoMode && FABEF.turnoId && FABEF.turno?.estado === "ABERTO") {
+        if (confirm("O caixa ainda está aberto.\n\nQuer fechar o caixa antes de sair?\n\nOK = fechar o caixa agora\nCancelar = sair sem fechar")) {
+            mostrarSecao("caixa");
+            window.abrirModalFecharCaixaCego();
+            return;
+        }
+    }
     try {
         sessionStorage.removeItem("fabef_sessao_desbloqueada");
         sessionStorage.setItem("fabef_saiu_manual", "true");
@@ -4789,12 +4797,20 @@ async function finalizarVenda() {
         return;
     }
 
-    // Se o caixa ainda não estiver aberto, abre automaticamente o caixa do dia sem perder o carrinho
-    if (!FABEF.turnoId || FABEF.turno?.estado !== "ABERTO") {
-        try {
-            await abrirCaixaAutomatico(0);
-        } catch (eCaixa) {
-            console.warn("Aviso ao abrir caixa automaticamente:", eCaixa);
+    // O caixa tem de estar aberto (hoje, neste ramo). Só o gerente o abre.
+    if (!caixaAbertoHoje()) {
+        if (CAIXA_ABRE_SOZINHO_NA_VENDA || window.FABEF?.isDemoMode) {
+            try {
+                await abrirCaixaAutomatico(0);
+            } catch (eCaixa) {
+                console.warn("Aviso ao abrir caixa automaticamente:", eCaixa);
+            }
+        } else {
+            const antigo = !!FABEF.turnoId && FABEF.turno?.estado === "ABERTO";
+            alert(antigo
+                ? "🔒 O caixa de um dia anterior ficou aberto.\n\nO gerente tem de o fechar e abrir o caixa de hoje antes de vender."
+                : "🔒 O caixa está fechado.\n\nPeça ao gerente para abrir o caixa antes de vender.");
+            return;
         }
     }
 
@@ -6561,7 +6577,27 @@ window.enviarAvisoEncomenda = function(id) {
    MÓDULO LÓGICO: CONTROLO FINANCEIRO DE CAIXA / TURNOS
 ===================================================== */
 
+// false = o caixa só abre quando o GERENTE o abre (Caixa → Abrir caixa) e só fecha quando
+// o gerente o fecha. true = comportamento antigo (abre sozinho na 1.ª venda do dia).
+const CAIXA_ABRE_SOZINHO_NA_VENDA = false;
+
 let FABEF_UNSUB_CAIXA = null;
+
+// Dia (AAAA-MM-DD) em que um turno foi aberto.
+function diaDoTurno(t) {
+    if (!t) return "";
+    if (t.diaOperacional && /^\d{4}-\d{2}-\d{2}$/.test(t.diaOperacional)) return t.diaOperacional;
+    return t.dataAbertura ? dataDoRegisto({ data: t.dataAbertura }) : "";
+}
+
+// Há um caixa ABERTO, deste ramo, aberto HOJE?
+function caixaAbertoHoje() {
+    if (!FABEF.turnoId || FABEF.turno?.estado !== "ABERTO") return false;
+    const dia = diaDoTurno(FABEF.turno);
+    return !dia || dia === dataHojeStr();
+}
+
+let FABEF_aFecharTurnoAntigo = false;
 
 function ouvirCaixa() {
     return new Promise((resolve) => {
@@ -6587,8 +6623,11 @@ function ouvirCaixa() {
                     FABEF.turno = null;
                 } else {
                     const todosAbertos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    // Prioriza o turno do ramo atual, ou o primeiro aberto disponível
-                    const dAtivo = todosAbertos.find(t => !t.ramo || t.ramo === FABEF.ramo) || todosAbertos[0];
+                    // Cada ramo tem o SEU caixa: nunca se usa o caixa aberto de outro ramo.
+                    // Se houver mais de um aberto neste ramo, vale o mais recente.
+                    const dAtivo = todosAbertos
+                        .filter(t => ramoDoRegisto(t) === FABEF.ramo)
+                        .sort((a, b) => String(b.dataAbertura || "").localeCompare(String(a.dataAbertura || "")))[0];
                     if (dAtivo) {
                         FABEF.turnoId = dAtivo.id;
                         FABEF.turno = dAtivo;
@@ -6600,6 +6639,16 @@ function ouvirCaixa() {
 
                 aplicarFiltroDia();
                 atualizarTelaCaixa();
+
+                // Caixa que ficou aberto de um dia anterior: o gerente fecha-o automaticamente
+                // ao entrar (fica registado na auditoria), para o dia novo começar com caixa fechado.
+                const diaAntigo = diaDoTurno(FABEF.turno);
+                if (FABEF.turnoId && diaAntigo && diaAntigo !== dataHojeStr()
+                    && ehUsuarioGerente() && !window.FABEF?.isDemoMode && !FABEF_aFecharTurnoAntigo) {
+                    FABEF_aFecharTurnoAntigo = true;
+                    encerrarTurnoAnteriorAutomatico(FABEF.turnoId, diaAntigo)
+                        .finally(() => { FABEF_aFecharTurnoAntigo = false; atualizarTelaCaixa(); pedirRenderTudo(); });
+                }
 
                 if (primeiraVez) { primeiraVez = false; resolve(); }
                 else pedirRenderTudo();
@@ -7086,6 +7135,8 @@ window.imprimirComprovativoFechoCaixa = function(d) {
 
 function atualizarTelaCaixa() {
     const aberto = !!FABEF.turnoId;
+    const abertoHoje = caixaAbertoHoje();
+    document.getElementById("aviso-pos-caixa")?.classList.toggle("hidden", abertoHoje || !!window.FABEF?.isDemoMode || CAIXA_ABRE_SOZINHO_NA_VENDA);
     const statusSpan = document.getElementById("caixa-status");
 
     if (statusSpan) {
@@ -7127,7 +7178,6 @@ function atualizarTelaCaixa() {
     // Gerencia dinamicamente a visibilidade dos ecrãs de ação com a classe hidden blindada
     document.getElementById("caixa-abertura")?.classList.toggle("hidden", aberto);
     document.getElementById("caixa-fecho")?.classList.toggle("hidden", !aberto);
-    document.getElementById("aviso-pos-caixa")?.classList.toggle("hidden", aberto);
 
     const ehGerenteCaixa = ehUsuarioGerente();
     const btnAbrir = document.getElementById("btn-abrir-caixa");
