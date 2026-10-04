@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="fabef-build" content="v16-20261004">
+<meta name="fabef-build" content="v17-20261004">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script type="importmap">
 {
@@ -559,7 +559,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       <div id="aviso-pos-gerente-bloqueado" class="alert alert-warn" style="display:none;background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;font-size:13px;font-weight:700;margin-bottom:12px;">
         🛡️ <strong>Modo Exclusivo de Supervisão:</strong> O perfil de Gerente é exclusivo para gestão estratégica, relatórios e auditoria. As vendas operacionais no caixa devem ser registradas pelo perfil de Funcionário.
       </div>
-      <div id="aviso-pos-caixa" class="alert alert-warn hidden">⚠️ O caixa está fechado. Abra o turno na secção "Caixa / Turnos" para poder vender.</div>
+      <div id="aviso-pos-caixa" class="alert alert-warn hidden">🔒 O caixa está fechado. Só o gerente o pode abrir (Caixa → Abrir caixa). Sem caixa aberto não se pode vender.</div>
       <div id="aviso-pos-offline"></div>
       <div class="pos-layout">
         <div class="card">
@@ -2859,7 +2859,7 @@ function definirAbaVenda(p) {
 <script>
 window.FABEF_CARREGADO = false;
 </script>
-<script type="module" charset="UTF-8" src="./src/app.js?v=v16-20261004" onload="window.FABEF_CARREGADO=true;" onerror="
+<script type="module" charset="UTF-8" src="./src/app.js?v=v17-20261004" onload="window.FABEF_CARREGADO=true;" onerror="
   if (!window.FABEF_CARREGADO) {
     console.warn('Ficheiro ./src/app.js não encontrado. A carregar ./app.js da mesma pasta...');
     const s = document.createElement('script');
