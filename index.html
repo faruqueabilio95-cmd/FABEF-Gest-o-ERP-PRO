@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="fabef-build" content="v15-20261003">
+<meta name="fabef-build" content="v16-20261004">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script type="importmap">
 {
@@ -903,6 +903,19 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
 
       <!-- SUGESTÕES DE COMPRAS / ENTRADAS PARA O RAMO -->
+      <div class="card" id="card-todos-produtos-compra" style="border-top:3px solid #16a34a;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+          <h3 style="margin:0;color:#166534;font-size:15px;">📦 Todos os produtos — <span id="compra-todos-ramo-nome" style="color:#0284c7;">Ramo</span></h3>
+          <span id="compra-todos-contagem" style="font-size:12px;color:#64748b;font-weight:700;"></span>
+        </div>
+        <p style="font-size:12px;color:#64748b;margin:0 0 8px;">Toque em <strong>🛒 Comprar / Repor</strong> no produto que quer comprar: o formulário de cima fica preenchido.</p>
+        <input type="search" id="compra-todos-pesquisa" autocomplete="off" placeholder="🔍 Pesquisar nesta lista..." style="width:100%;margin-bottom:8px;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Produto</th><th>Stock atual</th><th>Stock mínimo</th><th>Último custo</th><th>Fornecedor</th><th>Ação</th></tr></thead>
+          <tbody id="tabela-todos-produtos-compra"></tbody>
+        </table></div>
+      </div>
+
       <div class="card" id="card-sugestoes-compras-ramo" style="border-top:3px solid #2563eb;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
           <div>
@@ -2846,7 +2859,7 @@ function definirAbaVenda(p) {
 <script>
 window.FABEF_CARREGADO = false;
 </script>
-<script type="module" charset="UTF-8" src="./src/app.js?v=v15-20261003" onload="window.FABEF_CARREGADO=true;" onerror="
+<script type="module" charset="UTF-8" src="./src/app.js?v=v16-20261004" onload="window.FABEF_CARREGADO=true;" onerror="
   if (!window.FABEF_CARREGADO) {
     console.warn('Ficheiro ./src/app.js não encontrado. A carregar ./app.js da mesma pasta...');
     const s = document.createElement('script');
