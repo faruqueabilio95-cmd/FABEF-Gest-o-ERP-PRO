@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v14-20261003";
+const FABEF_BUILD = "v15-20261003";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -280,6 +280,22 @@ const FABEF_ADMIN = { empresas: [], pedidos: [], carregado: false };
 // ramo principal da empresa (e NÃO aparecem em todos os ramos).
 function ramoDoRegisto(x) {
     return (x && x.ramo) || ramoPrincipalEmpresa(FABEF.empresa || {}) || "";
+}
+
+// Compara ramos sem se enganar com maiúsculas, acentos, espaços ou barras
+// ("Talho / Açougue" = "talho/acougue"). Evita que os produtos "desapareçam"
+// por diferenças mínimas na forma como o nome do ramo foi gravado.
+function chaveRamoTolerante(r) {
+    return String(r ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+// Dos produtos da empresa, devolve só os do ramo ativo. Os produtos antigos, sem ramo
+// gravado, pertencem ao ramo principal. Nunca devolve produtos de outro ramo.
+function filtrarProdutosDoRamo(todos, ramoAtivo, ramoPrincipal) {
+    const alvo = chaveRamoTolerante(ramoAtivo);
+    return (todos || [])
+        .filter(p => chaveRamoTolerante(p.ramo || ramoPrincipal) === alvo)
+        .map(p => ({ ...p, ramo: ramoAtivo }));
 }
 
 function ehUsuarioGerente() {
@@ -1308,6 +1324,7 @@ async function limparEstadoFABEF() {
     FABEF._raw = {};
     FABEF.carregado = false;
     FABEF.ramo = "";
+    FABEF._produtosPorRamo = {};
     limparArmazenamentoLocalSessao();
     limparInterfaceFABEF();
 }
@@ -1953,7 +1970,7 @@ function pedirRenderTudo() {
    é assim que os dados chegam quando o dispositivo estava offline
    e volta a ligar-se à internet.
 ===================================================== */
-const COLECOES_POR_RAMO = new Set(["produtos","compras","vendas","despesas","encomendas","funcionarios","gastos_funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
+const COLECOES_POR_RAMO = new Set(["compras","vendas","despesas","encomendas","funcionarios","gastos_funcionarios","auditoria_logs","sugestoes","caixas_turnos","ajustes_stock"]);
 const COLECOES_POR_DIA = new Set(["encomendas","auditoria_logs","sugestoes"]);
 function referenciaColecaoFiltrada(nome) {
     const ref = subRef(nome);
@@ -2030,7 +2047,7 @@ function escutarColecao(nome, estado) {
     return new Promise((resolve) => {
         let primeiraVez = true;
         const unsub = onSnapshot(referenciaColecaoFiltrada(nome), (snap) => {
-            const dados=snap.docs.map(d=>({id:d.id,...d.data()}));
+            let dados=snap.docs.map(d=>({id:d.id,...d.data()}));
             if (estado === "clientes") {
                 try {
                     const localRaw = localStorage.getItem("fabef_local_clientes_" + FABEF.empresaId);
@@ -2069,6 +2086,14 @@ function escutarColecao(nome, estado) {
                         });
                     }
                 } catch(e){}
+            }
+            if (estado === "produtos") {
+                // Guarda só a contagem por ramo (para avisar quando o ramo ativo está vazio);
+                // a lista usada pela app contém APENAS produtos do ramo ativo.
+                const contagem = {};
+                dados.forEach(p => { const r = p.ramo || ramoPrincipalEmpresa(FABEF.empresa || {}) || "(sem ramo)"; contagem[r] = (contagem[r] || 0) + 1; });
+                FABEF._produtosPorRamo = contagem;
+                dados = filtrarProdutosDoRamo(dados, FABEF.ramo, ramoPrincipalEmpresa(FABEF.empresa || {}));
             }
             // Rede de segurança: nunca deixar o mesmo id duas vezes na lista
             const vistos = new Set();
@@ -3582,7 +3607,16 @@ function renderListaProdutosCompra() {
         html += `<div style="padding:8px 12px;font-size:12px;color:#64748b;">A mostrar ${LIMITE} de ${achados.length}. Escreva mais letras para refinar a pesquisa.</div>`;
     }
     if (!achados.length) {
-        html = `<div style="padding:12px;color:#64748b;font-size:13px;">${todos.length ? "Nenhum produto encontrado para a pesquisa." : "Este ramo ainda não tem produtos."}</div>`;
+        let dica = "";
+        if (!todos.length) {
+            const outros = Object.entries(FABEF._produtosPorRamo || {})
+                .filter(([r]) => chaveRamoTolerante(r) !== chaveRamoTolerante(FABEF.ramo));
+            dica = outros.length
+                ? `<br>Os seus produtos estão noutro ramo: ` + outros.map(([r, n]) =>
+                    `<button type="button" onclick="mudarRamo(${jsArg(r)})" style="margin:3px 4px 0 0;padding:5px 10px;border:1px solid #93c5fd;background:#eff6ff;color:#1e3a8a;border-radius:8px;font-weight:700;cursor:pointer;">${escapeHTML(r)} (${n})</button>`).join("")
+                : `<br>Registe os produtos na aba <strong>Produtos</strong> com este ramo ativo.`;
+        }
+        html = `<div style="padding:12px;color:#64748b;font-size:13px;">${todos.length ? "Nenhum produto encontrado para a pesquisa." : "O ramo <strong>" + escapeHTML(FABEF.ramo || "—") + "</strong> ainda não tem produtos." + dica}</div>`;
     }
 
     lista.innerHTML = html;
@@ -12067,34 +12101,37 @@ document.getElementById("auditoria-pesquisa")?.addEventListener("input", renderA
 
 
 function renderTudo() {
-    // Executa em cadeia sequencial a renderização e o desenho de cada bloco da SPA
-    renderDashboard();
-    renderRamos();
-    renderProdutos();
-    renderInventario();
-    preencherProdutosCompra();
-    renderCompras();
-    renderPOS();
-    renderVendas();
-    renderFornecedores();
-    renderClientes();
-    renderDividas();
-    renderEncomendas();
-    atualizarTelaCaixa();
-    renderDespesas();
-    renderRelatorios();
-
-    // Proteções de segurança contra erros de inicialização de funções secundárias
-    if (typeof renderFuncionarios === "function") renderFuncionarios();
-    if (typeof renderGastosFuncionarios === "function") renderGastosFuncionarios();
-    if (typeof renderDispensas === "function") renderDispensas();
-    if (typeof renderAuditoria === "function") renderAuditoria();
-    if (typeof renderMetas === "function") renderMetas();
-    if (typeof renderDesempenho === "function") renderDesempenho();
-    if (typeof renderSugestoes === "function") renderSugestoes();
-    if (typeof renderSugestoesComprasRamo === "function") renderSugestoesComprasRamo();
-    if (typeof renderConfiguracoes === "function") renderConfiguracoes();
-    if (typeof verificarSubscricao === "function") verificarSubscricao();
+    // Cada bloco desenha-se à parte: se um falhar, os restantes (ex.: a lista de produtos
+    // das Compras) continuam a ser desenhados.
+    const passo = (nome, fn) => {
+        try { if (typeof fn === "function") fn(); }
+        catch (e) { console.error("Erro ao desenhar '" + nome + "':", e); }
+    };
+    passo("dashboard", renderDashboard);
+    passo("ramos", renderRamos);
+    passo("produtos", renderProdutos);
+    passo("inventario", renderInventario);
+    passo("compras-produtos", preencherProdutosCompra);
+    passo("compras", renderCompras);
+    passo("pos", renderPOS);
+    passo("vendas", renderVendas);
+    passo("fornecedores", renderFornecedores);
+    passo("clientes", renderClientes);
+    passo("dividas", renderDividas);
+    passo("encomendas", renderEncomendas);
+    passo("caixa", atualizarTelaCaixa);
+    passo("despesas", renderDespesas);
+    passo("relatorios", renderRelatorios);
+    passo("funcionarios", typeof renderFuncionarios === "function" ? renderFuncionarios : null);
+    passo("gastos-funcionarios", typeof renderGastosFuncionarios === "function" ? renderGastosFuncionarios : null);
+    passo("dispensas", typeof renderDispensas === "function" ? renderDispensas : null);
+    passo("auditoria", typeof renderAuditoria === "function" ? renderAuditoria : null);
+    passo("metas", typeof renderMetas === "function" ? renderMetas : null);
+    passo("desempenho", typeof renderDesempenho === "function" ? renderDesempenho : null);
+    passo("sugestoes", typeof renderSugestoes === "function" ? renderSugestoes : null);
+    passo("sugestoes-compras", typeof renderSugestoesComprasRamo === "function" ? renderSugestoesComprasRamo : null);
+    passo("configuracoes", typeof renderConfiguracoes === "function" ? renderConfiguracoes : null);
+    passo("subscricao", typeof verificarSubscricao === "function" ? verificarSubscricao : null);
 }
 
 
