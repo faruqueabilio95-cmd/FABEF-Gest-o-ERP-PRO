@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v15-20261003";
+const FABEF_BUILD = "v16-20261004";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -3575,6 +3575,18 @@ async function diagnosticarSemProdutos(idAviso, qtd) {
     }
 }
 
+// Texto para quando o ramo ativo não tem produtos. Não lista produtos de outros ramos:
+// só diz em que ramo estão e deixa o gerente mudar de ramo.
+function htmlRamoSemProdutos() {
+    const outros = Object.entries(FABEF._produtosPorRamo || {})
+        .filter(([r]) => chaveRamoTolerante(r) !== chaveRamoTolerante(FABEF.ramo));
+    const dica = outros.length
+        ? `<br>Os seus produtos estão noutro ramo: ` + outros.map(([r, n]) =>
+            `<button type="button" onclick="mudarRamo(${jsArg(r)})" style="margin:3px 4px 0 0;padding:5px 10px;border:1px solid #93c5fd;background:#eff6ff;color:#1e3a8a;border-radius:8px;font-weight:700;cursor:pointer;">${escapeHTML(r)} (${n})</button>`).join("")
+        : `<br>Registe os produtos na aba <strong>Produtos</strong> com este ramo ativo.`;
+    return `O ramo <strong>${escapeHTML(FABEF.ramo || "—")}</strong> ainda não tem produtos.${dica}`;
+}
+
 function normalizarBusca(t) {
     return String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
@@ -3607,16 +3619,7 @@ function renderListaProdutosCompra() {
         html += `<div style="padding:8px 12px;font-size:12px;color:#64748b;">A mostrar ${LIMITE} de ${achados.length}. Escreva mais letras para refinar a pesquisa.</div>`;
     }
     if (!achados.length) {
-        let dica = "";
-        if (!todos.length) {
-            const outros = Object.entries(FABEF._produtosPorRamo || {})
-                .filter(([r]) => chaveRamoTolerante(r) !== chaveRamoTolerante(FABEF.ramo));
-            dica = outros.length
-                ? `<br>Os seus produtos estão noutro ramo: ` + outros.map(([r, n]) =>
-                    `<button type="button" onclick="mudarRamo(${jsArg(r)})" style="margin:3px 4px 0 0;padding:5px 10px;border:1px solid #93c5fd;background:#eff6ff;color:#1e3a8a;border-radius:8px;font-weight:700;cursor:pointer;">${escapeHTML(r)} (${n})</button>`).join("")
-                : `<br>Registe os produtos na aba <strong>Produtos</strong> com este ramo ativo.`;
-        }
-        html = `<div style="padding:12px;color:#64748b;font-size:13px;">${todos.length ? "Nenhum produto encontrado para a pesquisa." : "O ramo <strong>" + escapeHTML(FABEF.ramo || "—") + "</strong> ainda não tem produtos." + dica}</div>`;
+        html = `<div style="padding:12px;color:#64748b;font-size:13px;">${todos.length ? "Nenhum produto encontrado para a pesquisa." : htmlRamoSemProdutos()}</div>`;
     }
 
     lista.innerHTML = html;
@@ -3649,6 +3652,62 @@ window.escolherProdutoCompra = function (id) {
 
 document.getElementById("compra-pesquisa")?.addEventListener("input", renderListaProdutosCompra);
 
+// Lista de TODOS os produtos do ramo ativo (só os deste ramo), com um botão para comprar/repor.
+function renderTodosProdutosCompra() {
+    const tbody = document.getElementById("tabela-todos-produtos-compra");
+    if (!tbody) return;
+    const nomeRamo = document.getElementById("compra-todos-ramo-nome");
+    if (nomeRamo) nomeRamo.textContent = FABEF.ramo || "Geral";
+
+    const termo = normalizarBusca(document.getElementById("compra-todos-pesquisa")?.value);
+    const todos = (FABEF.produtos || [])
+        .filter(p => p.ramo === FABEF.ramo)
+        .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt"));
+    const achados = termo
+        ? todos.filter(p => [p.nome, p.idPersonalizado, p.codigo].some(v => normalizarBusca(v).includes(termo)))
+        : todos;
+
+    const cont = document.getElementById("compra-todos-contagem");
+    if (cont) cont.textContent = termo ? `${achados.length} de ${todos.length}` : `${todos.length} produto(s)`;
+
+    if (!todos.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:14px;color:#64748b;font-size:13px;text-align:center;">${htmlRamoSemProdutos()}</td></tr>`;
+        return;
+    }
+    if (!achados.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:14px;color:#64748b;font-size:13px;text-align:center;">Nenhum produto encontrado para a pesquisa.</td></tr>`;
+        return;
+    }
+
+    const LIMITE = 200;
+    const fornecedoresDoRamo = (FABEF.fornecedores || []).filter(f => ramoDoRegisto(f) === FABEF.ramo);
+    tbody.innerHTML = achados.slice(0, LIMITE).map(p => {
+        const stockAtual = numero(p.stock);
+        const stockMin = numero(p.minimo || p.stockMinimo || 5);
+        const un = p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : " un";
+        const ultCompra = (FABEF.compras || [])
+            .filter(c => c.produtoId === p.id && ramoDoRegisto(c) === FABEF.ramo)
+            .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))[0];
+        const fornecedor = ultCompra?.fornecedorNome || fornecedoresDoRamo[0]?.nome || "";
+        const custo = ultCompra?.custoUnitario || p.custo || 0;
+        const baixo = stockAtual <= stockMin;
+        const cor = stockAtual <= 0 ? "#dc2626" : (baixo ? "#d97706" : "#15803d");
+        const qtdSug = baixo ? Math.max(1, (stockMin * 2) - stockAtual) : 0;
+        return `<tr>
+            <td><strong>${escapeHTML(p.nome || "—")}</strong></td>
+            <td><span style="color:${cor};font-weight:800;">${stockAtual}${un}</span></td>
+            <td>${stockMin}${un}</td>
+            <td>${custo ? dinheiro(custo) : "—"}</td>
+            <td>${fornecedor ? escapeHTML(fornecedor) : "—"}</td>
+            <td><button class="btn btn-primary btn-small" type="button" style="width:auto;white-space:nowrap;" onclick="prepararCompraArtigo(${jsArg(p.id)}, ${jsArg(fornecedor)}, ${numero(custo)}, ${qtdSug})">🛒 Comprar / Repor</button></td>
+        </tr>`;
+    }).join("") + (achados.length > LIMITE
+        ? `<tr><td colspan="6" style="padding:10px;font-size:12px;color:#64748b;text-align:center;">A mostrar ${LIMITE} de ${achados.length}. Use a pesquisa para ver os outros.</td></tr>`
+        : "");
+}
+window.renderTodosProdutosCompra = renderTodosProdutosCompra;
+document.getElementById("compra-todos-pesquisa")?.addEventListener("input", renderTodosProdutosCompra);
+
 function preencherProdutosCompra() {
     const select = document.getElementById("compra-produto");
     if (!select) return;
@@ -3666,6 +3725,7 @@ function preencherProdutosCompra() {
         `).join("");
     if (valorAnterior && Array.from(select.options).some(o => o.value === valorAnterior)) select.value = valorAnterior;
     renderListaProdutosCompra();
+    renderTodosProdutosCompra();
 
     // Sugestões de fornecedores isoladas e filtradas ESTRITAMENTE para este ramo (não mistura fornecedores)
     const listaFornecedores = document.getElementById("lista-fornecedores-compra");
@@ -3722,6 +3782,11 @@ window.renderSugestoesComprasRamo = function() {
         return stockAtual <= stockMin;
     });
 
+    if (produtosDoRamo.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:14px;color:#64748b;font-size:13px;">${htmlRamoSemProdutos()}</td></tr>`;
+        return;
+    }
+
     if (produtosSugeridos.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -3776,10 +3841,10 @@ window.prepararCompraArtigo = function(produtoId, fornecedorNome, custoUnit, qtd
     if (inputCusto) inputCusto.value = custoUnit;
     const inputQtd = document.getElementById("compra-quantidade");
     if (inputQtd) {
-        inputQtd.value = qtd || 1;
+        inputQtd.value = qtd ? qtd : "";
         inputQtd.focus();
     }
-    document.getElementById("compra-pesquisa")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (document.getElementById("compra-produto-escolhido") || document.getElementById("compra-pesquisa"))?.scrollIntoView({ behavior: "smooth", block: "center" });
 };
 
 
