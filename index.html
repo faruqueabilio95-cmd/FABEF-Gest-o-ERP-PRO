@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="fabef-build" content="v17-20261004">
+<meta name="fabef-build" content="v18-20261004">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script type="importmap">
 {
@@ -75,6 +75,7 @@ window.forcarAtualizacaoSistema = async function() {
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 body { background: #f1f5f9; min-height: 100vh; color: #0f172a; }
 .hidden { display: none !important; }
+body.perfil-funcionario .so-gerente { display: none !important; }
 
 /* ---------- LOGIN ---------- */
 #tela-login { width: 100%; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px;
@@ -848,7 +849,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <button type="button" class="btn btn-light" onclick="exportarInventarioCSV()" style="border:1px solid #10b981;color:#047857;font-weight:700;padding:10px 16px;">📊 Exportar Excel (CSV)</button>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Código</th><th>Custo</th><th>Preço</th><th>Stock</th><th>Mínimo</th><th>Ramo</th><th>Estado</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome</th><th>Código</th><th class="so-gerente">Custo</th><th>Preço</th><th>Stock</th><th>Mínimo</th><th>Ramo</th><th>Estado</th><th>Ações</th></tr></thead>
           <tbody id="tabela-produtos"></tbody>
         </table></div>
       </div>
@@ -862,14 +863,14 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <div class="kpi"><div class="rotulo">Total de unidades</div><div class="valor" id="inv-total-unidades">0</div></div>
         <div class="kpi"><div class="rotulo">Stock baixo</div><div class="valor" id="inv-stock-baixo">0</div></div>
         <div class="kpi"><div class="rotulo">Esgotados</div><div class="valor" id="inv-esgotados">0</div></div>
-        <div class="kpi"><div class="rotulo">Valor em custo</div><div class="valor" id="inv-valor-custo">MT 0,00</div></div>
+        <div class="kpi so-gerente"><div class="rotulo">Valor em custo</div><div class="valor" id="inv-valor-custo">MT 0,00</div></div>
       </div>
       <div class="card">
         <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
           <button id="btn-exportar-inventario" class="btn btn-light">⬇️ Exportar inventário</button>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Nome</th><th>Categoria</th><th>Stock</th><th>Mínimo</th><th>Custo unit.</th><th>Valor total</th><th>Estado</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome</th><th>Categoria</th><th>Stock</th><th>Mínimo</th><th class="so-gerente">Custo unit.</th><th class="so-gerente">Valor total</th><th>Estado</th><th>Ações</th></tr></thead>
           <tbody id="tabela-inventario"></tbody>
         </table></div>
       </div>
@@ -2859,7 +2860,7 @@ function definirAbaVenda(p) {
 <script>
 window.FABEF_CARREGADO = false;
 </script>
-<script type="module" charset="UTF-8" src="./src/app.js?v=v17-20261004" onload="window.FABEF_CARREGADO=true;" onerror="
+<script type="module" charset="UTF-8" src="./src/app.js?v=v18-20261004" onload="window.FABEF_CARREGADO=true;" onerror="
   if (!window.FABEF_CARREGADO) {
     console.warn('Ficheiro ./src/app.js não encontrado. A carregar ./app.js da mesma pasta...');
     const s = document.createElement('script');
