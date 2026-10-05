@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v17-20261004";
+const FABEF_BUILD = "v18-20261004";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -1272,6 +1272,7 @@ function limparInterfaceFABEF() {
             m.classList.remove("show");
             m.classList.remove("active");
         });
+        document.body.classList.remove("perfil-funcionario");
         window.FABEF_ULTIMO_FECHO = null;
         window.FABEF_SALDO_REVELADO_GERENTE = false;
         FABEF_errosLeitura.clear();
@@ -2179,6 +2180,8 @@ const SECOES_FUNCIONARIO = [
 
 function aplicarRestricoesDeAcessoPorPapel() {
     const ehGerente = ehUsuarioGerente();
+    // O funcionário não vê custos, margens nem valores de custo em lado nenhum.
+    document.body.classList.toggle("perfil-funcionario", !ehGerente);
 
     // Regra geral: ao funcionário, esconde todo o botão de menu que não esteja na lista permitida
     document.querySelectorAll(".sidebar button[data-sec]").forEach(btn => {
@@ -3150,7 +3153,7 @@ document.getElementById("produto-pesquisa").addEventListener("input", renderProd
 
 window.abrirModalEditarProduto = function(id) {
     if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente altera produtos. O funcionário apenas consulta."); return; }
-    const gerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const gerente = ehUsuarioGerente();
     if (!gerente && !window.FABEF?.isDemoMode) {
         alert("Operação negada: Apenas o Gerente tem autorização para editar produtos.");
         return;
@@ -3183,7 +3186,7 @@ window.abrirModalEditarProduto = function(id) {
 };
 
 async function salvarEdicaoProduto() {
-    const gerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const gerente = ehUsuarioGerente();
     if (!gerente && !window.FABEF?.isDemoMode) {
         alert("Operação negada: Funcionário não tem permissão para editar produtos. Esta função é exclusiva do Gerente.");
         return;
@@ -3270,7 +3273,7 @@ function renderProdutos() {
                 ${p.idPersonalizado ? `<br><small style="color:#64748b;font-size:11px;">ID: ${escapeHTML(p.idPersonalizado)}</small>` : ""}
             </td>
             <td>${escapeHTML(p.codigo || "—")}</td>
-            <td>
+            <td class="so-gerente">
                 ${ehGerente ? `
                     <div style="font-weight:700;color:#0f172a;">${custoUnit > 0 ? dinheiro(custoUnit) : '<span style="color:#94a3b8;font-size:12px;">MT 0,00</span>'}</div>
                     ${custoUnit > 0 ? `<small style="color:${margem >= 0 ? '#16a34a' : '#dc2626'};font-size:11px;font-weight:600;">Lucro: ${dinheiro(margem)}</small>` : ''}
@@ -3371,8 +3374,8 @@ function renderInventario() {
                 ${stock}
             </td>
             <td>${minimo}</td>
-            <td>${ehGerenteInv ? (custoUnit > 0 ? dinheiro(custoUnit) : '<span style="color:#94a3b8;">MT 0,00</span>') : "—"}</td>
-            <td>${ehGerenteInv ? (custoUnit > 0 ? dinheiro(stock * custoUnit) : '<span style="color:#94a3b8;">MT 0,00</span>') : "—"}</td>
+            <td class="so-gerente">${ehGerenteInv ? (custoUnit > 0 ? dinheiro(custoUnit) : '<span style="color:#94a3b8;">MT 0,00</span>') : "—"}</td>
+            <td class="so-gerente">${ehGerenteInv ? (custoUnit > 0 ? dinheiro(stock * custoUnit) : '<span style="color:#94a3b8;">MT 0,00</span>') : "—"}</td>
             <td>
                 ${esgotado ?
                     '<span class="badge badge-red">ESGOTADO</span>' :
@@ -5793,7 +5796,7 @@ document.getElementById("btn-adicionar-fornecedor").addEventListener("click", ad
 
 
 async function adicionarFornecedor() {
-    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const ehGerente = ehUsuarioGerente();
     if (!ehGerente && !window.FABEF?.isDemoMode) {
         alert("Operação negada: Funcionário não regista fornecedor, isso é do gerente.");
         return;
@@ -5855,7 +5858,7 @@ async function adicionarFornecedor() {
 }
 
 window.apagarFornecedor = async function(id, nome) {
-    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const ehGerente = ehUsuarioGerente();
     if (!ehGerente && !window.FABEF?.isDemoMode) {
         alert("Operação negada: Apenas o gerente pode apagar fornecedores.");
         return;
@@ -5865,7 +5868,7 @@ window.apagarFornecedor = async function(id, nome) {
     if (!confirm(`Deseja apagar definitivamente o fornecedor "${nome || f.nome}"?`)) return;
 
     try {
-        await deleteDoc(subRef("fornecedores", id));
+        await deleteDoc(doc(db, "empresas", FABEF.empresaId, "fornecedores", id));
         FABEF.fornecedores = FABEF.fornecedores.filter(x => x.id !== id);
         renderFornecedores();
         await gravarAuditoria("Eliminou o fornecedor: " + (nome || f.nome), "INFO");
@@ -5880,7 +5883,7 @@ function renderFornecedores() {
     const tabelaCorpo = document.getElementById("tabela-fornecedores");
     if (!tabelaCorpo) return;
 
-    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const ehGerente = ehUsuarioGerente();
 
     // Fornecedores isolados para o respetivo ramo (não mistura fornecedores)
     const fornecedoresDoRamo = (FABEF.fornecedores || []).filter(f => ramoDoRegisto(f) === FABEF.ramo);
@@ -6845,7 +6848,7 @@ async function registarReforco() {
 
 window.FABEF_SALDO_REVELADO_GERENTE = false;
 window.toggleRevelarSaldoGerente = function() {
-    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const ehGerente = ehUsuarioGerente();
     if (!ehGerente) {
         alert("Apenas o gerente possui autorização para consultar o saldo preliminar da gaveta.");
         return;
@@ -8876,7 +8879,7 @@ function renderFuncionarios(){
     const tabela = document.getElementById("tabela-funcionarios");
     if (!tabela) return;
 
-    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const souGerente = ehUsuarioGerente();
     const gerenteId = "gerente_" + (FABEF.user?.uid || "admin");
     const gastosGerente = (FABEF.gastosFuncionarios || []).filter(g => g.funcionarioId === gerenteId || g.funcionarioId === (FABEF.user?.uid || "gerente") || g.funcionarioId?.startsWith("gerente"));
     const totalGastosGerente = gastosGerente.reduce((s, g) => s + numero(g.valor), 0);
@@ -11261,7 +11264,7 @@ function renderAvisoReconciliacao() {
     const container = document.getElementById("aviso-reconciliacao-stock");
     if (!container) return;
 
-    const ehGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const ehGerente = ehUsuarioGerente();
     const negativos = FABEF.produtos.filter(p => p.ramo === FABEF.ramo && numero(p.stock) < 0);
 
     if (!ehGerente || negativos.length === 0) {
@@ -11423,7 +11426,7 @@ function renderMetas() {
     }
 
     // Formulário de metas gerais (só o gerente edita)
-    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const souGerente = ehUsuarioGerente();
     ["metas-input-diaria", "metas-input-semanal", "metas-input-mensal"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = !souGerente;
@@ -11496,7 +11499,7 @@ function renderDesempenho() {
     const corpo = document.getElementById("tabela-desempenho");
     if (!corpo) return;
 
-    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const souGerente = ehUsuarioGerente();
     const listaFuncionarios = (FABEF.funcionarios || []).filter(f => ramoDoRegisto(f) === FABEF.ramo);
 
     const todasVendas = (FABEF.vendas && FABEF.vendas.length > 0) ? FABEF.vendas : (FABEF._raw?.vendas || []);
@@ -11850,7 +11853,7 @@ function renderGastosFuncionarios() {
     const corpo = document.getElementById("tabela-gastos-funcionarios");
     if (!corpo) return;
 
-    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const souGerente = ehUsuarioGerente();
     const lista = (FABEF.gastosFuncionarios || [])
         .filter(g => souGerente || !g.ramo || g.ramo === FABEF.ramo)
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
@@ -12156,7 +12159,7 @@ document.getElementById("btn-enviar-sugestao")?.addEventListener("click", async 
 function renderSugestoes() {
     const corpo = document.getElementById("tabela-sugestoes");
     if (!corpo) return;
-    const souGerente = (FABEF.userData?.perfil || FABEF.userData?.role) === "gerente";
+    const souGerente = ehUsuarioGerente();
 
     corpo.innerHTML = (FABEF.sugestoes || [])
         .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))
