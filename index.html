@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<meta name="fabef-build" content="v18-20261004">
+<meta name="fabef-build" content="v19-20261006">
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script type="importmap">
 {
@@ -76,6 +76,17 @@ window.forcarAtualizacaoSistema = async function() {
 body { background: #f1f5f9; min-height: 100vh; color: #0f172a; }
 .hidden { display: none !important; }
 body.perfil-funcionario .so-gerente { display: none !important; }
+.produto-pos { transition: transform .08s ease, box-shadow .15s ease; }
+.produto-pos:active { transform: scale(.97); }
+.produto-pos.esgotado { opacity: .55; }
+.resumo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:6px 0 14px; }
+.resumo-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(15,23,42,.06); text-align:left; cursor:default; border-left-width:5px; font:inherit; }
+.resumo-card[data-ir] { cursor:pointer; }
+#barra-carrinho-flutuante { position:fixed; left:10px; right:10px; bottom:calc(10px + env(safe-area-inset-bottom, 0px)); background:#0f172a; color:#fff; border-radius:14px; padding:13px 16px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-weight:800; font-size:15px; box-shadow:0 8px 24px rgba(15,23,42,.35); z-index:380; cursor:pointer; }
+#barra-carrinho-flutuante span:last-child { background:#10b981; color:#fff; padding:7px 12px; border-radius:10px; font-size:13px; white-space:nowrap; }
+.resumo-card .r-rot { font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.3px; }
+.resumo-card .r-val { font-size:22px; font-weight:900; color:#0f172a; margin-top:4px; line-height:1.15; }
+.resumo-card .r-sub { font-size:12px; color:#64748b; margin-top:3px; }
 
 /* ---------- LOGIN ---------- */
 #tela-login { width: 100%; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px;
@@ -491,6 +502,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
         <input type="date" id="fabef-dia-ativo" style="padding:8px;border:1px solid #cbd5e1;border-radius:7px;">
         <span style="font-size:12px;color:#64748b;">Os movimentos operacionais apresentados pertencem apenas ao dia seleccionado.</span>
       </div>
+      <div id="inicio-resumo-dia"></div>
       <div class="grid">
         <div class="kpi"><div class="rotulo">Negócio</div><div class="valor" id="inicio-nome-negocio">—</div></div>
         <div class="kpi"><div class="rotulo">ID da empresa</div><div class="valor" id="inicio-id-empresa" style="font-size:12px;">—</div></div>
@@ -846,6 +858,7 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
           <option value="Outro">Outro</option>
         </select>
           <button id="btn-novo-produto" class="btn btn-primary">+ Novo produto</button>
+          <button id="btn-importar-produtos" type="button" class="btn btn-light" onclick="window.abrirImportarProdutos()" style="font-weight:700;">📥 Importar lista (CSV)</button>
           <button type="button" class="btn btn-light" onclick="exportarInventarioCSV()" style="border:1px solid #10b981;color:#047857;font-weight:700;padding:10px 16px;">📊 Exportar Excel (CSV)</button>
         </div>
         <div class="table-wrap"><table>
@@ -2176,7 +2189,12 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
       <div class="form-group"><label for="novo-produto-tamanho">Tamanho (opcional, ex: roupa/calçado)</label><input type="text" id="novo-produto-tamanho" placeholder="Ex: M, 42, Único"></div>
       <div class="form-group"><label for="novo-produto-cor">Cor (opcional)</label><input type="text" id="novo-produto-cor" placeholder="Ex: Azul"></div>
-      <div class="form-group"><label for="novo-produto-foto">Foto (link/URL da imagem, opcional)</label><input type="text" id="novo-produto-foto" placeholder="https://..."></div>
+            <div class="form-group">
+        <label for="novo-produto-foto-arquivo">📷 Tirar foto ou escolher da galeria</label>
+        <input type="file" id="novo-produto-foto-arquivo" accept="image/*">
+        <img id="novo-produto-foto-preview" alt="" style="display:none;width:90px;height:90px;object-fit:cover;border-radius:10px;margin-top:6px;border:1px solid #e2e8f0;">
+      </div>
+      <div class="form-group"><label for="novo-produto-foto">…ou link da foto (opcional)</label><input type="text" id="novo-produto-foto" placeholder="https://..."></div>
       <div class="form-group" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="novo-produto-destaque" style="width:auto;">
         <label for="novo-produto-destaque" style="margin:0;">⭐ Mostrar como sugestão rápida na página Vender</label>
@@ -2215,7 +2233,12 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
       <div class="form-group"><label for="edit-produto-tamanho">Tamanho (opcional)</label><input type="text" id="edit-produto-tamanho" placeholder="Ex: M, 42, Único"></div>
       <div class="form-group"><label for="edit-produto-cor">Cor (opcional)</label><input type="text" id="edit-produto-cor" placeholder="Ex: Azul"></div>
-      <div class="form-group"><label for="edit-produto-foto">Foto (link/URL da imagem, opcional)</label><input type="text" id="edit-produto-foto" placeholder="https://..."></div>
+            <div class="form-group">
+        <label for="edit-produto-foto-arquivo">📷 Tirar foto ou escolher da galeria</label>
+        <input type="file" id="edit-produto-foto-arquivo" accept="image/*">
+        <img id="edit-produto-foto-preview" alt="" style="display:none;width:90px;height:90px;object-fit:cover;border-radius:10px;margin-top:6px;border:1px solid #e2e8f0;">
+      </div>
+      <div class="form-group"><label for="edit-produto-foto">…ou link da foto (opcional)</label><input type="text" id="edit-produto-foto" placeholder="https://..."></div>
       <div class="form-group" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="edit-produto-destaque" style="width:auto;">
         <label for="edit-produto-destaque" style="margin:0;">⭐ Mostrar como sugestão rápida na página Vender</label>
@@ -2294,6 +2317,37 @@ body.dark .form-group input, body.dark .form-group select, body.dark .form-group
       </div>
     </div>
   </div>
+
+  <div class="modal-overlay" id="modal-importar-produtos">
+    <div class="modal-box" style="max-width:520px;">
+      <h3>📥 Importar produtos de uma lista</h3>
+      <p style="font-size:13px;color:#475569;">Use uma folha de Excel ou do telemóvel: guarde-a como <strong>CSV</strong> e escolha-a aqui. Colunas: <em>nome; preço; custo; stock; unidade; código; mínimo</em> (só o nome e o preço são obrigatórios).</p>
+      <button type="button" class="btn btn-light btn-small" onclick="window.baixarModeloProdutos()" style="width:auto;margin-bottom:10px;">⬇️ Descarregar modelo</button>
+      <input type="file" id="importar-produtos-arquivo" accept=".csv,.txt,text/csv,text/plain">
+      <div id="importar-produtos-resumo" style="margin-top:10px;font-size:13px;color:#334155;"></div>
+      <div class="modal-acoes">
+        <button class="btn btn-light" type="button" onclick="fecharModal('modal-importar-produtos')" style="flex:1;">Cancelar</button>
+        <button id="btn-confirmar-importacao" class="btn btn-entrar" type="button" onclick="window.confirmarImportacaoProdutos()" style="flex:1;" disabled>Importar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-arranque">
+    <div class="modal-box" style="max-width:560px;">
+      <h3>👋 Bem-vindo ao FABEF!</h3>
+      <p style="font-size:14px;color:#334155;margin-bottom:4px;">Vamos preparar o seu negócio em 1 minuto. Ramo: <strong id="arranque-ramo"></strong></p>
+      <p style="font-size:12px;color:#64748b;margin-bottom:8px;">Escreva o <strong>preço</strong> dos produtos que vende (e o stock, se souber). Só os que tiverem preço são adicionados. Pode mudar tudo depois.</p>
+      <div id="arranque-lista" style="max-height:44vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;"></div>
+      <div class="modal-acoes" style="flex-wrap:wrap;">
+        <button class="btn btn-light" type="button" onclick="window.abrirImportarProdutos()" style="flex:1 1 45%;">📥 Tenho uma lista (CSV)</button>
+        <button class="btn btn-light" type="button" onclick="window.adiarArranque()" style="flex:1 1 45%;">Fazer depois</button>
+        <button id="btn-arranque-adicionar" class="btn btn-entrar" type="button" onclick="window.concluirArranque()" style="flex:1 1 100%;">Adicionar produtos</button>
+      </div>
+      <p style="text-align:center;margin-top:6px;"><a href="#" onclick="window.naoMostrarArranque();return false;" style="font-size:12px;color:#64748b;">Não mostrar outra vez</a></p>
+    </div>
+  </div>
+
+  <div id="barra-carrinho-flutuante" class="hidden" onclick="window.irParaCarrinho()" role="button" aria-label="Ver carrinho"><span id="bcf-resumo">🛒</span><span>Ver carrinho ↓</span></div>
 
   <div class="modal-overlay" id="modal-editar-cliente">
     <div class="modal-box">
@@ -2860,7 +2914,7 @@ function definirAbaVenda(p) {
 <script>
 window.FABEF_CARREGADO = false;
 </script>
-<script type="module" charset="UTF-8" src="./src/app.js?v=v18-20261004" onload="window.FABEF_CARREGADO=true;" onerror="
+<script type="module" charset="UTF-8" src="./src/app.js?v=v19-20261006" onload="window.FABEF_CARREGADO=true;" onerror="
   if (!window.FABEF_CARREGADO) {
     console.warn('Ficheiro ./src/app.js não encontrado. A carregar ./app.js da mesma pasta...');
     const s = document.createElement('script');
