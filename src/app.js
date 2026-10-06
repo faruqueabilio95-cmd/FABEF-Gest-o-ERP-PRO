@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v18-20261004";
+const FABEF_BUILD = "v19-20261006";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -1228,6 +1228,7 @@ const IDS_LISTAS_DINAMICAS = [
     "tabela-funcionarios",
     "tabela-gastos-funcionarios",
     "tabela-inicio-stock-baixo",
+    "inicio-resumo-dia",
     "tabela-inventario",
     "tabela-metas-funcionarios",
     "tabela-produtos",
@@ -1273,6 +1274,8 @@ function limparInterfaceFABEF() {
             m.classList.remove("active");
         });
         document.body.classList.remove("perfil-funcionario");
+        document.getElementById("barra-carrinho-flutuante")?.classList.add("hidden");
+        FABEF_cartVisivel = false;
         window.FABEF_ULTIMO_FECHO = null;
         window.FABEF_SALDO_REVELADO_GERENTE = false;
         FABEF_errosLeitura.clear();
@@ -1326,6 +1329,8 @@ async function limparEstadoFABEF() {
     FABEF.carregado = false;
     FABEF.ramo = "";
     FABEF._produtosPorRamo = {};
+    FABEF._produtosLidos = false;
+    FABEF_arranqueAdiado = false;
     limparArmazenamentoLocalSessao();
     limparInterfaceFABEF();
 }
@@ -2094,6 +2099,7 @@ function escutarColecao(nome, estado) {
                 const contagem = {};
                 dados.forEach(p => { const r = p.ramo || ramoPrincipalEmpresa(FABEF.empresa || {}) || "(sem ramo)"; contagem[r] = (contagem[r] || 0) + 1; });
                 FABEF._produtosPorRamo = contagem;
+                FABEF._produtosLidos = true;
                 dados = filtrarProdutosDoRamo(dados, FABEF.ramo, ramoPrincipalEmpresa(FABEF.empresa || {}));
             }
             // Rede de segurança: nunca deixar o mesmo id duas vezes na lista
@@ -2376,6 +2382,7 @@ document.addEventListener("click", (e) => {
 });
 
 function mostrarSecao(nome) {
+    setTimeout(() => { if (typeof atualizarBarraCarrinho === "function") atualizarBarraCarrinho(); }, 0);
     if (!ehUsuarioGerente() && !SECOES_FUNCIONARIO.includes(nome)) {
         nome = "inicio";
     }
@@ -3114,6 +3121,9 @@ async function salvarProduto() {
 
 
 function limparProdutoForm() {
+    const fotoCampo = document.getElementById("novo-produto-foto"); if (fotoCampo) fotoCampo.value = "";
+    const fotoArq = document.getElementById("novo-produto-foto-arquivo"); if (fotoArq) fotoArq.value = "";
+    atualizarPreviewFotoProduto("novo-produto-foto", "novo-produto-foto-preview");
     const campos = [
         "novo-produto-id-custom",
         "novo-produto-nome",
@@ -3175,6 +3185,8 @@ window.abrirModalEditarProduto = function(id) {
     document.getElementById("edit-produto-minimo").value = numero(p.stockMinimo || p.minimo || 5);
     if (document.getElementById("edit-produto-unidade")) document.getElementById("edit-produto-unidade").value = p.unidade || "unidade";
     if (document.getElementById("edit-produto-foto")) document.getElementById("edit-produto-foto").value = p.foto || "";
+    const arqEdit = document.getElementById("edit-produto-foto-arquivo"); if (arqEdit) arqEdit.value = "";
+    atualizarPreviewFotoProduto("edit-produto-foto", "edit-produto-foto-preview");
     if (document.getElementById("edit-produto-tamanho")) document.getElementById("edit-produto-tamanho").value = p.tamanho || "";
     if (document.getElementById("edit-produto-cor")) document.getElementById("edit-produto-cor").value = p.cor || "";
     if (document.getElementById("edit-produto-destaque")) document.getElementById("edit-produto-destaque").checked = !!p.destaque;
@@ -3239,6 +3251,326 @@ async function eliminarProduto(){
 document.getElementById("btn-salvar-edicao-produto")?.addEventListener("click",salvarEdicaoProduto);
 document.getElementById("btn-eliminar-produto")?.addEventListener("click",eliminarProduto);
 
+/* =====================================================
+   FOTO DO PRODUTO: câmara / galeria (reduzida e guardada no próprio produto)
+===================================================== */
+function dimensoesReduzidas(largura, altura, maximo) {
+    const maior = Math.max(largura, altura);
+    if (!maior || maior <= maximo) return { w: largura, h: altura };
+    const f = maximo / maior;
+    return { w: Math.max(1, Math.round(largura * f)), h: Math.max(1, Math.round(altura * f)) };
+}
+
+function reduzirImagemParaDataURL(arquivo) {
+    return new Promise((resolve, reject) => {
+        const leitor = new FileReader();
+        leitor.onerror = () => reject(new Error("leitura"));
+        leitor.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error("imagem"));
+            img.onload = () => {
+                // 240 px / qualidade 0.7 chega para a grelha e mantém o produto leve (~10-20 KB)
+                for (const [max, q] of [[240, 0.7], [180, 0.6], [140, 0.5]]) {
+                    const { w, h } = dimensoesReduzidas(img.naturalWidth || img.width, img.naturalHeight || img.height, max);
+                    const canvas = document.createElement("canvas");
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+                    const url = canvas.toDataURL("image/jpeg", q);
+                    if (url.length <= 70000) return resolve(url);
+                }
+                reject(new Error("grande"));
+            };
+            img.src = leitor.result;
+        };
+        leitor.readAsDataURL(arquivo);
+    });
+}
+
+function ligarCampoFoto(idArquivo, idCampo, idPreview) {
+    const arq = document.getElementById(idArquivo);
+    const campo = document.getElementById(idCampo);
+    const prev = document.getElementById(idPreview);
+    if (!arq || !campo) return;
+    const mostrar = () => {
+        if (!prev) return;
+        const v = campo.value.trim();
+        prev.src = v;
+        prev.style.display = v ? "block" : "none";
+    };
+    arq.addEventListener("change", async () => {
+        const f = arq.files && arq.files[0];
+        if (!f) return;
+        if (!/^image\//.test(f.type)) { alert("Escolha um ficheiro de imagem."); arq.value = ""; return; }
+        try {
+            campo.value = await reduzirImagemParaDataURL(f);
+            mostrar();
+        } catch (e) {
+            console.warn("Foto:", e);
+            alert("Não foi possível usar esta imagem. Tente outra foto.");
+            arq.value = "";
+        }
+    });
+    campo.addEventListener("input", mostrar);
+}
+ligarCampoFoto("novo-produto-foto-arquivo", "novo-produto-foto", "novo-produto-foto-preview");
+ligarCampoFoto("edit-produto-foto-arquivo", "edit-produto-foto", "edit-produto-foto-preview");
+
+window.atualizarPreviewFotoProduto = function (idCampo, idPreview) {
+    const campo = document.getElementById(idCampo), prev = document.getElementById(idPreview);
+    if (!campo || !prev) return;
+    const v = campo.value.trim();
+    prev.src = v;
+    prev.style.display = v ? "block" : "none";
+};
+
+// Miniatura para as listas (tabela de produtos)
+function avatarMini(p) {
+    if (p.foto) return `<img src="${escapeHTML(p.foto)}" alt="" style="width:34px;height:34px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-right:8px;" onerror="this.style.display='none';">`;
+    const nome = String(p.nome || "?").trim();
+    let hsh = 0;
+    for (let i = 0; i < nome.length; i++) hsh = (hsh * 31 + nome.charCodeAt(i)) % 360;
+    return `<span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;margin-right:8px;vertical-align:middle;font-weight:800;background:hsl(${hsh},70%,92%);color:hsl(${hsh},45%,32%);">${escapeHTML(nome.charAt(0).toUpperCase())}</span>`;
+}
+
+/* =====================================================
+   IMPORTAR PRODUTOS DE UM FICHEIRO CSV
+===================================================== */
+function numeroDeTexto(v) {
+    let t = String(v ?? "").replace(/mt/gi, "").replace(/\s/g, "");
+    if (!t) return 0;
+    if (t.includes(",") && t.includes(".")) {
+        t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+    } else if (t.includes(",")) {
+        t = t.replace(",", ".");
+    }
+    const n = parseFloat(t);
+    return Number.isFinite(n) ? n : 0;
+}
+
+function dividirLinhaCSV(linha, sep) {
+    const out = [];
+    let atual = "", aspas = false;
+    for (let i = 0; i < linha.length; i++) {
+        const c = linha[i];
+        if (c === '"') {
+            if (aspas && linha[i + 1] === '"') { atual += '"'; i++; }
+            else aspas = !aspas;
+        } else if (c === sep && !aspas) { out.push(atual); atual = ""; }
+        else atual += c;
+    }
+    out.push(atual);
+    return out.map(x => x.trim());
+}
+
+function parseCSVProdutos(texto) {
+    const linhas = String(texto || "").replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim() !== "");
+    if (!linhas.length) return { produtos: [], ignoradas: 0 };
+    const conta = c => linhas[0].split(c).length - 1;
+    const sep = [";", ",", "\t"].sort((a, b) => conta(b) - conta(a))[0];
+    let col = { nome: 0, preco: 1, custo: 2, stock: 3, unidade: 4, codigo: 5, minimo: 6 };
+    const cab = dividirLinhaCSV(linhas[0], sep).map(c => normalizarBusca(c));
+    const acha = (...nomes) => cab.findIndex(c => nomes.includes(c));
+    let inicio = 0;
+    const iNome = acha("nome", "produto", "artigo", "descricao");
+    if (iNome >= 0) {
+        inicio = 1;
+        col = {
+            nome: iNome,
+            preco: acha("preco", "pvp", "venda", "preco de venda"),
+            custo: acha("custo", "compra", "preco de custo"),
+            stock: acha("stock", "estoque", "quantidade", "qtd"),
+            unidade: acha("unidade", "un"),
+            codigo: acha("codigo", "barras", "ref", "referencia"),
+            minimo: acha("minimo", "stock minimo", "stockminimo")
+        };
+    }
+    const produtos = [];
+    let ignoradas = 0;
+    for (let i = inicio; i < linhas.length; i++) {
+        const c = dividirLinhaCSV(linhas[i], sep);
+        const val = k => (col[k] >= 0 && col[k] < c.length) ? c[col[k]] : "";
+        const nome = val("nome").trim();
+        const preco = numeroDeTexto(val("preco"));
+        if (!nome || !(preco > 0)) { ignoradas++; continue; }
+        produtos.push({
+            nome,
+            preco,
+            custo: numeroDeTexto(val("custo")),
+            stock: numeroDeTexto(val("stock")),
+            unidade: val("unidade").trim() || "unidade",
+            codigo: val("codigo").trim(),
+            minimo: numeroDeTexto(val("minimo")) || 5
+        });
+    }
+    return { produtos, ignoradas };
+}
+
+function payloadProdutoNovo(d) {
+    return {
+        nome: d.nome, categoria: d.categoria || "", codigo: d.codigo || "",
+        custo: numero(d.custo), preco: numero(d.preco), stock: numero(d.stock),
+        stockMinimo: numero(d.minimo) || 5, unidade: d.unidade || "unidade",
+        foto: "", tamanho: "", cor: "", destaque: false,
+        ramo: FABEF.ramo, ativo: true,
+        criadoPor: FABEF.user?.uid || FABEF.userData?.uid || "admin",
+        dataCriacao: serverTimestamp()
+    };
+}
+
+// Cria vários produtos (em grupos de 10), sem repetir nomes que já existem neste ramo.
+async function criarProdutosEmLote(lista, aoProgredir) {
+    const existentes = new Set((FABEF.produtos || []).filter(p => p.ramo === FABEF.ramo).map(p => normalizarBusca(p.nome)));
+    const novos = [];
+    let repetidos = 0;
+    lista.forEach(d => {
+        const k = normalizarBusca(d.nome);
+        if (existentes.has(k)) { repetidos++; return; }
+        existentes.add(k);
+        novos.push(d);
+    });
+    let feitos = 0;
+    for (let i = 0; i < novos.length; i += 10) {
+        const grupo = novos.slice(i, i + 10);
+        await Promise.all(grupo.map(async d => {
+            const payload = payloadProdutoNovo(d);
+            const ref = await addDoc(subRef("produtos"), payload);
+            incluirSemDuplicar(FABEF.produtos, { id: ref.id, idPersonalizado: ref.id, ...payload, dataCriacao: undefined });
+            feitos++;
+        }));
+        if (aoProgredir) aoProgredir(feitos, novos.length);
+    }
+    return { criados: feitos, repetidos };
+}
+
+let FABEF_importacaoPendente = [];
+window.abrirImportarProdutos = function () {
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente importa produtos."); return; }
+    FABEF_importacaoPendente = [];
+    const arq = document.getElementById("importar-produtos-arquivo"); if (arq) arq.value = "";
+    const r = document.getElementById("importar-produtos-resumo"); if (r) r.textContent = "";
+    const b = document.getElementById("btn-confirmar-importacao"); if (b) b.disabled = true;
+    document.getElementById("modal-arranque")?.classList.remove("show");
+    document.getElementById("modal-importar-produtos")?.classList.add("show");
+};
+
+window.baixarModeloProdutos = function () {
+    const csv = "\uFEFFnome;preco;custo;stock;unidade;codigo;minimo\nArroz 25kg;1100;900;12;unidade;789001;5\nCarne de vaca;420;300;8;kg;;3\n";
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "modelo-produtos-fabef.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
+
+document.getElementById("importar-produtos-arquivo")?.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    const resumo = document.getElementById("importar-produtos-resumo");
+    const btn = document.getElementById("btn-confirmar-importacao");
+    FABEF_importacaoPendente = [];
+    if (btn) btn.disabled = true;
+    if (!f) return;
+    try {
+        const { produtos, ignoradas } = parseCSVProdutos(await f.text());
+        FABEF_importacaoPendente = produtos.slice(0, 500);
+        if (resumo) {
+            resumo.innerHTML = produtos.length
+                ? `✅ <strong>${FABEF_importacaoPendente.length}</strong> produto(s) prontos a importar${produtos.length > 500 ? " (limite de 500 por vez)" : ""}${ignoradas ? ` · ${ignoradas} linha(s) ignoradas (sem nome ou sem preço)` : ""}.<br><span style="color:#64748b;">Ex.: ${FABEF_importacaoPendente.slice(0, 4).map(p => escapeHTML(p.nome)).join(", ")}…</span>`
+                : "⚠️ Não encontrei produtos válidos. Confirme que há as colunas <em>nome</em> e <em>preço</em>.";
+        }
+        if (btn) btn.disabled = !FABEF_importacaoPendente.length;
+    } catch (err) {
+        if (resumo) resumo.textContent = "⚠️ Não foi possível ler o ficheiro.";
+    }
+});
+
+window.confirmarImportacaoProdutos = async function () {
+    if (!FABEF_importacaoPendente.length) return;
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente importa produtos."); return; }
+    const btn = document.getElementById("btn-confirmar-importacao");
+    const resumo = document.getElementById("importar-produtos-resumo");
+    if (btn) btn.disabled = true;
+    try {
+        const r = await criarProdutosEmLote(FABEF_importacaoPendente, (f, t) => { if (resumo) resumo.textContent = `⏳ A importar… ${f} de ${t}`; });
+        FABEF_importacaoPendente = [];
+        fecharModal("modal-importar-produtos");
+        marcarArranqueConcluido();
+        renderTudo();
+        try { await gravarAuditoria(`Importou ${r.criados} produto(s) por ficheiro.`, "INFO"); } catch (_) {}
+        alert(`✅ ${r.criados} produto(s) importados.${r.repetidos ? `\n${r.repetidos} já existiam neste ramo e foram ignorados.` : ""}`);
+    } catch (e) {
+        console.error(e);
+        if (btn) btn.disabled = false;
+        alert("Erro ao importar:\n" + mensagemFirebase(e) + "\n\nOs produtos já criados mantêm-se; pode repetir (os repetidos são ignorados).");
+    }
+};
+
+/* =====================================================
+   ASSISTENTE DE ARRANQUE (empresa nova, sem produtos)
+===================================================== */
+let FABEF_arranqueAdiado = false;
+
+function marcarArranqueConcluido() {
+    try {
+        if (FABEF.empresa) FABEF.empresa.onboarding_concluido = true;
+        if (!window.FABEF?.isDemoMode && FABEF.empresaId && ehUsuarioGerente()) {
+            updateDoc(doc(db, "empresas", FABEF.empresaId), { onboarding_concluido: true, atualizadoEm: serverTimestamp() })
+                .catch(e => console.warn("Aviso (arranque):", e));
+        }
+    } catch (e) { console.warn("Aviso (arranque):", e); }
+}
+
+function deveMostrarArranque() {
+    if (window.FABEF?.isDemoMode || FABEF_arranqueAdiado) return false;
+    if (!ehUsuarioGerente() || !FABEF.carregado || !FABEF._produtosLidos || !FABEF.empresa) return false;
+    if (FABEF.empresa.onboarding_concluido) return false;
+    const total = Object.values(FABEF._produtosPorRamo || {}).reduce((s, n) => s + n, 0);
+    return total === 0;
+}
+
+function verificarArranque() {
+    const modal = document.getElementById("modal-arranque");
+    if (!modal || modal.classList.contains("show")) return;
+    if (!deveMostrarArranque()) return;
+    document.getElementById("arranque-ramo").textContent = FABEF.ramo || "";
+    const nomes = (SUGESTOES[FABEF.ramo] || []).slice(0, 20);
+    document.getElementById("arranque-lista").innerHTML = nomes.length ? nomes.map((n, i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f1f5f9;">
+            <span style="flex:1;font-weight:600;font-size:14px;color:#0f172a;">${escapeHTML(n)}</span>
+            <input type="number" inputmode="decimal" min="0" step="0.01" data-arr-preco="${i}" placeholder="Preço MT" style="width:92px;padding:7px;">
+            <input type="number" inputmode="decimal" min="0" step="1" data-arr-stock="${i}" placeholder="Stock" style="width:70px;padding:7px;">
+        </div>`).join("")
+        : `<div style="padding:14px;color:#64748b;font-size:13px;">Ainda não há sugestões para este ramo. Importe uma lista ou registe os produtos na aba Produtos.</div>`;
+    modal.classList.add("show");
+}
+
+window.concluirArranque = async function () {
+    const nomes = (SUGESTOES[FABEF.ramo] || []).slice(0, 20);
+    const lista = [];
+    nomes.forEach((nome, i) => {
+        const preco = numero(document.querySelector(`[data-arr-preco="${i}"]`)?.value);
+        const stock = numero(document.querySelector(`[data-arr-stock="${i}"]`)?.value);
+        if (preco > 0) lista.push({ nome, preco, stock, custo: 0, unidade: "unidade", codigo: "", minimo: 5 });
+    });
+    if (!lista.length) { alert("Escreva o preço de pelo menos um produto, ou escolha 'Fazer depois'."); return; }
+    const btn = document.getElementById("btn-arranque-adicionar");
+    if (btn) { btn.disabled = true; btn.textContent = "A adicionar…"; }
+    try {
+        const r = await criarProdutosEmLote(lista);
+        marcarArranqueConcluido();
+        fecharModal("modal-arranque");
+        renderTudo();
+        try { await gravarAuditoria(`Assistente de arranque: adicionou ${r.criados} produto(s).`, "INFO"); } catch (_) {}
+        alert(`✅ ${r.criados} produto(s) adicionados. Já pode vender!`);
+    } catch (e) {
+        console.error(e);
+        alert("Erro ao adicionar:\n" + mensagemFirebase(e));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Adicionar produtos"; }
+    }
+};
+window.adiarArranque = function () { FABEF_arranqueAdiado = true; fecharModal("modal-arranque"); };
+window.naoMostrarArranque = function () { marcarArranqueConcluido(); fecharModal("modal-arranque"); };
+
 function renderProdutos() {
     const pesquisa = document.getElementById("produto-pesquisa").value.toLowerCase();
     diagnosticarSemProdutos("aviso-produtos-sem-produtos", FABEF.produtos.filter(p => p.ramo === FABEF.ramo).length);
@@ -3268,7 +3600,7 @@ function renderProdutos() {
         return `
         <tr>
             <td>
-                <strong>${escapeHTML(p.nome)}</strong>
+                <strong>${avatarMini(p)}${escapeHTML(p.nome)}</strong>
                 ${(p.tamanho || p.cor) ? `<br><small style="color:#0284c7;font-weight:600;">${[p.tamanho ? 'Tam: ' + escapeHTML(p.tamanho) : '', p.cor ? 'Cor: ' + escapeHTML(p.cor) : ''].filter(Boolean).join(' | ')}</small>` : ''}
                 ${p.idPersonalizado ? `<br><small style="color:#64748b;font-size:11px;">ID: ${escapeHTML(p.idPersonalizado)}</small>` : ""}
             </td>
@@ -4203,6 +4535,39 @@ window.apagarCompra = async function (id) {
 document.getElementById("pos-pesquisa").addEventListener("input", renderPOS);
 
 
+// Quadrado colorido com a inicial do produto (quando não há foto): deixa o ecrã de venda vistoso.
+function avatarProduto(p, altura) {
+    const alt = altura || 70;
+    if (p.foto) {
+        return `<img src="${escapeHTML(p.foto)}" alt="" style="width:100%;height:${alt}px;object-fit:cover;border-radius:8px;margin-bottom:4px;" onerror="this.style.display='none';">`;
+    }
+    const nome = String(p.nome || "?").trim();
+    let hsh = 0;
+    for (let i = 0; i < nome.length; i++) hsh = (hsh * 31 + nome.charCodeAt(i)) % 360;
+    return `<div style="width:100%;height:${alt}px;border-radius:8px;margin-bottom:4px;display:flex;align-items:center;justify-content:center;font-size:${Math.round(alt * 0.42)}px;font-weight:800;background:hsl(${hsh},70%,92%);color:hsl(${hsh},45%,32%);">${escapeHTML(nome.charAt(0).toUpperCase())}</div>`;
+}
+
+// Os produtos mais vendidos do ramo nos últimos 30 dias (por quantidade).
+function produtosMaisVendidos(limite) {
+    const desde = Date.now() - 30 * 86400000;
+    const vendas = (FABEF._raw && FABEF._raw.vendas) || FABEF.vendas || [];
+    const contagem = {};
+    vendas.forEach(v => {
+        if (v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA") return;
+        if (v.ramo && v.ramo !== FABEF.ramo) return;
+        const t = new Date(v.data || 0).getTime();
+        if (t && t < desde) return;
+        (v.itens || v.items || []).forEach(it => {
+            if (it.produtoId) contagem[it.produtoId] = (contagem[it.produtoId] || 0) + numero(it.quantidade);
+        });
+    });
+    return Object.entries(contagem)
+        .sort((a, b) => b[1] - a[1])
+        .map(([id]) => (FABEF.produtos || []).find(p => p.id === id))
+        .filter(p => p && p.ramo === FABEF.ramo && p.ativo !== false)
+        .slice(0, limite || 8);
+}
+
 function renderPOS() {
     const pesquisa = document.getElementById("pos-pesquisa").value.toLowerCase();
 
@@ -4237,14 +4602,16 @@ function renderPOS() {
     // Sugestões rápidas marcadas pelo gerente (só aparecem quando não há pesquisa ativa)
     const containerDestaques = document.getElementById("pos-sugestoes-rapidas");
     if (containerDestaques) {
-        const destaques = pesquisa ? [] : FABEF.produtos.filter(p => p.ativo !== false && p.ramo === FABEF.ramo && p.destaque);
+        const manuais = pesquisa ? [] : FABEF.produtos.filter(p => p.ativo !== false && p.ramo === FABEF.ramo && p.destaque);
+        const destaques = manuais.length ? manuais : (pesquisa ? [] : produtosMaisVendidos(8));
+        const tituloDestaques = manuais.length ? "⭐ SUGESTÕES RÁPIDAS" : "🔥 MAIS VENDIDOS";
         containerDestaques.innerHTML = destaques.length ? `
-            <p style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;">⭐ SUGESTÕES RÁPIDAS</p>
+            <p style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;">${tituloDestaques}</p>
             <div id="pos-sugestoes-rapidas-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));gap:8px;margin-bottom:14px;">
                 ${destaques.map(p => `
-                <button class="produto-pos" data-pos-produto="${escapeHTML(p.id)}" type="button" style="border-color:#f59e0b;">
+                <button class="produto-pos${numero(p.stock) <= 0 ? " esgotado" : ""}" data-pos-produto="${escapeHTML(p.id)}" type="button" style="border-color:#f59e0b;">
+                    ${avatarProduto(p, 56)}
                     <strong>${escapeHTML(p.nome)}</strong>
-                    ${(p.tamanho || p.cor) ? `<small style="color:#0284c7;font-weight:600;">${[p.tamanho ? 'Tam: ' + escapeHTML(p.tamanho) : '', p.cor ? 'Cor: ' + escapeHTML(p.cor) : ''].filter(Boolean).join(' | ')}</small>` : ''}
                     <small>${dinheiro(p.preco)}</small>
                 </button>`).join("")}
             </div>` : "";
@@ -4267,17 +4634,17 @@ function renderPOS() {
 
         return `
         <div
-            class="produto-pos"
+            class="produto-pos${numero(p.stock) <= 0 ? " esgotado" : ""}"
             data-pos-produto="${escapeHTML(p.id)}"
             title="${ehPesavel ? 'Clique para escolher vender em KG ou escrever o preço' : 'Adicionar ao carrinho'}"
             style="cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;"
         >
             <div>
-                ${p.foto ? `<img src="${escapeHTML(p.foto)}" alt="" style="width:100%;height:70px;object-fit:cover;border-radius:6px;margin-bottom:4px;" onerror="this.style.display='none';">` : ""}
+                ${avatarProduto(p, 70)}
                 <strong>${escapeHTML(p.nome)}</strong>
                 ${atrBadge}
                 <small style="display:block;">${dinheiro(p.preco)}${p.unidade && p.unidade !== "unidade" ? " / " + escapeHTML(p.unidade) : ""}</small>
-                <small style="display:block;color:#64748b;">Stock: ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</small>
+                <small style="display:block;color:${numero(p.stock) <= 0 ? "#dc2626" : "#64748b"};font-weight:${numero(p.stock) <= 0 ? 800 : 400};">${numero(p.stock) <= 0 ? "ESGOTADO" : "Stock: " + numero(p.stock) + (p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : "")}</small>
             </div>
             ${botoesOpcaoVenda}
         </div>
@@ -4586,7 +4953,38 @@ document.getElementById("btn-confirmar-fracionada")?.addEventListener("click", (
    MÓDULO LÓGICO: EXECUÇÃO E RENDERIZAÇÃO DO CARRINHO
 ===================================================== */
 
+/* =====================================================
+   BARRA FLUTUANTE DO CARRINHO (telemóvel)
+   Aparece no ecrã de venda quando há artigos no carrinho e o carrinho
+   não está à vista: mostra o total e leva-o ao carrinho com um toque.
+===================================================== */
+let FABEF_cartVisivel = false;
+let FABEF_cartObs = null;
+function atualizarBarraCarrinho() {
+    const barra = document.getElementById("barra-carrinho-flutuante");
+    if (!barra) return;
+    const cartCard = document.getElementById("carrinho-corpo")?.closest(".card");
+    if (cartCard && !FABEF_cartObs && typeof IntersectionObserver !== "undefined") {
+        FABEF_cartObs = new IntersectionObserver(es => {
+            FABEF_cartVisivel = es.some(e => e.isIntersecting);
+            atualizarBarraCarrinho();
+        }, { threshold: 0.15 });
+        FABEF_cartObs.observe(cartCard);
+    }
+    const itens = FABEF.carrinho || [];
+    const posAtivo = document.getElementById("sec-pos")?.classList.contains("active");
+    if (!posAtivo || !itens.length || FABEF_cartVisivel) { barra.classList.add("hidden"); return; }
+    const total = itens.reduce((t, i) => t + numero(i.preco) * numero(i.quantidade), 0);
+    const resumo = document.getElementById("bcf-resumo");
+    if (resumo) resumo.textContent = `🛒 ${itens.length} artigo(s) · ${dinheiro(total)}`;
+    barra.classList.remove("hidden");
+}
+window.irParaCarrinho = function () {
+    document.getElementById("carrinho-corpo")?.closest(".card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
 function renderCarrinho() {
+    atualizarBarraCarrinho();
     const corpo = document.getElementById("carrinho-corpo");
     const totalSpan = document.getElementById("cart-total");
     
@@ -11288,6 +11686,66 @@ function renderAvisoReconciliacao() {
 }
 
 
+/* =====================================================
+   ÍNICIO: RESUMO DO DIA (cartões grandes)
+===================================================== */
+function saudacaoDoDia() {
+    const hr = new Date().getHours();
+    return hr < 12 ? "☀️ Bom dia" : (hr < 18 ? "🌤️ Boa tarde" : "🌙 Boa noite");
+}
+
+function dadosResumoDia() {
+    const hojeStr = dataHojeStr();
+    const vendasHoje = (FABEF.vendas || []).filter(v => {
+        const cancelada = v.status === "FALHADA_CANCELADA" || v.status === "CANCELADA";
+        return !cancelada && dataDoRegisto(v) === hojeStr && (!v.ramo || v.ramo === FABEF.ramo);
+    });
+    const totalHoje = vendasHoje.reduce((s, v) => s + numero(v.total), 0);
+    const baixos = (FABEF.produtos || []).filter(p => p.ramo === FABEF.ramo && p.ativo !== false
+        && numero(p.stock) <= numero(p.stockMinimo || 5)).length;
+    const devedores = (FABEF.dividas || []).filter(d => numero(d.saldo) > 0 && (!d.ramo || d.ramo === FABEF.ramo));
+    const fiado = devedores.reduce((s, d) => s + numero(d.saldo), 0);
+    return { nVendas: vendasHoje.length, totalHoje, baixos, nDevedores: devedores.length, fiado };
+}
+
+function renderResumoDia() {
+    const el = document.getElementById("inicio-resumo-dia");
+    if (!el) return;
+    const d = dadosResumoDia();
+    const ger = ehUsuarioGerente();
+    const aberto = caixaAbertoHoje();
+    const hora = (() => {
+        const t = FABEF.turno?.dataAbertura;
+        if (!aberto || !t) return "";
+        const dt = new Date(t);
+        return isNaN(dt) ? "" : " desde as " + dt.toLocaleTimeString("pt-MZ", { hour: "2-digit", minute: "2-digit" });
+    })();
+    const primeiroNome = String(FABEF.userData?.nome || "").trim().split(/\s+/)[0];
+    const dataBonita = new Date().toLocaleDateString("pt-MZ", { weekday: "long", day: "numeric", month: "long" });
+
+    const cartao = (cor, rotulo, valor, sub, ir) => `
+        <button type="button" class="resumo-card" style="border-left-color:${cor};" ${ir ? `data-ir="${ir}"` : ""}>
+            <div class="r-rot">${rotulo}</div>
+            <div class="r-val">${valor}</div>
+            <div class="r-sub">${sub}</div>
+        </button>`;
+
+    el.innerHTML = `
+        <div style="margin:6px 0 2px;font-size:18px;font-weight:800;color:#0f172a;">${saudacaoDoDia()}${primeiroNome ? ", " + escapeHTML(primeiroNome) : ""}!</div>
+        <div style="font-size:13px;color:#64748b;margin-bottom:8px;text-transform:capitalize;">${escapeHTML(dataBonita)} · ${escapeHTML(FABEF.ramo || "")}</div>
+        <div class="resumo-grid">
+            ${cartao("#10b981", "💰 Vendas de hoje", dinheiro(d.totalHoje), `${d.nVendas} venda(s)`, "vendas")}
+            ${cartao(aberto ? "#16a34a" : "#dc2626", "🧾 Caixa", aberto ? "Aberto" : "Fechado",
+                aberto ? "A vender" + hora : (ger ? "Toque para abrir o caixa" : "Peça ao gerente para abrir"), ger ? "caixa" : "")}
+            ${cartao(d.baixos ? "#f59e0b" : "#10b981", "📦 Stock baixo", String(d.baixos),
+                d.baixos ? "produto(s) a repor" : "tudo em ordem", ger ? "compras" : "inventario")}
+            ${cartao(d.fiado ? "#f97316" : "#10b981", "📒 Fiado por receber", dinheiro(d.fiado),
+                d.nDevedores ? `${d.nDevedores} cliente(s)` : "ninguém deve", "dividas")}
+        </div>`;
+    el.querySelectorAll("[data-ir]").forEach(b => b.addEventListener("click", () => mostrarSecao(b.dataset.ir)));
+}
+window.renderResumoDia = renderResumoDia;
+
 function renderDashboard() {
     renderAvisoReconciliacao();
 
@@ -12226,6 +12684,8 @@ function renderTudo() {
         catch (e) { console.error("Erro ao desenhar '" + nome + "':", e); }
     };
     passo("dashboard", renderDashboard);
+    passo("resumo-dia", renderResumoDia);
+    passo("arranque", verificarArranque);
     passo("ramos", renderRamos);
     passo("produtos", renderProdutos);
     passo("inventario", renderInventario);
