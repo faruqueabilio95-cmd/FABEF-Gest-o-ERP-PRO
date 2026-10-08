@@ -6,7 +6,7 @@
    - Funciona 100% offline se não houver internet
    - Suporte a ativação imediata (skipWaiting e clients.claim)
 ===================================================== */
-const VERSAO_SW = "fabef-erp-v12.25.0-20261006";
+const VERSAO_SW = "fabef-erp-v12.26.0-20261006";
 const NOME_CACHE = "fabef-cache-" + VERSAO_SW;
 
 const FICHEIROS_ESSENCIAIS = [
