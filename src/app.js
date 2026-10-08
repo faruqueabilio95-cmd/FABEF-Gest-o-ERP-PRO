@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v19-20261006";
+const FABEF_BUILD = "v20-20261006";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -1113,6 +1113,8 @@ async function criarConta() {
             gerenteId: uidUser,
             ramo_ativo: ramo,
             ramos_atividade: [ramo],
+            codigoIndicacao: gerarCodigoIndicacao(),
+            indicadoPorCodigo: String(document.getElementById("reg-indicacao")?.value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12),
             estado_licenca: "TESTE",
             subscricao_paga: false,
             data_registo: agora,
@@ -1260,7 +1262,7 @@ function limparInterfaceFABEF() {
             }
             el.value = el.defaultValue;
         });
-        ["login-senha", "reg-empresa", "reg-gerente", "reg-telefone", "reg-email", "reg-senha"].forEach(id => {
+        ["login-senha", "reg-empresa", "reg-gerente", "reg-telefone", "reg-email", "reg-senha", "reg-indicacao"].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = "";
         });
@@ -1750,6 +1752,228 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
+
+
+/* =====================================================
+   PONTOS 3 e 4: WHATSAPP (recibo, fecho do caixa, reposição), EXPORTAÇÃO E INDICAÇÕES
+===================================================== */
+// Telefone no formato do WhatsApp (258 + 9 dígitos). Devolve "" se não for válido.
+function telefoneWhatsApp(t) {
+    let d = String(t || "").replace(/\D/g, "");
+    if (d.length === 9) d = "258" + d;
+    return (d.length >= 11 && d.length <= 13) ? d : "";
+}
+
+function telefoneDoClienteDaVenda(v) {
+    if (!v) return "";
+    let tel = telefoneWhatsApp(v.telefoneCliente);
+    if (tel) return tel;
+    const nome = normalizarBusca(v.cliente);
+    const c = (FABEF.clientes || []).find(x => (v.clienteId && x.id === v.clienteId) || (nome && normalizarBusca(x.nome) === nome));
+    return telefoneWhatsApp(c && c.telefone);
+}
+
+// Recibo em IMAGEM (para enviar no WhatsApp como foto)
+window.compartilharReciboImagem = async function (vendaId) {
+    const v = (FABEF.vendas || []).find(x => x.id === vendaId) || ((FABEF._raw && FABEF._raw.vendas) || []).find(x => x.id === vendaId);
+    if (!v) { alert("Venda não localizada."); return; }
+    const ramo = v.ramo || FABEF.ramo;
+    const emp = typeof obterConfiguracaoRamo === "function" ? obterConfiguracaoRamo(ramo) : (FABEF.empresa || {});
+    const itens = v.itens || [];
+    const W = 620, L = 34, alt = 360 + itens.length * L;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = alt;
+    const g = canvas.getContext("2d");
+    g.fillStyle = "#ffffff"; g.fillRect(0, 0, W, alt);
+    g.fillStyle = "#10b981"; g.fillRect(0, 0, W, 10);
+    const cortar = (txt, max) => { let t = String(txt || ""); while (t.length > 1 && g.measureText(t).width > max) t = t.slice(0, -2) + "…"; return t; };
+    let y = 56;
+    g.fillStyle = "#0f172a"; g.font = "bold 28px sans-serif";
+    g.fillText(cortar(String(emp.nome || ramo || "Recibo").toUpperCase(), W - 50), 25, y); y += 34;
+    g.fillStyle = "#64748b"; g.font = "18px sans-serif";
+    g.fillText(cortar(`${emp.endereco || "Moçambique"}${emp.telefone ? " · " + emp.telefone : ""}`, W - 50), 25, y); y += 26;
+    if (emp.nuit) { g.fillText("NUIT: " + emp.nuit, 25, y); y += 26; }
+    g.strokeStyle = "#e2e8f0"; g.beginPath(); g.moveTo(25, y); g.lineTo(W - 25, y); g.stroke(); y += 30;
+    g.fillStyle = "#0f172a"; g.font = "bold 20px sans-serif";
+    g.fillText("RECIBO DE VENDA", 25, y); y += 28;
+    g.font = "18px sans-serif"; g.fillStyle = "#475569";
+    g.fillText(`Data: ${dataTexto(v.data)}`, 25, y); y += 26;
+    g.fillText(cortar(`Cliente: ${v.cliente || "Consumidor Final"}`, W - 50), 25, y); y += 34;
+    g.fillStyle = "#0f172a"; g.font = "20px sans-serif";
+    itens.forEach(it => {
+        const frac = it.unidade === "kg" || it.unidade === "litro" || it.unidade === "g";
+        const qtd = frac ? `${numero(it.quantidade).toFixed(3)} ${it.unidade}` : `${numero(it.quantidade)} ${it.unidade || "un"}`;
+        const val = dinheiro(it.subtotal);
+        g.textAlign = "right"; g.fillText(val, W - 25, y);
+        g.textAlign = "left"; g.fillText(cortar(`${it.nome} (${qtd})`, W - 50 - g.measureText(val).width - 10), 25, y);
+        y += L;
+    });
+    y += 6; g.strokeStyle = "#e2e8f0"; g.beginPath(); g.moveTo(25, y); g.lineTo(W - 25, y); g.stroke(); y += 40;
+    g.font = "bold 30px sans-serif"; g.fillStyle = "#047857";
+    g.textAlign = "right"; g.fillText(dinheiro(v.total), W - 25, y);
+    g.textAlign = "left"; g.fillStyle = "#0f172a"; g.fillText("TOTAL", 25, y); y += 34;
+    g.font = "18px sans-serif"; g.fillStyle = "#475569";
+    g.fillText(`Pagamento: ${v.pagamento || "Dinheiro"}`, 25, y); y += 40;
+    g.fillStyle = "#64748b"; g.font = "italic 17px sans-serif";
+    g.fillText(cortar(emp.rodapeRecibo || "Obrigado pela preferência! Volte sempre.", W - 50), 25, y);
+    canvas.toBlob(async (blob) => {
+        if (!blob) { alert("Não foi possível gerar a imagem do recibo."); return; }
+        const nomeF = `recibo-${String(v.id).slice(-6)}.png`;
+        const file = new File([blob], nomeF, { type: "image/png" });
+        try {
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: "Recibo de venda", text: `Recibo ${emp.nome || ""}` });
+                return;
+            }
+        } catch (e) { if (e && e.name === "AbortError") return; }
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = nomeF;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        alert("A imagem do recibo foi guardada no telemóvel. Pode anexá-la numa conversa do WhatsApp.");
+    }, "image/png");
+};
+document.getElementById("btn-recibo-imagem")?.addEventListener("click", () => {
+    if (window.FABEF_ultimaVendaId) window.compartilharReciboImagem(window.FABEF_ultimaVendaId);
+});
+
+// Resumo do fecho do caixa para o WhatsApp do gerente
+window.enviarFechoCaixaWhatsApp = function () {
+    const t = id => (document.getElementById(id)?.textContent || "").trim();
+    const nome = FABEF.empresa?.nome || "";
+    const msg = `🧾 *FECHO DE CAIXA*\n🏪 ${nome}${FABEF.ramo ? " — " + FABEF.ramo : ""}\n📅 ${t("res-fecho-data")}\n👤 Fechado por: ${t("res-fecho-operador")}\n\n` +
+        `▫️ Abertura: ${t("res-fecho-abertura")}\n💵 Vendas em dinheiro: ${t("res-fecho-vendas-dinheiro")}\n📲 Outras vendas: ${t("res-fecho-vendas-outras")}\n` +
+        `➕ Reforços: ${t("res-fecho-reforcos")}\n➖ Sangrias: ${t("res-fecho-sangrias")}\n🧮 Esperado: ${t("res-fecho-esperado")}\n✋ Contado: ${t("res-fecho-contado")}\n\n` +
+        `${t("res-fecho-rotulo")}: *${t("res-fecho-diferenca")}*\n_Emitido via FABEF Gestão ERP PRO_`;
+    const tel = telefoneWhatsApp(FABEF.userData?.telefone || FABEF.empresa?.telefone);
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+// Lista de reposição (stock baixo do ramo ativo) pronta para enviar ao fornecedor
+window.enviarListaReposicaoWhatsApp = function () {
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente envia listas de compra."); return; }
+    const prods = (FABEF.produtos || []).filter(p => p.ramo === FABEF.ramo && p.ativo !== false && numero(p.stock) <= numero(p.stockMinimo || 5));
+    if (!prods.length) { alert("Não há produtos com stock baixo neste ramo."); return; }
+    const cont = {};
+    prods.forEach(p => {
+        const u = (FABEF.compras || []).filter(c => c.produtoId === p.id && ramoDoRegisto(c) === FABEF.ramo)
+            .sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0))[0];
+        if (u && u.fornecedorNome) cont[u.fornecedorNome] = (cont[u.fornecedorNome] || 0) + 1;
+    });
+    const top = Object.entries(cont).sort((a, b) => b[1] - a[1])[0];
+    const forn = top ? (FABEF.fornecedores || []).find(f => f.nome === top[0]) : null;
+    const linhas = prods.map(p => {
+        const min = numero(p.stockMinimo || 5);
+        const falta = Math.max(1, min * 2 - numero(p.stock));
+        const un = p.unidade && p.unidade !== "unidade" ? " " + p.unidade : "";
+        return `• ${p.nome}: preciso de ${Number.isInteger(falta) ? falta : falta.toFixed(1)}${un} (tenho ${numero(p.stock)})`;
+    });
+    const msg = `Olá${forn ? " " + forn.nome : ""}! 👋\nPreciso de repor o stock ${FABEF.empresa?.nome ? "da " + FABEF.empresa.nome : "da loja"}${FABEF.ramo ? " (" + FABEF.ramo + ")" : ""}:\n\n${linhas.join("\n")}\n\nPode confirmar a disponibilidade e o preço? Obrigado!`;
+    window.open(`https://wa.me/${telefoneWhatsApp(forn && forn.telefone)}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+// Exportar todos os dados (um CSV por tabela, abre no Excel)
+function celulaSegura(v) {
+    if (v === undefined || v === null) return "";
+    if (typeof v === "number") return v;
+    const t = String(v);
+    // Evita "injeção de fórmulas" no Excel (texto que começa por = + - @)
+    return /^[=+\-@\t\r]/.test(t) && !/^-?\d+([.,]\d+)?$/.test(t) ? "'" + t : t;
+}
+window.exportarTudoCSV = async function () {
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente exporta os dados."); return; }
+    const dia = dataHojeStr();
+    const rm = String(FABEF.ramo || "ramo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+    const vendas = (FABEF._raw && FABEF._raw.vendas) || FABEF.vendas || [];
+    const itens = [];
+    vendas.forEach(v => (v.itens || v.items || []).forEach(it => itens.push([dataTexto(v.data), v.id, it.nome, it.quantidade, it.unidade || "un", it.preco, it.subtotal])));
+    const tabelas = [
+        ["produtos", ["Nome", "Código", "Categoria", "Unidade", "Custo", "Preço", "Stock", "Stock mínimo", "Ramo"],
+            (FABEF.produtos || []).map(p => [p.nome, p.codigo, p.categoria, p.unidade, p.custo, p.preco, p.stock, p.stockMinimo, p.ramo])],
+        ["vendas", ["Data", "Recibo", "Cliente", "Operador", "Pagamento", "Total", "Estado", "Ramo"],
+            vendas.map(v => [dataTexto(v.data), v.id, v.cliente, v.operadorNome, v.pagamento, v.total, v.status || "OK", v.ramo])],
+        ["itens-vendidos", ["Data", "Recibo", "Produto", "Quantidade", "Unidade", "Preço", "Subtotal"], itens],
+        ["clientes", ["Nome", "Telefone", "NUIT"], (FABEF.clientes || []).map(c => [c.nome, c.telefone, c.nuit])],
+        ["dividas", ["Cliente", "Telefone", "Saldo"], (FABEF.dividas || []).map(d => [d.cliente, d.telefone, d.saldo])],
+        ["despesas", ["Data", "Descrição", "Categoria", "Valor"], (FABEF.despesas || []).map(d => [dataTexto(d.data), d.descricao, d.categoria, d.valor])],
+        ["compras", ["Data", "Produto", "Fornecedor", "Quantidade", "Custo unitário", "Pagamento"],
+            (FABEF.compras || []).map(c => [dataTexto(c.data), c.produtoNome, c.fornecedorNome, c.quantidade, c.custoUnitario, c.pagamento])],
+        ["fornecedores", ["Nome", "Telefone", "Dívida"], (FABEF.fornecedores || []).map(f => [f.nome, f.telefone, f.divida])]
+    ].filter(t => t[2].length);
+    if (!tabelas.length) { alert("Ainda não há dados para exportar."); return; }
+    for (const [nome, cab, linhas] of tabelas) {
+        baixarCSV(`fabef-${rm}-${nome}-${dia}.csv`, cab, linhas.map(l => l.map(celulaSegura)));
+        await new Promise(r => setTimeout(r, 600));
+    }
+    alert(`✅ ${tabelas.length} ficheiro(s) CSV guardados (abrem no Excel).\nSe só vir alguns, o navegador pediu para permitir várias transferências: aceite e repita.`);
+};
+
+// Indicações: código de convite e prémio de +30 dias
+const LETRAS_CODIGO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function gerarCodigoIndicacao() {
+    const a = new Uint32Array(6);
+    (window.crypto || { getRandomValues: x => x.forEach((_, i) => { x[i] = Math.floor(Math.random() * 4294967295); }) }).getRandomValues(a);
+    return Array.from(a).map(n => LETRAS_CODIGO[n % LETRAS_CODIGO.length]).join("");
+}
+async function renderIndicar() {
+    const el = document.getElementById("indicar-codigo");
+    if (!el) return;
+    let codigo = FABEF.empresa?.codigoIndicacao || "";
+    if (!codigo && ehUsuarioGerente() && !window.FABEF?.isDemoMode && FABEF.empresaId) {
+        try {
+            codigo = gerarCodigoIndicacao();
+            await updateDoc(doc(db, "empresas", FABEF.empresaId), { codigoIndicacao: codigo, atualizadoEm: serverTimestamp() });
+            FABEF.empresa.codigoIndicacao = codigo;
+        } catch (e) { console.warn("Não foi possível criar o código de indicação:", e); codigo = ""; }
+    }
+    el.textContent = codigo || (window.FABEF?.isDemoMode ? "DEMO23" : "—");
+}
+function linkApresentacao() {
+    try { return new URL("apresentacao.html", location.href).href; } catch (_) { return ""; }
+}
+window.partilharIndicacao = function () {
+    const c = document.getElementById("indicar-codigo")?.textContent || "";
+    if (!c || c === "—") { alert("O código ainda não está disponível. Tente de novo daqui a pouco."); return; }
+    const msg = `Olá! 👋 Uso o *FABEF Gestão ERP PRO* para gerir o meu negócio (vendas, caixa, stock, fiado e relatórios) no telemóvel.\n\nTeste 7 dias grátis e use o meu código *${c}* ao registar-se:\n${linkApresentacao()}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+};
+window.copiarCodigoIndicacao = async function () {
+    const c = document.getElementById("indicar-codigo")?.textContent || "";
+    try { await navigator.clipboard.writeText(c); alert("Código copiado: " + c); } catch (_) { alert("O seu código é: " + c); }
+};
+
+// Painel admin: quando a empresa indicada paga pela 1.ª vez, quem indicou ganha +30 dias.
+async function premiarIndicacaoSeAplicavel(emp) {
+    try {
+        if (!emp || emp.indicacaoPremiada || !emp.indicadoPorCodigo) return "";
+        const cod = String(emp.indicadoPorCodigo).toUpperCase();
+        const ref = FABEF_ADMIN.empresas.find(e => e.id !== emp.id && String(e.codigoIndicacao || "").toUpperCase() === cod);
+        if (!ref) return "";
+        const adminEmail = auth.currentUser?.email || "";
+        const principal = ramoPrincipalEmpresa(ref), ch = chaveRamo(principal);
+        const lic = obterLicencaRamo(principal, ref);
+        const agora = new Date();
+        const validade = paraDataAdmin(lic.validade_subscricao);
+        const base = (lic.estado_licenca === "ACTIVO" && validade && validade > agora) ? validade : agora;
+        const nova = new Date(base); nova.setDate(nova.getDate() + 30);
+        if (usaLicencaDaEmpresa(ref, ch)) {
+            await updateDoc(doc(db, "empresas", ref.id), { estado_licenca: "ACTIVO", subscricao_paga: true, validade_subscricao: nova.toISOString(),
+                ativadoPor: adminEmail + " (indicação)", ativadoEm: serverTimestamp(), atualizadoEm: serverTimestamp() });
+            ref.estado_licenca = "ACTIVO"; ref.subscricao_paga = true; ref.validade_subscricao = nova.toISOString();
+        } else {
+            const dados = { ...(ref.licencas_ramos?.[ch] || {}), nome: principal, estado_licenca: "ACTIVO", validade_subscricao: nova.toISOString(), ativadoPor: adminEmail + " (indicação)" };
+            await updateDoc(doc(db, "empresas", ref.id), { ["licencas_ramos." + ch]: dados, atualizadoEm: serverTimestamp() });
+            ref.licencas_ramos = { ...(ref.licencas_ramos || {}), [ch]: dados };
+        }
+        await updateDoc(doc(db, "empresas", emp.id), { indicacaoPremiada: true, indicacaoPremiadaPara: ref.id, atualizadoEm: serverTimestamp() });
+        emp.indicacaoPremiada = true;
+        renderPainelAdmin();
+        return `🎁 Indicação premiada: "${ref.nome || ref.id}" ganhou +30 dias (até ${nova.toLocaleDateString("pt-MZ")}).`;
+    } catch (e) {
+        console.warn("Não foi possível premiar a indicação:", e);
+        return "⚠️ Não foi possível premiar a indicação automaticamente (veja a consola).";
+    }
+}
 
 /* =====================================================
    SAÍDA AUTOMÁTICA POR INATIVIDADE
@@ -2417,6 +2641,7 @@ function mostrarSecao(nome) {
     } else if (nome === "ramos") {
         renderPastaRamos();
     } else if (nome === "subscricao") {
+        renderIndicar();
         verificarSubscricao();
         atualizarCalculadoraSubscricao();
     } else if (nome === "pos") {
@@ -5922,6 +6147,7 @@ function renderLinhaVendaHTML(v) {
                 <div style="position:absolute;right:0;top:calc(100% + 4px);z-index:90;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);min-width:190px;padding:6px;display:flex;flex-direction:column;gap:5px;">
                     <button class="btn btn-light btn-small" onclick="this.closest('details').removeAttribute('open'); imprimirReciboVenda(${jsArg(v.id)})" type="button" style="text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;" title="Imprimir Recibo Térmico ou A4">🖨️ Imprimir Recibo</button>
                     <button class="btn btn-success btn-small" onclick="this.closest('details').removeAttribute('open'); enviarReciboWhatsApp(${jsArg(v.id)})" type="button" style="background-color:#25d366;color:#fff;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;border:none;" title="Enviar Recibo pelo WhatsApp">📱 Enviar WhatsApp</button>
+                    <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); compartilharReciboImagem(${jsArg(v.id)})" type="button" style="background-color:#0ea5e9;color:#fff;">🖼️ Recibo em imagem</button>
                     ${podeOperarVendasEDespesas() ? `
                     <button class="btn btn-primary btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalEditarVenda(${jsArg(v.id)})" type="button" style="background:#2563eb;color:#fff;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;border:none;" title="Editar valor, forma de pagamento ou cliente">✏️ Editar Venda</button>
                     ${!ehFalhada ? `
@@ -6158,7 +6384,7 @@ window.enviarReciboWhatsApp = function(vendaId) {
         `✨ _${emp.rodapeRecibo || "Obrigado pela preferência! Volte sempre."}_\n` +
         `_Emitido via FABEF Gestão ERP PRO_`
     );
-    window.open(`https://wa.me/?text=${mensagem}`, "_blank");
+    window.open(`https://wa.me/${telefoneDoClienteDaVenda(v)}?text=${mensagem}`, "_blank");
 };
 
 /* =====================================================
@@ -6747,9 +6973,8 @@ function renderDividas() {
 window.enviarLembreteDivida = function(id) {
     const d = FABEF.dividas.find(x => x.id === id);
     if (!d) return;
-    if (!d.telefone || d.telefone === "—") { alert("Este cliente não tem um número de telefone registado."); return; }
-    let telefoneFormatado = String(d.telefone).trim().replace(/\D/g, "");
-    if (telefoneFormatado.length === 9) telefoneFormatado = "258" + telefoneFormatado;
+    // Sem telefone registado, abre o WhatsApp para escolher o contacto.
+    const telefoneFormatado = telefoneWhatsApp(d.telefone);
     const nomeEmpresa = FABEF.empresa?.nome || "Nosso Estabelecimento";
     const mensagem = encodeURIComponent(`Olá *${d.cliente}*,\n\nEsperamos que esteja bem. Passamos por aqui para lembrar gentilmente que possui um saldo em aberto no valor de *${dinheiro(d.saldo)}* referente às suas compras a fiado em *${nomeEmpresa}*.\n\nO seu limite de crédito atual é de ${dinheiro(d.limite)}.\n\nAgradecemos se puder passar pelo estabelecimento para regularizar o valor assim que possível. Obrigado pela compreensão! 🙏`);
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
@@ -10407,7 +10632,7 @@ function renderPainelAdmin() {
         return `
         <tr>
             <td>${dataTexto(p.data)}</td>
-            <td><strong>${escapeHTML(nome)}</strong><br><span style="font-size:12px;color:#1e3a8a;font-weight:700;">Ramo: ${escapeHTML(ramoNome)}</span><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.gerenteEmail || "")}${p.telefone ? " · " + escapeHTML(p.telefone) : ""}</span></td>
+            <td><strong>${escapeHTML(nome)}</strong><br><span style="font-size:12px;color:#1e3a8a;font-weight:700;">Ramo: ${escapeHTML(ramoNome)}</span><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.gerenteEmail || "")}${p.telefone ? " · " + escapeHTML(p.telefone) : ""}</span>${emp?.indicadoPorCodigo && !emp?.indicacaoPremiada ? `<br><span style="font-size:11px;font-weight:700;color:#b45309;">🎁 Indicado pelo código ${escapeHTML(emp.indicadoPorCodigo)}</span>` : ""}</td>
             <td><code>${escapeHTML(p.referencia || "—")}</code><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.tipo === "CHAVE" ? "Chave de licença" : "Código SMS")}</span></td>
             <td>${dinheiro(numero(p.valor) || 250)}</td>
             <td style="white-space:nowrap;">
@@ -10551,7 +10776,8 @@ window.adminAtivarEmpresa = async function (empresaId, dias, pedidoId, chaveRamo
         }
         renderPainelAdmin();
         try { await gravarAuditoria(`Administrador ativou o ramo "${ramoNome}" da conta "${nome}" até ${nova.toLocaleDateString("pt-MZ")}.`, "INFO"); } catch (_) {}
-        alert(`✅ Ramo "${ramoNome}" (${nome}) ativado até ${nova.toLocaleDateString("pt-MZ")}.`);
+        const premio = await premiarIndicacaoSeAplicavel(emp);
+        alert(`✅ Ramo "${ramoNome}" (${nome}) ativado até ${nova.toLocaleDateString("pt-MZ")}.` + (premio ? "\n\n" + premio : ""));
     } catch (error) {
         console.error("Erro ao ativar ramo:", error);
         alert("Não foi possível ativar o ramo:\n" + mensagemFirebase(error));
