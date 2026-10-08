@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-MZ">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10b981">
+<title>FABEF Gestão ERP PRO — a gestão do seu negócio no telemóvel</title>
+<meta name="description" content="Vendas, caixa, stock, fiado e relatórios no telemóvel. 7 dias grátis. Depois 250 MT por mês.">
+<style>
+:root{--verde:#10b981;--verde2:#047857;--noite:#0f172a;--cinza:#64748b;--claro:#f1f5f9;--amar:#f59e0b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--noite);background:#fff;line-height:1.55}
+a{color:inherit}
+.wrap{max-width:980px;margin:0 auto;padding:0 18px}
+header.top{background:var(--noite);color:#fff;padding:12px 0}
+header.top .wrap{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.logo{font-weight:900;font-size:19px;letter-spacing:.5px}.logo span{color:var(--verde)}
+.btn{display:inline-block;text-decoration:none;font-weight:800;border-radius:12px;padding:13px 20px;font-size:16px;border:0;cursor:pointer}
+.btn-v{background:var(--verde);color:#fff}.btn-w{background:#25d366;color:#fff}.btn-o{background:#fff;color:var(--verde2);border:2px solid var(--verde)}
+.hero{background:linear-gradient(160deg,#0f172a 0%,#064e3b 100%);color:#fff;padding:44px 0 56px}
+.hero .wrap{display:grid;gap:30px;align-items:center}
+.hero h1{font-size:clamp(28px,6vw,44px);line-height:1.15;margin-bottom:14px}.hero h1 em{color:var(--verde);font-style:normal}
+.hero p{font-size:18px;color:#cbd5e1;margin-bottom:22px}
+.hero .cta{display:flex;gap:10px;flex-wrap:wrap}.hero small{display:block;margin-top:12px;color:#94a3b8}
+.phone{width:min(270px,80vw);margin:0 auto;background:#111827;border-radius:34px;padding:12px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.screen{background:#f8fafc;border-radius:24px;padding:14px;color:var(--noite)}
+.screen .oi{font-size:13px;color:var(--cinza)}.screen .oi b{display:block;font-size:16px;color:var(--noite)}
+.kp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.kp div{background:#fff;border-radius:12px;padding:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);font-size:11px;color:var(--cinza)}
+.kp b{display:block;font-size:17px;color:var(--noite)}.kp .g b{color:var(--verde2)}.kp .r b{color:#dc2626}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tiles i{display:block;background:#fff;border-radius:10px;padding:8px 4px;text-align:center;font-style:normal;font-size:10px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tiles i s{display:block;width:26px;height:26px;border-radius:8px;margin:0 auto 4px;text-decoration:none;color:#fff;line-height:26px;font-size:13px}
+section.s{padding:44px 0}section.alt{background:var(--claro)}
+h2{font-size:clamp(23px,4.5vw,32px);margin-bottom:8px}.sub{color:var(--cinza);margin-bottom:24px;max-width:640px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:#fff;border-radius:16px;padding:18px;box-shadow:0 2px 10px rgba(15,23,42,.07)}
+.card .ic{font-size:28px;margin-bottom:6px}.card h3{font-size:17px;margin-bottom:4px}.card p{color:var(--cinza);font-size:14.5px}
+.passos{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));counter-reset:p}
+.passo{background:#fff;border-radius:16px;padding:18px 18px 18px 64px;position:relative;box-shadow:0 2px 10px rgba(15,23,42,.07)}
+.passo:before{counter-increment:p;content:counter(p);position:absolute;left:16px;top:16px;width:34px;height:34px;border-radius:50%;background:var(--verde);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center}
+.preco{max-width:430px;margin:0 auto;background:#fff;border-radius:22px;border:3px solid var(--verde);padding:26px;text-align:center;box-shadow:0 10px 30px rgba(16,185,129,.2)}
+.preco .v{font-size:54px;font-weight:900;color:var(--verde2);line-height:1}.preco .v small{font-size:18px;color:var(--cinza);font-weight:700}
+.preco ul{list-style:none;text-align:left;margin:18px 0}.preco li{padding:6px 0 6px 26px;position:relative;border-bottom:1px solid #eef2f7;font-size:15px}
+.preco li:before{content:"✓";position:absolute;left:0;color:var(--verde);font-weight:900}
+.pag{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-top:16px}
+.pag .n{background:#fff;border-radius:14px;padding:16px;text-align:center;box-shadow:0 2px 10px rgba(15,23,42,.07)}
+.pag .n b{display:block;font-size:22px;color:var(--verde2);letter-spacing:1px;margin-top:4px}
+.indica{background:#fffbeb;border:2px dashed var(--amar);border-radius:18px;padding:22px;text-align:center}
+details{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 6px rgba(15,23,42,.07)}
+summary{font-weight:800;cursor:pointer}details p{margin-top:8px;color:var(--cinza);font-size:14.5px}
+#video{display:none}#video iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:16px}
+footer{background:var(--noite);color:#94a3b8;text-align:center;padding:26px 18px;font-size:14px}
+.fixo{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;display:flex;gap:8px}
+.fixo .btn{flex:1;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25);padding:13px 8px;font-size:15px}
+body{padding-bottom:78px}
+@media(min-width:760px){.hero .wrap{grid-template-columns:1.2fr .8fr}.fixo{display:none}body{padding-bottom:0}}
+</style>
+</head>
+<body>
+
+<header class="top"><div class="wrap">
+  <div class="logo">FABEF <span>ERP PRO</span></div>
+  <a class="btn btn-v" href="./index.html" style="padding:9px 14px;font-size:14px">Entrar</a>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <div>
+    <h1>A gestão do seu negócio <em>no telemóvel</em></h1>
+    <p>Venda mais rápido, controle o caixa e o stock, cobre o fiado pelo WhatsApp e saiba quanto lucra, tudo num só aplicativo feito para comerciantes em Moçambique.</p>
+    <div class="cta">
+      <a class="btn btn-v" href="./index.html">Experimentar 7 dias grátis</a>
+      <a class="btn btn-w" href="https://wa.me/258840157474?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20FABEF%20Gest%C3%A3o%20ERP%20PRO.">Falar no WhatsApp</a>
+    </div>
+    <small>Sem cartão. Depois do teste, 250 MT por mês.</small>
+  </div>
+  <div class="phone" aria-hidden="true"><div class="screen">
+    <div class="oi">Bom dia 👋<b>O seu negócio hoje</b></div>
+    <div class="kp">
+      <div class="g">Vendas de hoje<b>MT 12.450</b></div>
+      <div>Caixa<b>🟢 Aberto</b></div>
+      <div class="r">Stock baixo<b>3 artigos</b></div>
+      <div>Fiado por receber<b>MT 2.300</b></div>
+    </div>
+    <div class="tiles">
+      <i><s style="background:#ef4444">C</s>Carne<br>MT 420</i>
+      <i><s style="background:#f59e0b">A</s>Arroz<br>MT 1.100</i>
+      <i><s style="background:#0ea5e9">Ó</s>Óleo<br>MT 95</i>
+    </div>
+  </div></div>
+</div></section>
+
+<section class="s"><div class="wrap">
+  <h2>Tudo o que precisa para vender e controlar</h2>
+  <p class="sub">Pensado para o balcão: poucos toques, tudo no telemóvel, e cada pessoa vê só o que lhe cabe.</p>
+  <div class="grid">
+    <div class="card"><div class="ic">🛒</div><h3>Venda rápida</h3><p>Produtos com foto e preço, leitor de código de barras pela câmara, venda por kg ou litro e pagamento misto (dinheiro, M-Pesa, e-Mola, crédito).</p></div>
+    <div class="card"><div class="ic">💵</div><h3>Caixa por turno</h3><p>O gerente abre e fecha o caixa. O fecho é feito com contagem do dinheiro e mostra qualquer diferença.</p></div>
+    <div class="card"><div class="ic">📒</div><h3>Fiado sob controlo</h3><p>Saiba quem lhe deve e quanto. Cobre com um toque, por mensagem de WhatsApp já escrita.</p></div>
+    <div class="card"><div class="ic">📦</div><h3>Stock e compras</h3><p>Avisos de stock baixo, lista de reposição para enviar ao fornecedor e histórico de compras por ramo.</p></div>
+    <div class="card"><div class="ic">🧾</div><h3>Recibos no WhatsApp</h3><p>Envie o recibo ao cliente em texto ou em imagem, ou imprima.</p></div>
+    <div class="card"><div class="ic">📊</div><h3>Lucro e relatórios</h3><p>Vendas, despesas, lucro e metas por dia e por mês. Exporte tudo para o Excel quando quiser.</p></div>
+    <div class="card"><div class="ic">🏪</div><h3>Vários ramos</h3><p>Tem mais do que um negócio? Cada ramo tem os seus produtos, caixa e relatórios separados.</p></div>
+    <div class="card"><div class="ic">👥</div><h3>Equipa com permissões</h3><p>O gerente supervisiona; o funcionário vende. Custos e lucros ficam só para o gerente.</p></div>
+  </div>
+</div></section>
+
+<section class="s alt" id="video"><div class="wrap">
+  <h2>Veja em 1 minuto</h2><p class="sub">Uma demonstração rápida do aplicativo.</p>
+  <div id="video-caixa"></div>
+</div></section>
+
+<section class="s alt"><div class="wrap">
+  <h2>Comece em 3 passos</h2>
+  <p class="sub">Em poucos minutos já está a vender.</p>
+  <div class="passos">
+    <div class="passo"><strong>Crie a conta</strong><p style="color:var(--cinza);font-size:14.5px">Nome do negócio, ramo e e-mail. Os 7 dias de teste começam logo.</p></div>
+    <div class="passo"><strong>Junte os produtos</strong><p style="color:var(--cinza);font-size:14.5px">Escolha os sugeridos para o seu ramo ou importe a sua lista do Excel.</p></div>
+    <div class="passo"><strong>Abra o caixa e venda</strong><p style="color:var(--cinza);font-size:14.5px">Dê ao funcionário o seu acesso e comece a vender.</p></div>
+  </div>
+  <div style="text-align:center;margin-top:22px"><a class="btn btn-v" href="./index.html">Criar a minha conta grátis</a></div>
+</div></section>
+
+<section class="s"><div class="wrap">
+  <h2 style="text-align:center">Um preço simples</h2>
+  <p class="sub" style="margin:0 auto 22px;text-align:center">Teste grátis. Depois, pague só pelo que usa.</p>
+  <div class="preco">
+    <div class="v">250 <small>MT / mês</small></div>
+    <p style="color:var(--cinza)">por ramo de atividade</p>
+    <ul>
+      <li>7 dias de teste grátis</li>
+      <li>1 ramo + até 3 utilizadores (1 gerente e 2 funcionários)</li>
+      <li>Funcionário extra: +50 MT por mês</li>
+      <li>Ramo adicional: 250 MT por mês, com 7 dias de teste</li>
+      <li>Se não renovar, a conta passa para o Plano Grátis e os seus dados não se apagam</li>
+    </ul>
+    <a class="btn btn-v" href="./index.html" style="width:100%">Experimentar 7 dias grátis</a>
+  </div>
+</div></section>
+
+<section class="s alt"><div class="wrap">
+  <h2>Como pagar</h2>
+  <p class="sub">Por M-Pesa ou e-Mola. Depois confirmamos o pagamento e ativamos a sua conta.</p>
+  <div class="pag">
+    <div class="n">M-Pesa<b>84 015 7474</b></div>
+    <div class="n">e-Mola<b>87 015 7474</b></div>
+  </div>
+  <div class="passos" style="margin-top:16px">
+    <div class="passo"><strong>Pague</strong><p style="color:var(--cinza);font-size:14.5px">250 MT por ramo (+50 MT por funcionário extra).</p></div>
+    <div class="passo"><strong>Copie o código do SMS</strong><p style="color:var(--cinza);font-size:14.5px">A mensagem de confirmação traz o código da transação.</p></div>
+    <div class="passo"><strong>Cole-o no aplicativo</strong><p style="color:var(--cinza);font-size:14.5px">Em Subscrição. Normalmente a ativação é feita em poucas horas, no mesmo dia.</p></div>
+  </div>
+</div></section>
+
+<section class="s"><div class="wrap">
+  <div class="indica">
+    <h2>🎁 Indique e ganhe 1 mês grátis</h2>
+    <p class="sub" style="margin:0 auto 14px">Cada cliente tem um código para partilhar. Quando o comerciante que indicou pagar a primeira subscrição, ganha +30 dias.</p>
+    <a class="btn btn-w" href="https://wa.me/258840157474?text=Ol%C3%A1!%20Quero%20saber%20como%20funciona%20o%20programa%20de%20indica%C3%A7%C3%A3o%20do%20FABEF.">Saber mais no WhatsApp</a>
+  </div>
+</div></section>
+
+<section class="s alt"><div class="wrap">
+  <h2>Perguntas frequentes</h2><p class="sub">As dúvidas mais comuns.</p>
+  <details><summary>Preciso de internet?</summary><p>Sim. É preciso internet para entrar e para os dados ficarem guardados e sincronizados. Funciona com dados móveis e gasta pouco.</p></details>
+  <details><summary>Os meus dados estão seguros?</summary><p>Cada negócio só vê os seus próprios dados. Entra-se com e-mail e senha, e a sessão termina quando fecha o aplicativo ou fica parado. Pode exportar tudo para o Excel quando quiser.</p></details>
+  <details><summary>Funciona em qualquer telemóvel?</summary><p>Funciona no navegador de telemóveis e computadores, e pode instalar no ecrã inicial como se fosse um aplicativo.</p></details>
+  <details><summary>E se eu não pagar a seguir ao teste?</summary><p>A conta passa para o Plano Grátis, com limites, e os seus dados não são apagados. Pode subscrever quando quiser.</p></details>
+  <details><summary>O funcionário vê os meus lucros?</summary><p>Não. O funcionário vende, regista despesas e consulta produtos, mas custos, margens e o fecho do caixa ficam para o gerente.</p></details>
+  <details><summary>Preciso de ajuda para começar. A quem peço?</summary><p>Fale connosco no WhatsApp. Ajudamos a configurar o seu negócio.</p></details>
+</div></section>
+
+<footer>
+  <p><strong style="color:#fff">FABEF Gestão ERP PRO</strong> · Moçambique</p>
+  <p style="margin-top:6px"><a href="https://wa.me/258840157474">WhatsApp 84 015 7474</a> · <a href="./index.html">Entrar no aplicativo</a></p>
+</footer>
+
+<div class="fixo">
+  <a class="btn btn-v" href="./index.html">7 dias grátis</a>
+  <a class="btn btn-w" href="https://wa.me/258840157474?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20FABEF.">WhatsApp</a>
+</div>
+
+<script>
+// Para mostrar o vídeo de demonstração, cole aqui o endereço de incorporação (ex.: https://www.youtube.com/embed/XXXXXXXX).
+var VIDEO_URL = "";
+(function(){
+  if (!/^https:\/\/(www\.youtube\.com|player\.vimeo\.com)\/(embed|video)\//.test(VIDEO_URL)) return;
+  var f = document.createElement("iframe");
+  f.src = VIDEO_URL; f.allow = "accelerometer; encrypted-media; picture-in-picture"; f.allowFullscreen = true; f.title = "Demonstração do FABEF";
+  document.getElementById("video-caixa").appendChild(f);
+  document.getElementById("video").style.display = "block";
+})();
+</script>
+</body>
+  </html>
+  
