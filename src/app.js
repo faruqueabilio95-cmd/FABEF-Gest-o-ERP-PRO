@@ -182,7 +182,7 @@ const firebaseConfig = {
 
 
 // Versão deste ficheiro (o index.html tem de ter a MESMA; ver banner de aviso).
-const FABEF_BUILD = "v20-20261006";
+const FABEF_BUILD = "v21-20261010";
 window.FABEF_BUILD = FABEF_BUILD;
 
 const appFirebase = initializeApp(firebaseConfig);
@@ -325,7 +325,7 @@ function podeOperarVendasEDespesas() {
 }
 window.podeOperarVendasEDespesas = podeOperarVendasEDespesas;
 function avisoSoFuncionario(acao) {
-    alert("🔒 O gerente só gere e supervisiona.\n\n" + acao + " é feito pelo funcionário.");
+    alert("O gerente só gere e supervisiona.\n\n" + acao + " é feito pelo funcionário.");
 }
 window.ehUsuarioGerente = ehUsuarioGerente;
 
@@ -887,7 +887,7 @@ async function executarLogin() {
     const status = elAuth("login-status");
 
     if (!email || !senha) {
-        if (status) status.textContent = "⚠️ Introduza o e-mail e a senha.";
+        if (status) status.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> Introduza o e-mail e a senha.";
         return;
     }
 
@@ -903,7 +903,7 @@ async function executarLogin() {
         FABEF_loginFresco = true;
         const credencial = await signInWithEmailAndPassword(auth, email, senha);
         if (status) {
-            status.textContent = "🟢 Acesso autorizado! A abrir o painel...";
+            status.textContent = "<span class="dot dot-green"></span> Acesso autorizado! A abrir o painel...";
             status.style.color = "#10b981";
         }
         if (credencial?.user) {
@@ -914,7 +914,7 @@ async function executarLogin() {
         console.error("Erro de login:", error);
         if (status) {
             status.style.color = "#dc2626";
-            status.textContent = "🔴 " + mensagemFirebase(error);
+            status.textContent = "<span class="dot dot-red"></span> " + mensagemFirebase(error);
         }
     } finally {
         if (btn) btn.disabled = false;
@@ -1004,7 +1004,7 @@ if (btnEsqueciSenha && !btnEsqueciSenha.dataset.fabefBound) {
             identificador = (prompt("Recuperar senha.\n\nEscreva o seu e-mail OU o número de telefone usado no registo da empresa:") || "").trim();
         }
         if (!identificador) {
-            if (status) status.textContent = "🔴 Escreva o e-mail ou o telefone da conta para recuperar a senha.";
+            if (status) status.textContent = "<span class="dot dot-red"></span> Escreva o e-mail ou o telefone da conta para recuperar a senha.";
             return;
         }
         try {
@@ -1013,22 +1013,22 @@ if (btnEsqueciSenha && !btnEsqueciSenha.dataset.fabefBound) {
             if (!identificador.includes("@")) {
                 const tel = normalizarTelefoneMZ(identificador);
                 if (!/^\d{9}$/.test(tel)) {
-                    if (status) status.textContent = "🔴 Escreva um e-mail válido ou um telefone com 9 dígitos (ex: 84 xxx xxxx).";
+                    if (status) status.textContent = "<span class="dot dot-red"></span> Escreva um e-mail válido ou um telefone com 9 dígitos (ex: 84 xxx xxxx).";
                     return;
                 }
                 if (status) status.textContent = "⏳ A procurar a conta...";
                 email = await procurarEmailPorTelefone(tel);
                 porTelefone = true;
                 if (!email) {
-                    if (status) status.textContent = "🔴 Não encontrámos nenhuma conta com esse telefone. Tente com o e-mail do registo.";
+                    if (status) status.textContent = "<span class="dot dot-red"></span> Não encontrámos nenhuma conta com esse telefone. Tente com o e-mail do registo.";
                     return;
                 }
             }
             await sendPasswordResetEmail(auth, email);
-            if (status) status.textContent = "🟢 Enviámos um e-mail para " + (porTelefone ? mascararEmail(email) : email) + " com as instruções para definir uma nova senha. Verifique também a pasta de spam.";
+            if (status) status.textContent = "<span class="dot dot-green"></span> Enviámos um e-mail para " + (porTelefone ? mascararEmail(email) : email) + " com as instruções para definir uma nova senha. Verifique também a pasta de spam.";
         } catch (error) {
             console.error(error);
-            if (status) status.textContent = "🔴 " + mensagemFirebase(error);
+            if (status) status.textContent = "<span class="dot dot-red"></span> " + mensagemFirebase(error);
         }
     });
 }
@@ -1058,12 +1058,12 @@ async function criarConta() {
     const status = elAuth("reg-status");
 
     if (!empresaNome || !gerente || !email || !senha) {
-        if (status) status.textContent = "⚠️ Preencha os campos obrigatórios (Negócio, Gerente, E-mail e Senha).";
+        if (status) status.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> Preencha os campos obrigatórios (Negócio, Gerente, E-mail e Senha).";
         return;
     }
 
     if (senha.length < 6) {
-        if (status) status.textContent = "⚠️ A senha deve ter pelo menos 6 caracteres.";
+        if (status) status.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> A senha deve ter pelo menos 6 caracteres.";
         return;
     }
 
@@ -1127,7 +1127,7 @@ async function criarConta() {
 
         try { await registarIndiceRecuperacao(credencial.user, telefone); } catch (eRec) { console.warn("Aviso: índice de recuperação por telefone não gravado:", eRec); }
 
-        if (status) status.textContent = "🟢 Conta e empresa criadas com sucesso. A abrir o sistema...";
+        if (status) status.textContent = "<span class="dot dot-green"></span> Conta e empresa criadas com sucesso. A abrir o sistema...";
 
         FABEF_registoEmCurso = false;
         if (auth.currentUser) {
@@ -1136,7 +1136,7 @@ async function criarConta() {
         return;
     } catch (error) {
         console.error("Erro ao criar conta:", error);
-        if (status) status.textContent = "🔴 " + mensagemFirebase(error);
+        if (status) status.textContent = "<span class="dot dot-red"></span> " + mensagemFirebase(error);
     } finally {
         FABEF_registoEmCurso = false;
         if (btnRegistar) btnRegistar.disabled = false;
@@ -1370,11 +1370,11 @@ async function iniciarSessaoFABEF(user) {
     } catch (error) {
         console.error("Erro crítico ao iniciar a aplicação:", error);
         const mensagem = mensagemFirebase(error);
-        if (loginStatus) loginStatus.textContent = "🔴 Não foi possível carregar a conta: " + mensagem;
+        if (loginStatus) loginStatus.textContent = "<span class="dot dot-red"></span> Não foi possível carregar a conta: " + mensagem;
 
         const regStatus = elAuth("reg-status");
         if (regStatus && !FABEF_registoEmCurso) {
-            regStatus.textContent = "🔴 Não foi possível carregar a empresa: " + mensagem;
+            regStatus.textContent = "<span class="dot dot-red"></span> Não foi possível carregar a empresa: " + mensagem;
         }
 
         FABEF.carregado = false;
@@ -1427,7 +1427,7 @@ function mostrarModalConfigurarPin(user, obrigatorio = false) {
     if (status) status.textContent = "";
 
     if (obrigatorio) {
-        if (titulo) titulo.textContent = "🛡️ Ativar PIN de Segurança (Obrigatório)";
+        if (titulo) titulo.textContent = "<svg class="ic"><use href="#ic-shield"></use></svg> Ativar PIN de Segurança (Obrigatório)";
         if (desc) desc.textContent = "Para garantir a máxima proteção do seu telemóvel e evitar acessos indevidos, crie um código PIN numérico de 4 a 6 dígitos.";
         if (btnCancelar) {
             btnCancelar.textContent = "Sair da Conta";
@@ -1440,7 +1440,7 @@ function mostrarModalConfigurarPin(user, obrigatorio = false) {
             };
         }
     } else {
-        if (titulo) titulo.textContent = "🔢 Definir / Alterar Código PIN";
+        if (titulo) titulo.textContent = "<svg class="ic"><use href="#ic-pin"></use></svg> Definir / Alterar Código PIN";
         if (desc) desc.textContent = "Introduza o código PIN numérico de 4 a 6 dígitos para o seu acesso pessoal ou bloqueio de caixa rápido.";
         if (btnCancelar) {
             btnCancelar.textContent = "Cancelar";
@@ -1490,7 +1490,7 @@ async function validarEEntrarPin() {
     const statusPin = document.getElementById("pin-status");
     if (!pinDigitado) {
         if (statusPin) {
-            statusPin.textContent = "⚠️ Introduza o seu código PIN.";
+            statusPin.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> Introduza o seu código PIN.";
             statusPin.style.color = "#b45309";
         }
         return;
@@ -1501,10 +1501,10 @@ async function validarEEntrarPin() {
             sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
             esconderEcraPin();
             document.getElementById("app")?.classList.remove("hidden");
-            toast("🔓 Aplicação desbloqueada com sucesso.");
+            toast("<svg class="ic"><use href="#ic-unlock"></use></svg> Aplicação desbloqueada com sucesso.");
         } else {
             if (statusPin) {
-                statusPin.textContent = "🔴 O PIN deve ter pelo menos 4 dígitos (ex: 1234).";
+                statusPin.textContent = "<span class="dot dot-red"></span> O PIN deve ter pelo menos 4 dígitos (ex: 1234).";
                 statusPin.style.color = "#dc2626";
             }
         }
@@ -1548,7 +1548,7 @@ async function validarEEntrarPin() {
     if (hashDigitado === hashGuardado) {
         try { sessionStorage.removeItem("fabef_pin_falhas"); sessionStorage.removeItem("fabef_pin_bloqueado_ate"); } catch (_) {}
         if (statusPin) {
-            statusPin.textContent = "🟢 PIN correto! A abrir o sistema...";
+            statusPin.textContent = "<span class="dot dot-green"></span> PIN correto! A abrir o sistema...";
             statusPin.style.color = "#16a34a";
         }
         sessionStorage.setItem("fabef_sessao_desbloqueada", "true");
@@ -1568,14 +1568,14 @@ async function validarEEntrarPin() {
         } catch (_) {}
         if (falhasPin >= 10) {
             try { sessionStorage.removeItem("fabef_pin_falhas"); sessionStorage.removeItem("fabef_pin_bloqueado_ate"); } catch (_) {}
-            FABEF_msgLogin = "🔒 PIN errado demasiadas vezes. Entre novamente com a senha.";
+            FABEF_msgLogin = "<svg class="ic"><use href="#ic-lock"></use></svg> PIN errado demasiadas vezes. Entre novamente com a senha.";
             try { await signOut(auth); } catch (_) {}
             return;
         }
         if (statusPin) {
             statusPin.textContent = espera
-                ? `🔴 PIN incorreto (${falhasPin} erros). Aguarde ${espera} s antes de tentar de novo.`
-                : `🔴 PIN incorreto (${falhasPin}/10). Tente novamente ou use a palavra-passe.`;
+                ? `<span class="dot dot-red"></span> PIN incorreto (${falhasPin} erros). Aguarde ${espera} s antes de tentar de novo.`
+                : `<span class="dot dot-red"></span> PIN incorreto (${falhasPin}/10). Tente novamente ou use a palavra-passe.`;
             statusPin.style.color = "#dc2626";
         }
         setTimeout(() => input?.focus(), 100);
@@ -1657,7 +1657,7 @@ async function salvarNovoPin() {
 
     if (!/^\d{4,6}$/.test(p1)) {
         if (status) {
-            status.textContent = "⚠️ O PIN deve conter entre 4 e 6 números (ex: 1234).";
+            status.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> O PIN deve conter entre 4 e 6 números (ex: 1234).";
             status.style.color = "#dc2626";
         }
         inpNovo?.focus();
@@ -1665,7 +1665,7 @@ async function salvarNovoPin() {
     }
     if (p1 !== p2) {
         if (status) {
-            status.textContent = "⚠️ Os dois PINs digitados não são iguais. Verifique e tente novamente.";
+            status.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> Os dois PINs digitados não são iguais. Verifique e tente novamente.";
             status.style.color = "#dc2626";
         }
         inpConf?.focus();
@@ -1711,12 +1711,12 @@ async function salvarNovoPin() {
 
         const configPinEstado = document.getElementById("config-pin-estado");
         if (configPinEstado) {
-            configPinEstado.textContent = `🟢 PIN ATIVO E PROTEGIDO (${p1.length} DÍGITOS)`;
+            configPinEstado.textContent = `<span class="dot dot-green"></span> PIN ATIVO E PROTEGIDO (${p1.length} DÍGITOS)`;
             configPinEstado.style.color = "#16a34a";
         }
 
         try { await gravarAuditoria("Definiu/atualizou o seu código PIN de segurança pessoal.", "INFO"); } catch (_) {}
-        alert("✅ Código PIN configurado com sucesso!\nO seu aplicativo agora está 100% protegido. O novo PIN será solicitado ao suspender ou reabrir.");
+        alert("Código PIN configurado com sucesso!\nO seu aplicativo agora está 100% protegido. O novo PIN será solicitado ao suspender ou reabrir.");
     } catch (err) {
         console.error("Erro ao guardar PIN:", err);
         if (status) {
@@ -1745,7 +1745,7 @@ document.addEventListener("visibilitychange", () => {
             mostrarEcraPin(auth.currentUser || FABEF.user);
             const statusPin = document.getElementById("pin-status");
             if (statusPin) {
-                statusPin.textContent = "🔒 Aplicação suspensa. Introduza o PIN para desbloquear.";
+                statusPin.textContent = "<svg class="ic"><use href="#ic-lock"></use></svg> Aplicação suspensa. Introduza o PIN para desbloquear.";
                 statusPin.style.color = "#2563eb";
             }
         }
@@ -1841,9 +1841,9 @@ document.getElementById("btn-recibo-imagem")?.addEventListener("click", () => {
 window.enviarFechoCaixaWhatsApp = function () {
     const t = id => (document.getElementById(id)?.textContent || "").trim();
     const nome = FABEF.empresa?.nome || "";
-    const msg = `🧾 *FECHO DE CAIXA*\n🏪 ${nome}${FABEF.ramo ? " — " + FABEF.ramo : ""}\n📅 ${t("res-fecho-data")}\n👤 Fechado por: ${t("res-fecho-operador")}\n\n` +
-        `▫️ Abertura: ${t("res-fecho-abertura")}\n💵 Vendas em dinheiro: ${t("res-fecho-vendas-dinheiro")}\n📲 Outras vendas: ${t("res-fecho-vendas-outras")}\n` +
-        `➕ Reforços: ${t("res-fecho-reforcos")}\n➖ Sangrias: ${t("res-fecho-sangrias")}\n🧮 Esperado: ${t("res-fecho-esperado")}\n✋ Contado: ${t("res-fecho-contado")}\n\n` +
+    const msg = `<svg class="ic"><use href="#ic-receipt"></use></svg> *FECHO DE CAIXA*\n<svg class="ic"><use href="#ic-store"></use></svg> ${nome}${FABEF.ramo ? " — " + FABEF.ramo : ""}\n<svg class="ic"><use href="#ic-calendar"></use></svg> ${t("res-fecho-data")}\n<svg class="ic"><use href="#ic-user"></use></svg> Fechado por: ${t("res-fecho-operador")}\n\n` +
+        `▫ Abertura: ${t("res-fecho-abertura")}\n<svg class="ic"><use href="#ic-cash"></use></svg> Vendas em dinheiro: ${t("res-fecho-vendas-dinheiro")}\n<svg class="ic"><use href="#ic-phone"></use></svg> Outras vendas: ${t("res-fecho-vendas-outras")}\n` +
+        `<svg class="ic"><use href="#ic-plus"></use></svg> Reforços: ${t("res-fecho-reforcos")}\n<svg class="ic"><use href="#ic-minus"></use></svg> Sangrias: ${t("res-fecho-sangrias")}\n<svg class="ic"><use href="#ic-box"></use></svg> Esperado: ${t("res-fecho-esperado")}\nContado: ${t("res-fecho-contado")}\n\n` +
         `${t("res-fecho-rotulo")}: *${t("res-fecho-diferenca")}*\n_Emitido via FABEF Gestão ERP PRO_`;
     const tel = telefoneWhatsApp(FABEF.userData?.telefone || FABEF.empresa?.telefone);
     window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
@@ -1851,7 +1851,7 @@ window.enviarFechoCaixaWhatsApp = function () {
 
 // Lista de reposição (stock baixo do ramo ativo) pronta para enviar ao fornecedor
 window.enviarListaReposicaoWhatsApp = function () {
-    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente envia listas de compra."); return; }
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("Só o gerente envia listas de compra."); return; }
     const prods = (FABEF.produtos || []).filter(p => p.ramo === FABEF.ramo && p.ativo !== false && numero(p.stock) <= numero(p.stockMinimo || 5));
     if (!prods.length) { alert("Não há produtos com stock baixo neste ramo."); return; }
     const cont = {};
@@ -1868,7 +1868,7 @@ window.enviarListaReposicaoWhatsApp = function () {
         const un = p.unidade && p.unidade !== "unidade" ? " " + p.unidade : "";
         return `• ${p.nome}: preciso de ${Number.isInteger(falta) ? falta : falta.toFixed(1)}${un} (tenho ${numero(p.stock)})`;
     });
-    const msg = `Olá${forn ? " " + forn.nome : ""}! 👋\nPreciso de repor o stock ${FABEF.empresa?.nome ? "da " + FABEF.empresa.nome : "da loja"}${FABEF.ramo ? " (" + FABEF.ramo + ")" : ""}:\n\n${linhas.join("\n")}\n\nPode confirmar a disponibilidade e o preço? Obrigado!`;
+    const msg = `Olá${forn ? " " + forn.nome : ""}! \nPreciso de repor o stock ${FABEF.empresa?.nome ? "da " + FABEF.empresa.nome : "da loja"}${FABEF.ramo ? " (" + FABEF.ramo + ")" : ""}:\n\n${linhas.join("\n")}\n\nPode confirmar a disponibilidade e o preço? Obrigado!`;
     window.open(`https://wa.me/${telefoneWhatsApp(forn && forn.telefone)}?text=${encodeURIComponent(msg)}`, "_blank");
 };
 
@@ -1881,7 +1881,7 @@ function celulaSegura(v) {
     return /^[=+\-@\t\r]/.test(t) && !/^-?\d+([.,]\d+)?$/.test(t) ? "'" + t : t;
 }
 window.exportarTudoCSV = async function () {
-    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente exporta os dados."); return; }
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("Só o gerente exporta os dados."); return; }
     const dia = dataHojeStr();
     const rm = String(FABEF.ramo || "ramo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
     const vendas = (FABEF._raw && FABEF._raw.vendas) || FABEF.vendas || [];
@@ -1905,7 +1905,7 @@ window.exportarTudoCSV = async function () {
         baixarCSV(`fabef-${rm}-${nome}-${dia}.csv`, cab, linhas.map(l => l.map(celulaSegura)));
         await new Promise(r => setTimeout(r, 600));
     }
-    alert(`✅ ${tabelas.length} ficheiro(s) CSV guardados (abrem no Excel).\nSe só vir alguns, o navegador pediu para permitir várias transferências: aceite e repita.`);
+    alert(`${tabelas.length} ficheiro(s) CSV guardados (abrem no Excel).\nSe só vir alguns, o navegador pediu para permitir várias transferências: aceite e repita.`);
 };
 
 // Indicações: código de convite e prémio de +30 dias
@@ -1934,7 +1934,7 @@ function linkApresentacao() {
 window.partilharIndicacao = function () {
     const c = document.getElementById("indicar-codigo")?.textContent || "";
     if (!c || c === "—") { alert("O código ainda não está disponível. Tente de novo daqui a pouco."); return; }
-    const msg = `Olá! 👋 Uso o *FABEF Gestão ERP PRO* para gerir o meu negócio (vendas, caixa, stock, fiado e relatórios) no telemóvel.\n\nTeste 7 dias grátis e use o meu código *${c}* ao registar-se:\n${linkApresentacao()}`;
+    const msg = `Olá! Uso o *FABEF Gestão ERP PRO* para gerir o meu negócio (vendas, caixa, stock, fiado e relatórios) no telemóvel.\n\nTeste 7 dias grátis e use o meu código *${c}* ao registar-se:\n${linkApresentacao()}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
 };
 window.copiarCodigoIndicacao = async function () {
@@ -1968,10 +1968,10 @@ async function premiarIndicacaoSeAplicavel(emp) {
         await updateDoc(doc(db, "empresas", emp.id), { indicacaoPremiada: true, indicacaoPremiadaPara: ref.id, atualizadoEm: serverTimestamp() });
         emp.indicacaoPremiada = true;
         renderPainelAdmin();
-        return `🎁 Indicação premiada: "${ref.nome || ref.id}" ganhou +30 dias (até ${nova.toLocaleDateString("pt-MZ")}).`;
+        return `<svg class="ic"><use href="#ic-gift"></use></svg> Indicação premiada: "${ref.nome || ref.id}" ganhou +30 dias (até ${nova.toLocaleDateString("pt-MZ")}).`;
     } catch (e) {
         console.warn("Não foi possível premiar a indicação:", e);
-        return "⚠️ Não foi possível premiar a indicação automaticamente (veja a consola).";
+        return "<svg class="ic"><use href="#ic-warning"></use></svg> Não foi possível premiar a indicação automaticamente (veja a consola).";
     }
 }
 
@@ -1987,7 +1987,7 @@ async function verificarInatividade() {
     if (!auth.currentUser || window.FABEF?.isDemoMode) return;
     if (Date.now() - FABEF_ultimaAtividade < MINUTOS_INATIVIDADE_SAIR * 60000) return;
     FABEF_ultimaAtividade = Date.now();
-    FABEF_msgLogin = "⏱️ Sessão terminada por inatividade. Entre novamente.";
+    FABEF_msgLogin = "⏱ Sessão terminada por inatividade. Entre novamente.";
     try { await signOut(auth); } catch (e) { console.warn("Erro ao sair por inatividade:", e); }
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) verificarInatividade(); });
@@ -2034,7 +2034,7 @@ onAuthStateChanged(auth, async user => {
         try { suja = suja || localStorage.getItem("fabef_cache_suja") === "1"; } catch (_) {}
         if (suja) {
             FABEF_teveSessao = false;
-            if (status && !msgPendente) { status.textContent = "🧹 A limpar os dados deste aparelho..."; }
+            if (status && !msgPendente) { status.textContent = "<svg class="ic"><use href="#ic-trash"></use></svg> A limpar os dados deste aparelho..."; }
             FABEF_msgLogin = msgPendente;
             await apagarDadosLocaisEReiniciar();
         }
@@ -2044,7 +2044,7 @@ onAuthStateChanged(auth, async user => {
     // Sessão antiga guardada no aparelho (versão anterior): terminar e pedir senha.
     if (FABEF_primeiroArranqueSeguro && !FABEF_loginFresco) {
         FABEF_primeiroArranqueSeguro = false;
-        FABEF_msgLogin = "🔒 Por segurança, entre novamente com o e-mail e a senha.";
+        FABEF_msgLogin = "<svg class="ic"><use href="#ic-lock"></use></svg> Por segurança, entre novamente com o e-mail e a senha.";
         await signOut(auth);
         return;
     }
@@ -2234,15 +2234,15 @@ function formatarDataExtensa(diaStr) {
     const ontem = dataOntemStr();
     const partes = diaStr.split("-");
     const dataFormatada = partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : diaStr;
-    if (diaStr === hoje) return `🟢 HOJE (${dataFormatada})`;
-    if (diaStr === ontem) return `🗓️ ONTEM (${dataFormatada})`;
+    if (diaStr === hoje) return `<span class="dot dot-green"></span> HOJE (${dataFormatada})`;
+    if (diaStr === ontem) return `<svg class="ic"><use href="#ic-calendar"></use></svg> ONTEM (${dataFormatada})`;
     try {
         const d = new Date(diaStr + "T12:00:00");
         const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
         const diaSemana = diasSemana[d.getDay()];
-        return `📅 ${diaSemana}, ${dataFormatada}`;
+        return `<svg class="ic"><use href="#ic-calendar"></use></svg> ${diaSemana}, ${dataFormatada}`;
     } catch(e) {
-        return `📅 ${dataFormatada}`;
+        return `<svg class="ic"><use href="#ic-calendar"></use></svg> ${dataFormatada}`;
     }
 }
 window.formatarDataExtensa = formatarDataExtensa;
@@ -2520,7 +2520,7 @@ function verificarAcessoPosGerente() {
     if (avisoPos) {
         avisoPos.style.display = podeVender ? "none" : "block";
         avisoPos.className = "alert alert-warn";
-        avisoPos.innerHTML = "🔒 <strong>Só o funcionário vende.</strong> O gerente gere e supervisiona: consulta vendas, caixa e relatórios, mas não vende nem altera vendas.";
+        avisoPos.innerHTML = "<svg class="ic"><use href="#ic-lock"></use></svg> <strong>Só o funcionário vende.</strong> O gerente gere e supervisiona: consulta vendas, caixa e relatórios, mas não vende nem altera vendas.";
     }
     if (btnFinalizar) {
         btnFinalizar.disabled = !podeVender;
@@ -2757,21 +2757,21 @@ document.getElementById("btn-guardar-nova-senha")?.addEventListener("click", asy
     const confirmar = document.getElementById("senha-nova-confirmar").value;
     const status = document.getElementById("senha-status");
 
-    if (!atual || !nova || !confirmar) { status.textContent = "🔴 Preencha todos os campos."; return; }
-    if (nova.length < 6) { status.textContent = "🔴 A nova senha deve ter pelo menos 6 caracteres."; return; }
-    if (nova !== confirmar) { status.textContent = "🔴 A confirmação não coincide com a nova senha."; return; }
+    if (!atual || !nova || !confirmar) { status.textContent = "<span class="dot dot-red"></span> Preencha todos os campos."; return; }
+    if (nova.length < 6) { status.textContent = "<span class="dot dot-red"></span> A nova senha deve ter pelo menos 6 caracteres."; return; }
+    if (nova !== confirmar) { status.textContent = "<span class="dot dot-red"></span> A confirmação não coincide com a nova senha."; return; }
 
     try {
         status.textContent = "â³ A validar...";
         const credencial = EmailAuthProvider.credential(auth.currentUser.email, atual);
         await reauthenticateWithCredential(auth.currentUser, credencial);
         await updatePassword(auth.currentUser, nova);
-        status.textContent = "🟢 Senha alterada com sucesso!";
+        status.textContent = "<span class="dot dot-green"></span> Senha alterada com sucesso!";
         await gravarAuditoria("Alterou a própria senha de acesso.", "INFO");
         setTimeout(() => fecharModal("modal-alterar-senha"), 1500);
     } catch (error) {
         console.error(error);
-        status.textContent = "🔴 " + mensagemFirebase(error);
+        status.textContent = "<span class="dot dot-red"></span> " + mensagemFirebase(error);
     }
 });
 
@@ -2895,7 +2895,7 @@ function renderVisaoGeralRamos() {
                         <p style="font-size:13px;margin:6px 0;">Este mês: <strong>${dinheiro(vendasMesRamo)}</strong></p>
                         ${!ativo ? (ramoDisponivel(ramo)
                             ? `<button class="btn btn-light btn-small" type="button" onclick="mudarRamo(${jsArg(ramo)})">Ver este ramo</button>`
-                            : `<button class="btn btn-small" type="button" onclick="mudarRamo(${jsArg(ramo)})" style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">🔒 Por pagar</button>`) : ""}
+                            : `<button class="btn btn-small" type="button" onclick="mudarRamo(${jsArg(ramo)})" style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b;"><svg class="ic"><use href="#ic-lock"></use></svg> Por pagar</button>`) : ""}
                     </div>`;
                 }).join("")}
             </div>
@@ -2949,7 +2949,7 @@ function renderRamos() {
     if (sugestoesDoRamo.length === 0) {
         const totalSugestoes = (SUGESTOES[FABEF.ramo] || []).length;
         containerSugestoes.innerHTML = totalSugestoes > 0
-            ? `<p style="color:#10b981;font-size:13px;">✔️ Já adicionou todas as sugestões prontas para este ramo.</p>`
+            ? `<p style="color:#10b981;font-size:13px;"><svg class="ic"><use href="#ic-check"></use></svg> Já adicionou todas as sugestões prontas para este ramo.</p>`
             : `<p style="color:#64748b;font-size:13px;">Ainda não há sugestões rápidas para este ramo. Pode criar os seus produtos manualmente na página "Produtos".</p>`;
     } else {
         containerSugestoes.innerHTML = `
@@ -3035,7 +3035,7 @@ async function adicionarRamoPersonalizado() {
         await gravarAuditoria("Adicionou o ramo / filial: " + nome + (pin ? " (com PIN)" : ""), "INFO");
         alert(novoJaDisponivel
             ? `Ramo / filial "${nome}" adicionado e ativado com sucesso!`
-            : `Ramo / filial "${nome}" adicionado.\n\n🔒 Fica bloqueado até pagar a subscrição deste ramo (250 MT / 30 dias) na aba Subscrição.`);
+            : `Ramo / filial "${nome}" adicionado.\n\n<svg class="ic"><use href="#ic-lock"></use></svg> Fica bloqueado até pagar a subscrição deste ramo (250 MT / 30 dias) na aba Subscrição.`);
     } catch (error) {
         console.error(error);
         alert("Não foi possível adicionar o ramo.\n" + mensagemFirebase(error));
@@ -3088,7 +3088,7 @@ async function mudarRamo(ramo) {
 
     // Cada ramo tem a sua subscrição: ramo por pagar não abre
     if (!ramoDisponivel(ramo)) {
-        alert(`🔒 O ramo "${ramo}" ainda não tem a subscrição paga.\n\nPague os 250 MT deste ramo na aba Subscrição e aguarde a ativação pelo administrador.`);
+        alert(`O ramo "${ramo}" ainda não tem a subscrição paga.\n\nPague os 250 MT deste ramo na aba Subscrição e aguarde a ativação pelo administrador.`);
         renderRamos();
         const selSub = document.getElementById("subscricao-ramo");
         mostrarSecao("subscricao");
@@ -3100,13 +3100,13 @@ async function mudarRamo(ramo) {
     const configRamos = obterConfigRamos();
     const ramoAlvo = configRamos.find(r => r.nome === ramo);
     if (ramoAlvo && ramoAlvo.senha && ramoAlvo.senha.trim()) {
-        const pinDigitado = prompt(`🔒 Segurança de Ramo / Filial:\n\nO ramo "${ramo}" está protegido por PIN.\nPor favor, introduza o PIN ou Senha de acesso configurada pelo Gerente:`);
+        const pinDigitado = prompt(`<svg class="ic"><use href="#ic-lock"></use></svg> Segurança de Ramo / Filial:\n\nO ramo "${ramo}" está protegido por PIN.\nPor favor, introduza o PIN ou Senha de acesso configurada pelo Gerente:`);
         if (pinDigitado === null) {
             renderRamos();
             return;
         }
         if (pinDigitado.trim() !== ramoAlvo.senha.trim()) {
-            alert("❌ Senha / PIN incorreto! Acesso não autorizado ao ramo " + ramo);
+            alert("Senha / PIN incorreto! Acesso não autorizado ao ramo " + ramo);
             renderRamos();
             return;
         }
@@ -3219,7 +3219,7 @@ async function criarProdutoSugestao(nome, silencioso) {
 
 document.getElementById("btn-novo-produto").addEventListener("click", () => {
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("🔒 Acesso Reservado:\n\nFuncionários não podem adicionar produtos ao catálogo. Apenas o Gerente pode cadastrar novos produtos.");
+        alert("Acesso Reservado:\n\nFuncionários não podem adicionar produtos ao catálogo. Apenas o Gerente pode cadastrar novos produtos.");
         return;
     }
     limparProdutoForm();
@@ -3237,7 +3237,7 @@ document.getElementById("btn-salvar-produto").addEventListener("click", salvarPr
 async function salvarProduto() {
     // 1. Apenas o Gerente pode cadastrar produtos
     if ((FABEF.userData?.perfil || FABEF.userData?.role) !== "gerente") {
-        alert("🔒 Acesso Reservado:\n\nFuncionários não podem adicionar produtos ao catálogo. Apenas o Gerente tem autorização para cadastrar novos produtos.");
+        alert("Acesso Reservado:\n\nFuncionários não podem adicionar produtos ao catálogo. Apenas o Gerente tem autorização para cadastrar novos produtos.");
         return;
     }
 
@@ -3272,7 +3272,7 @@ async function salvarProduto() {
     });
 
     if (jaExiste) {
-        alert(`❌ Não é permitido registar produtos repetidos!\n\nJá existe um produto com este nome ("${nome}") ou código no ramo "${FABEF.ramo}".\nSe pretender adicionar mais unidades, utilize "Ajustar Stock" ou lance uma nova Compra.`);
+        alert(`Não é permitido registar produtos repetidos!\n\nJá existe um produto com este nome ("${nome}") ou código no ramo "${FABEF.ramo}".\nSe pretender adicionar mais unidades, utilize "Ajustar Stock" ou lance uma nova Compra.`);
         return;
     }
 
@@ -3387,7 +3387,7 @@ document.getElementById("produto-pesquisa").addEventListener("input", renderProd
 
 
 window.abrirModalEditarProduto = function(id) {
-    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente altera produtos. O funcionário apenas consulta."); return; }
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("Só o gerente altera produtos. O funcionário apenas consulta."); return; }
     const gerente = ehUsuarioGerente();
     if (!gerente && !window.FABEF?.isDemoMode) {
         alert("Operação negada: Apenas o Gerente tem autorização para editar produtos.");
@@ -3669,7 +3669,7 @@ async function criarProdutosEmLote(lista, aoProgredir) {
 
 let FABEF_importacaoPendente = [];
 window.abrirImportarProdutos = function () {
-    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente importa produtos."); return; }
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("Só o gerente importa produtos."); return; }
     FABEF_importacaoPendente = [];
     const arq = document.getElementById("importar-produtos-arquivo"); if (arq) arq.value = "";
     const r = document.getElementById("importar-produtos-resumo"); if (r) r.textContent = "";
@@ -3699,18 +3699,18 @@ document.getElementById("importar-produtos-arquivo")?.addEventListener("change",
         FABEF_importacaoPendente = produtos.slice(0, 500);
         if (resumo) {
             resumo.innerHTML = produtos.length
-                ? `✅ <strong>${FABEF_importacaoPendente.length}</strong> produto(s) prontos a importar${produtos.length > 500 ? " (limite de 500 por vez)" : ""}${ignoradas ? ` · ${ignoradas} linha(s) ignoradas (sem nome ou sem preço)` : ""}.<br><span style="color:#64748b;">Ex.: ${FABEF_importacaoPendente.slice(0, 4).map(p => escapeHTML(p.nome)).join(", ")}…</span>`
-                : "⚠️ Não encontrei produtos válidos. Confirme que há as colunas <em>nome</em> e <em>preço</em>.";
+                ? `<svg class="ic"><use href="#ic-check"></use></svg> <strong>${FABEF_importacaoPendente.length}</strong> produto(s) prontos a importar${produtos.length > 500 ? " (limite de 500 por vez)" : ""}${ignoradas ? ` · ${ignoradas} linha(s) ignoradas (sem nome ou sem preço)` : ""}.<br><span style="color:#64748b;">Ex.: ${FABEF_importacaoPendente.slice(0, 4).map(p => escapeHTML(p.nome)).join(", ")}…</span>`
+                : "<svg class="ic"><use href="#ic-warning"></use></svg> Não encontrei produtos válidos. Confirme que há as colunas <em>nome</em> e <em>preço</em>.";
         }
         if (btn) btn.disabled = !FABEF_importacaoPendente.length;
     } catch (err) {
-        if (resumo) resumo.textContent = "⚠️ Não foi possível ler o ficheiro.";
+        if (resumo) resumo.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> Não foi possível ler o ficheiro.";
     }
 });
 
 window.confirmarImportacaoProdutos = async function () {
     if (!FABEF_importacaoPendente.length) return;
-    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente importa produtos."); return; }
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("Só o gerente importa produtos."); return; }
     const btn = document.getElementById("btn-confirmar-importacao");
     const resumo = document.getElementById("importar-produtos-resumo");
     if (btn) btn.disabled = true;
@@ -3721,7 +3721,7 @@ window.confirmarImportacaoProdutos = async function () {
         marcarArranqueConcluido();
         renderTudo();
         try { await gravarAuditoria(`Importou ${r.criados} produto(s) por ficheiro.`, "INFO"); } catch (_) {}
-        alert(`✅ ${r.criados} produto(s) importados.${r.repetidos ? `\n${r.repetidos} já existiam neste ramo e foram ignorados.` : ""}`);
+        alert(`${r.criados} produto(s) importados.${r.repetidos ? `\n${r.repetidos} já existiam neste ramo e foram ignorados.` : ""}`);
     } catch (e) {
         console.error(e);
         if (btn) btn.disabled = false;
@@ -3785,7 +3785,7 @@ window.concluirArranque = async function () {
         fecharModal("modal-arranque");
         renderTudo();
         try { await gravarAuditoria(`Assistente de arranque: adicionou ${r.criados} produto(s).`, "INFO"); } catch (_) {}
-        alert(`✅ ${r.criados} produto(s) adicionados. Já pode vender!`);
+        alert(`${r.criados} produto(s) adicionados. Já pode vender!`);
     } catch (e) {
         console.error(e);
         alert("Erro ao adicionar:\n" + mensagemFirebase(e));
@@ -3834,7 +3834,7 @@ function renderProdutos() {
                 ${ehGerente ? `
                     <div style="font-weight:700;color:#0f172a;">${custoUnit > 0 ? dinheiro(custoUnit) : '<span style="color:#94a3b8;font-size:12px;">MT 0,00</span>'}</div>
                     ${custoUnit > 0 ? `<small style="color:${margem >= 0 ? '#16a34a' : '#dc2626'};font-size:11px;font-weight:600;">Lucro: ${dinheiro(margem)}</small>` : ''}
-                ` : `<span style="color:#94a3b8;font-size:12px;">🔒 Só Gerente</span>`}
+                ` : `<span style="color:#94a3b8;font-size:12px;"><svg class="ic"><use href="#ic-lock"></use></svg> Só Gerente</span>`}
             </td>
             <td><strong>${dinheiro(precoUnit)}</strong></td>
             <td 
@@ -3856,9 +3856,9 @@ function renderProdutos() {
             </td>
             <td>
                 ${ehGerente ? `
-                    <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarProduto(${jsArg(p.id)})">✏️ Editar</button>
+                    <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarProduto(${jsArg(p.id)})"><svg class="ic"><use href="#ic-edit"></use></svg> Editar</button>
                 ` : `
-                    <span style="color:#94a3b8;font-size:12px;font-weight:600;">🔒 Só Gerente</span>
+                    <span style="color:#94a3b8;font-size:12px;font-weight:600;"><svg class="ic"><use href="#ic-lock"></use></svg> Só Gerente</span>
                 `}
             </td>
         </tr>
@@ -3941,7 +3941,7 @@ function renderInventario() {
                         '<span class="badge badge-green">NORMAL</span>')
                 }
             </td>
-            <td>${(ehUsuarioGerente() || window.FABEF?.isDemoMode) ? `<button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock(${jsArg(p.id)})">⚙️  Ajustar</button>` : `<span style="color:#94a3b8;font-size:12px;font-weight:600;">🔒 Só Gerente</span>`}</td>
+            <td>${(ehUsuarioGerente() || window.FABEF?.isDemoMode) ? `<button class="btn btn-light btn-small" type="button" onclick="abrirModalAjusteStock(${jsArg(p.id)})"><svg class="ic"><use href="#ic-gear"></use></svg>  Ajustar</button>` : `<span style="color:#94a3b8;font-size:12px;font-weight:600;"><svg class="ic"><use href="#ic-lock"></use></svg> Só Gerente</span>`}</td>
         </tr>
         `;
     }).join("") || `
@@ -4033,7 +4033,7 @@ async function confirmarAjusteStock() {
         renderTudo();
 
         await gravarAuditoria(
-            `Ajuste de stock (${tipoTexto}) em "${produto.nome}": ${stockAnterior} → ${stockNovo} (motivo: ${motivo})`,
+            `Ajuste de stock (${tipoTexto}) em "${produto.nome}": ${stockAnterior} <svg class="ic"><use href="#ic-arrow"></use></svg> ${stockNovo} (motivo: ${motivo})`,
             tipo === "perda" ? "AVISO" : "INFO"
         );
         alert("Ajuste de stock registado com sucesso.");
@@ -4056,7 +4056,7 @@ window.abrirRastreabilidadeDeLotes = function (idProduto, nomeProduto) {
 
     if (!modal || !corpo || !resumo) return;
 
-    document.getElementById("md-titulo-produto").textContent = "📋 Histórico de Lotes: " + nomeProduto;
+    document.getElementById("md-titulo-produto").textContent = "<svg class="ic"><use href="#ic-clipboard"></use></svg> Histórico de Lotes: " + nomeProduto;
     modal.classList.add("show");
 
     // Usa diretamente os dados já sincronizados em FABEF.compras (memória local),
@@ -4127,8 +4127,8 @@ async function diagnosticarSemProdutos(idAviso, qtd) {
         const cont = {};
         snap.docs.forEach(d => { const r = d.data().ramo || "(sem ramo)"; cont[r] = (cont[r] || 0) + 1; });
         const outros = Object.entries(cont).filter(([r]) => r !== FABEF.ramo);
-        let html = `⚠️ Não há produtos no ramo <strong>${escapeHTML(FABEF.ramo || "—")}</strong>.`;
-        if (obterPlanoAtual(FABEF.ramo) === "BLOQUEADO") html += " 🔒 Este ramo está por pagar (outro ramo já está pago).";
+        let html = `<svg class="ic"><use href="#ic-warning"></use></svg> Não há produtos no ramo <strong>${escapeHTML(FABEF.ramo || "—")}</strong>.`;
+        if (obterPlanoAtual(FABEF.ramo) === "BLOQUEADO") html += " <svg class="ic"><use href="#ic-lock"></use></svg> Este ramo está por pagar (outro ramo já está pago).";
         if (outros.length) {
             html += "<br>Existem produtos noutros ramos: " + outros.map(([r, n]) =>
                 `<button type="button" class="btn btn-light btn-small" style="width:auto;padding:4px 10px;margin:2px;" onclick="mudarRamo(${jsArg(r)})">${escapeHTML(r)} (${n})</button>`).join(" ");
@@ -4138,8 +4138,8 @@ async function diagnosticarSemProdutos(idAviso, qtd) {
         el.innerHTML = html;
     } catch (e) {
         el.innerHTML = e.code === "permission-denied"
-            ? "🔴 Sem permissão para ler os produtos desta empresa. Verifique as regras do Firestore e se entrou com a conta certa."
-            : "⚠️ Não foi possível verificar os produtos: " + mensagemFirebase(e);
+            ? "<span class="dot dot-red"></span> Sem permissão para ler os produtos desta empresa. Verifique as regras do Firestore e se entrou com a conta certa."
+            : "<svg class="ic"><use href="#ic-warning"></use></svg> Não foi possível verificar os produtos: " + mensagemFirebase(e);
     }
 }
 
@@ -4179,7 +4179,7 @@ function renderListaProdutosCompra() {
         const ativo = p.id === selecionado;
         return `<button type="button" onclick="window.escolherProdutoCompra(${jsArg(p.id)})"
             style="display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 12px;border:none;border-bottom:1px solid #f1f5f9;background:${ativo ? "#dcfce7" : "#fff"};cursor:pointer;font-size:14px;">
-            <span style="font-weight:${ativo ? 800 : 600};color:#0f172a;">${ativo ? "✔ " : ""}${escapeHTML(p.nome || "—")}</span>
+            <span style="font-weight:${ativo ? 800 : 600};color:#0f172a;">${ativo ? "<svg class="ic"><use href="#ic-check"></use></svg> " : ""}${escapeHTML(p.nome || "—")}</span>
             <span style="font-size:13px;font-weight:700;color:${numero(p.stock) <= 0 ? "#b91c1c" : "#15803d"};white-space:nowrap;">Stock: ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</span>
         </button>`;
     }).join("");
@@ -4196,7 +4196,7 @@ function renderListaProdutosCompra() {
     if (resumo) {
         const p = todos.find(x => x.id === selecionado);
         resumo.innerHTML = p
-            ? `✔ Selecionado: <strong>${escapeHTML(p.nome || "—")}</strong> · stock atual ${numero(p.stock)}`
+            ? `<svg class="ic"><use href="#ic-check"></use></svg> Selecionado: <strong>${escapeHTML(p.nome || "—")}</strong> · stock atual ${numero(p.stock)}`
             : "Nenhum produto selecionado. Pesquise e toque no produto.";
     }
 }
@@ -4267,7 +4267,7 @@ function renderTodosProdutosCompra() {
             <td>${stockMin}${un}</td>
             <td>${custo ? dinheiro(custo) : "—"}</td>
             <td>${fornecedor ? escapeHTML(fornecedor) : "—"}</td>
-            <td><button class="btn btn-primary btn-small" type="button" style="width:auto;white-space:nowrap;" onclick="prepararCompraArtigo(${jsArg(p.id)}, ${jsArg(fornecedor)}, ${numero(custo)}, ${qtdSug})">🛒 Comprar / Repor</button></td>
+            <td><button class="btn btn-primary btn-small" type="button" style="width:auto;white-space:nowrap;" onclick="prepararCompraArtigo(${jsArg(p.id)}, ${jsArg(fornecedor)}, ${numero(custo)}, ${qtdSug})"><svg class="ic"><use href="#ic-cart"></use></svg> Comprar / Repor</button></td>
         </tr>`;
     }).join("") + (achados.length > LIMITE
         ? `<tr><td colspan="6" style="padding:10px;font-size:12px;color:#64748b;text-align:center;">A mostrar ${LIMITE} de ${achados.length}. Use a pesquisa para ver os outros.</td></tr>`
@@ -4359,7 +4359,7 @@ window.renderSugestoesComprasRamo = function() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" style="text-align:center;padding:14px;color:#10b981;font-weight:600;">
-                    ✅ Todos os artigos do ramo <strong>"${escapeHTML(FABEF.ramo || 'Geral')}"</strong> estão com níveis regulares de stock. Não há compras urgentes recomendadas.
+                    <svg class="ic"><use href="#ic-check"></use></svg> Todos os artigos do ramo <strong>"${escapeHTML(FABEF.ramo || 'Geral')}"</strong> estão com níveis regulares de stock. Não há compras urgentes recomendadas.
                 </td>
             </tr>
         `;
@@ -4389,7 +4389,7 @@ window.renderSugestoesComprasRamo = function() {
                 <td>${dinheiro(custoSugerido)}</td>
                 <td>
                     <button class="btn btn-primary btn-small" type="button" onclick="prepararCompraArtigo(${jsArg(p.id)}, ${jsArg(fornecedorSugerido)}, ${custoSugerido}, ${qtdSugerida})" style="background:#2563eb;color:#fff;font-weight:700;padding:5px 10px;font-size:12px;border:none;border-radius:6px;cursor:pointer;">
-                        🛒 Preparar Compra (${qtdSugerida} un)
+                        <svg class="ic"><use href="#ic-cart"></use></svg> Preparar Compra (${qtdSugerida} un)
                     </button>
                 </td>
             </tr>
@@ -4424,7 +4424,7 @@ document.getElementById("btn-registar-compra").addEventListener("click", regista
 ===================================================== */
 
 async function registarCompra() {
-    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("🔒 Só o gerente regista compras."); return; }
+    if (!ehUsuarioGerente() && !window.FABEF?.isDemoMode) { alert("Só o gerente regista compras."); return; }
     const produtoId = document.getElementById("compra-produto").value;
     const fornecedor = document.getElementById("compra-fornecedor").value.trim();
     const quantidade = numero(document.getElementById("compra-quantidade").value);
@@ -4552,8 +4552,8 @@ function renderCompras() {
         <td>${dinheiro(c.custoUnitario)}</td>
         <td>${dinheiro(numero(c.quantidade) * numero(c.custoUnitario))}</td>
         ${podeGerir ? `<td style="white-space:nowrap;">
-            <button type="button" class="btn btn-small" onclick="window.abrirModalEditarCompra(${jsArg(c.id)})" style="width:auto;padding:5px 10px;font-size:12px;">✏️ Editar</button>
-            <button type="button" class="btn btn-small btn-danger" onclick="window.apagarCompra(${jsArg(c.id)})" style="width:auto;padding:5px 10px;font-size:12px;">🗑️ Apagar</button>
+            <button type="button" class="btn btn-small" onclick="window.abrirModalEditarCompra(${jsArg(c.id)})" style="width:auto;padding:5px 10px;font-size:12px;"><svg class="ic"><use href="#ic-edit"></use></svg> Editar</button>
+            <button type="button" class="btn btn-small btn-danger" onclick="window.apagarCompra(${jsArg(c.id)})" style="width:auto;padding:5px 10px;font-size:12px;"><svg class="ic"><use href="#ic-trash"></use></svg> Apagar</button>
         </td>` : ""}
     </tr>
     `).join("") || `
@@ -4698,7 +4698,7 @@ window.salvarEdicaoCompra = async function () {
         fecharModal("modal-editar-compra");
         renderTudo();
         try {
-            await gravarAuditoria(`Editou a compra de "${c.produtoNome}": ${qtdAntiga} → ${quantidade} un., custo ${custoAntigo} → ${custo}.`, "INFO");
+            await gravarAuditoria(`Editou a compra de "${c.produtoNome}": ${qtdAntiga} <svg class="ic"><use href="#ic-arrow"></use></svg> ${quantidade} un., custo ${custoAntigo} <svg class="ic"><use href="#ic-arrow"></use></svg> ${custo}.`, "INFO");
         } catch (_) {}
         alert("Compra atualizada com sucesso. Stock e dívida do fornecedor foram ajustados.");
     } catch (error) {
@@ -4723,7 +4723,7 @@ window.apagarCompra = async function (id) {
     let msg = `Apagar a compra de ${qtd} un. de "${c.produtoNome}"?\n\nO stock do produto vai diminuir ${qtd} unidade(s)`;
     msg += c.pagamento === "Credito" ? ` e a dívida ao fornecedor "${c.fornecedorNome}" diminui ${dinheiro(total)}.` : ".";
     if (produto && numero(produto.stock) - qtd < 0) {
-        msg += `\n\n⚠️ O stock ficará negativo (${numero(produto.stock) - qtd}), porque parte desta mercadoria já foi vendida.`;
+        msg += `\n\n<svg class="ic"><use href="#ic-warning"></use></svg> O stock ficará negativo (${numero(produto.stock) - qtd}), porque parte desta mercadoria já foi vendida.`;
     }
     if (!confirm(msg)) return;
 
@@ -4801,7 +4801,7 @@ function renderPOS() {
     const avisoOffline = document.getElementById("aviso-pos-offline");
     if (avisoOffline) {
         avisoOffline.innerHTML = navigator.onLine ? "" :
-            `<div class="alert alert-warn">🔴 Está offline. O stock apresentado é o último conhecido neste aparelho —
+            `<div class="alert alert-warn"><span class="dot dot-red"></span> Está offline. O stock apresentado é o último conhecido neste aparelho —
             se outro funcionário também estiver offline a vender o mesmo produto, pode haver stock negativo até
             os dois voltarem a ter internet e sincronizarem. Assim que sincronizar, verifique o aviso de
             reconciliação no Início, se aparecer.</div>`;
@@ -4829,7 +4829,7 @@ function renderPOS() {
     if (containerDestaques) {
         const manuais = pesquisa ? [] : FABEF.produtos.filter(p => p.ativo !== false && p.ramo === FABEF.ramo && p.destaque);
         const destaques = manuais.length ? manuais : (pesquisa ? [] : produtosMaisVendidos(8));
-        const tituloDestaques = manuais.length ? "⭐ SUGESTÕES RÁPIDAS" : "🔥 MAIS VENDIDOS";
+        const tituloDestaques = manuais.length ? "<svg class="ic"><use href="#ic-star"></use></svg> SUGESTÕES RÁPIDAS" : "<svg class="ic"><use href="#ic-bolt"></use></svg> MAIS VENDIDOS";
         containerDestaques.innerHTML = destaques.length ? `
             <p style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;">${tituloDestaques}</p>
             <div id="pos-sugestoes-rapidas-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));gap:8px;margin-bottom:14px;">
@@ -4852,8 +4852,8 @@ function renderPOS() {
 
         const botoesOpcaoVenda = ehPesavel ? `
             <div style="display:flex;gap:4px;width:100%;margin-top:6px;z-index:2;" onclick="event.stopPropagation();">
-                <button type="button" class="btn btn-small btn-primary" onclick="abrirModalVendaFracionadaById(${jsArg(p.id)}, 'peso')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o peso exato na balança em KG ou Gramas">⚖️ Pesar KG</button>
-                <button type="button" class="btn btn-small btn-light" onclick="abrirModalVendaFracionadaById(${jsArg(p.id)}, 'valor')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;color:#1e3a8a;border:1px solid #93c5fd;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o valor em Meticais (calcula os KG automaticamente)">💵 Digitar MT</button>
+                <button type="button" class="btn btn-small btn-primary" onclick="abrirModalVendaFracionadaById(${jsArg(p.id)}, 'peso')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o peso exato na balança em KG ou Gramas">Pesar KG</button>
+                <button type="button" class="btn btn-small btn-light" onclick="abrirModalVendaFracionadaById(${jsArg(p.id)}, 'valor')" style="flex:1;padding:5px 4px;font-size:11px;font-weight:700;color:#1e3a8a;border:1px solid #93c5fd;display:inline-flex;align-items:center;justify-content:center;gap:3px;" title="Vender indicando o valor em Meticais (calcula os KG automaticamente)"><svg class="ic"><use href="#ic-cash"></use></svg> Digitar MT</button>
             </div>
         ` : "";
 
@@ -4939,7 +4939,7 @@ async function adicionarCarrinho(id) {
 
     // Barreira imediata de interface: caixa deve estar aberto para vender
     if (!FABEF.turnoId) {
-        const abrir = confirm("⚠️ O Caixa / Turno de hoje ainda não foi aberto.\n\nPara registar vendas operacionais, o caixa precisa de estar aberto.\nDeseja ir à secção Caixa / Turnos para abrir agora?");
+        const abrir = confirm("O Caixa / Turno de hoje ainda não foi aberto.\n\nPara registar vendas operacionais, o caixa precisa de estar aberto.\nDeseja ir à secção Caixa / Turnos para abrir agora?");
         if (abrir) {
             mostrarSecao("caixa");
         }
@@ -5004,12 +5004,12 @@ function abrirModalVendaFracionada(produto, modoInicial) {
 
     // Deteta ícone temático de acordo com a mercadoria
     const nomeBaixo = String(produto.nome || "").toLowerCase();
-    let icone = "🥩";
-    if (nomeBaixo.includes("peixe") || nomeBaixo.includes("camar") || nomeBaixo.includes("chicoa") || nomeBaixo.includes("carapau")) icone = "🐟";
-    else if (nomeBaixo.includes("frango") || nomeBaixo.includes("galinha") || nomeBaixo.includes("moela") || nomeBaixo.includes("asa")) icone = "🍗";
-    else if (nomeBaixo.includes("fruta") || nomeBaixo.includes("banana") || nomeBaixo.includes("maçã") || nomeBaixo.includes("laranja")) icone = "🍎";
-    else if (nomeBaixo.includes("tomate") || nomeBaixo.includes("batata") || nomeBaixo.includes("cebola") || nomeBaixo.includes("legume")) icone = "🥔";
-    else if (nomeBaixo.includes("leite") || nomeBaixo.includes("óleo") || nomeBaixo.includes("oleo") || produto.unidade === "litro") icone = "🥛";
+    let icone = "<svg class="ic"><use href="#ic-box"></use></svg>";
+    if (nomeBaixo.includes("peixe") || nomeBaixo.includes("camar") || nomeBaixo.includes("chicoa") || nomeBaixo.includes("carapau")) icone = "<svg class="ic"><use href="#ic-box"></use></svg>";
+    else if (nomeBaixo.includes("frango") || nomeBaixo.includes("galinha") || nomeBaixo.includes("moela") || nomeBaixo.includes("asa")) icone = "<svg class="ic"><use href="#ic-box"></use></svg>";
+    else if (nomeBaixo.includes("fruta") || nomeBaixo.includes("banana") || nomeBaixo.includes("maçã") || nomeBaixo.includes("laranja")) icone = "<svg class="ic"><use href="#ic-box"></use></svg>";
+    else if (nomeBaixo.includes("tomate") || nomeBaixo.includes("batata") || nomeBaixo.includes("cebola") || nomeBaixo.includes("legume")) icone = "<svg class="ic"><use href="#ic-box"></use></svg>";
+    else if (nomeBaixo.includes("leite") || nomeBaixo.includes("óleo") || nomeBaixo.includes("oleo") || produto.unidade === "litro") icone = "<svg class="ic"><use href="#ic-box"></use></svg>";
 
     const unidTexto = produto.unidade || "kg";
     document.getElementById("frac-titulo").textContent = `${icone} ${produto.nome}`;
@@ -5201,7 +5201,7 @@ function atualizarBarraCarrinho() {
     if (!posAtivo || !itens.length || FABEF_cartVisivel) { barra.classList.add("hidden"); return; }
     const total = itens.reduce((t, i) => t + numero(i.preco) * numero(i.quantidade), 0);
     const resumo = document.getElementById("bcf-resumo");
-    if (resumo) resumo.textContent = `🛒 ${itens.length} artigo(s) · ${dinheiro(total)}`;
+    if (resumo) resumo.textContent = `<svg class="ic"><use href="#ic-cart"></use></svg> ${itens.length} artigo(s) · ${dinheiro(total)}`;
     barra.classList.remove("hidden");
 }
 window.irParaCarrinho = function () {
@@ -5257,7 +5257,7 @@ function renderCarrinho() {
                     type="button"
                     title="Ajustar peso ou valor da pesagem"
                 >
-                    ⚖️
+                    
                 </button>
                 ` : ''}
                 <button 
@@ -5267,7 +5267,7 @@ function renderCarrinho() {
                     type="button"
                     title="Remover do carrinho"
                 >
-                    ✕
+                    <svg class="ic"><use href="#ic-close"></use></svg>
                 </button>
             </div>
         </div>
@@ -5402,7 +5402,7 @@ function atualizarRestantePagamentoMisto() {
     const restante = totalComDesconto - soma;
     span.textContent = dinheiro(Math.abs(restante));
     span.style.color = Math.abs(restante) < 0.5 ? "#10b981" : (restante > 0 ? "#ef4444" : "#f59e0b");
-    span.textContent += restante > 0.5 ? " em falta" : (restante < -0.5 ? " a mais" : " — tudo atribuído ✓");
+    span.textContent += restante > 0.5 ? " em falta" : (restante < -0.5 ? " a mais" : " — tudo atribuído <svg class="ic"><use href="#ic-check"></use></svg>");
 }
 ["pos-valor-dinheiro", "pos-valor-mpesa", "pos-valor-emola", "pos-valor-cartao", "pos-valor-credito", "pos-desconto"].forEach(id => {
     document.getElementById(id)?.addEventListener("input", atualizarRestantePagamentoMisto);
@@ -5434,8 +5434,8 @@ async function finalizarVenda() {
         } else {
             const antigo = !!FABEF.turnoId && FABEF.turno?.estado === "ABERTO";
             alert(antigo
-                ? "🔒 O caixa de um dia anterior ficou aberto.\n\nO gerente tem de o fechar e abrir o caixa de hoje antes de vender."
-                : "🔒 O caixa está fechado.\n\nPeça ao gerente para abrir o caixa antes de vender.");
+                ? "<svg class="ic"><use href="#ic-lock"></use></svg> O caixa de um dia anterior ficou aberto.\n\nO gerente tem de o fechar e abrir o caixa de hoje antes de vender."
+                : "<svg class="ic"><use href="#ic-lock"></use></svg> O caixa está fechado.\n\nPeça ao gerente para abrir o caixa antes de vender.");
             return;
         }
     }
@@ -5465,7 +5465,7 @@ async function finalizarVenda() {
         if (valorEntregueInput > totalComDesconto) {
             trocoCalculado = valorEntregueInput - totalComDesconto;
         } else if (valorEntregueInput <= 0) {
-            const promptTroco = prompt(`💵 Venda em Dinheiro / Numerário\nTotal a Pagar: ${dinheiro(totalComDesconto)}\n\nIndique quanto o cliente entregou para o sistema calcular o troco\n(ou clique OK se entregou o valor exato):`, totalComDesconto.toString());
+            const promptTroco = prompt(`<svg class="ic"><use href="#ic-cash"></use></svg> Venda em Dinheiro / Numerário\nTotal a Pagar: ${dinheiro(totalComDesconto)}\n\nIndique quanto o cliente entregou para o sistema calcular o troco\n(ou clique OK se entregou o valor exato):`, totalComDesconto.toString());
             if (promptTroco !== null) {
                 const numPrompt = numero(promptTroco);
                 if (numPrompt > totalComDesconto) {
@@ -5621,7 +5621,7 @@ async function finalizarVenda() {
             if (trocoCalculado > 0) {
                 trocoHtml = `
                     <div style="margin: 14px 0; background: #ecfdf5; border: 2px solid #10b981; border-radius: 12px; padding: 12px 16px; box-shadow: 0 4px 12px rgba(16,185,129,0.18);">
-                        <div style="font-size: 13px; color: #047857; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">💵 Entregar Troco ao Cliente:</div>
+                        <div style="font-size: 13px; color: #047857; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;"><svg class="ic"><use href="#ic-cash"></use></svg> Entregar Troco ao Cliente:</div>
                         <div style="font-size: 30px; color: #059669; font-weight: 900; margin-top: 4px;">${dinheiro(trocoCalculado)}</div>
                         <div style="font-size: 12px; color: #065f46; margin-top: 4px; font-weight: 600;">Recebido: ${dinheiro(valorEntregueInput)} &nbsp;•&nbsp; Total da Venda: ${dinheiro(totalComDesconto)}</div>
                     </div>
@@ -5778,33 +5778,33 @@ function renderVendas() {
     const corDif = difOntem >= 0 ? "#047857" : "#b91c1c";
 
     if (periodo === "hoje") {
-        if (elBannerTexto) elBannerTexto.innerHTML = `🟢 A visualizar vendas de <strong>HOJE (${formatarDataExtensa(hojeStr)})</strong>. Todas as vendas anteriores estão guardadas e separadas no dia anterior.`;
+        if (elBannerTexto) elBannerTexto.innerHTML = `<span class="dot dot-green"></span> A visualizar vendas de <strong>HOJE (${formatarDataExtensa(hojeStr)})</strong>. Todas as vendas anteriores estão guardadas e separadas no dia anterior.`;
         if (elBannerComp) elBannerComp.innerHTML = `Ontem faturou: <strong>${dinheiro(fatOntem)}</strong> (${qtdOntem} vendas) | Comparativo: <strong style="color:${corDif};">${sinalDif} ${dinheiro(Math.abs(difOntem))}</strong>`;
         if (elRotuloFat) elRotuloFat.textContent = "Total Faturado (Hoje)";
         if (elSubFat) elSubFat.innerHTML = `Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
     } else if (periodo === "ontem") {
-        if (elBannerTexto) elBannerTexto.innerHTML = `🗓️ A visualizar vendas de <strong>ONTEM (${formatarDataExtensa(ontemStr)})</strong>. Registos arquivados do dia anterior.`;
+        if (elBannerTexto) elBannerTexto.innerHTML = `<svg class="ic"><use href="#ic-calendar"></use></svg> A visualizar vendas de <strong>ONTEM (${formatarDataExtensa(ontemStr)})</strong>. Registos arquivados do dia anterior.`;
         if (elBannerComp) elBannerComp.innerHTML = `Hoje em curso: <strong>${dinheiro(fatHoje)}</strong> (${qtdHoje} vendas)`;
         if (elRotuloFat) elRotuloFat.textContent = "Total Faturado (Ontem)";
         if (elSubFat) elSubFat.innerHTML = `Hoje está em: <strong>${dinheiro(fatHoje)}</strong>`;
     } else if (periodo === "progressao") {
-        if (elBannerTexto) elBannerTexto.innerHTML = `🏆 <strong>Progressão dos Dias</strong>: Veja abaixo a evolução dia a dia do negócio e qual foi o dia que vendeu melhor.`;
+        if (elBannerTexto) elBannerTexto.innerHTML = `<svg class="ic"><use href="#ic-target"></use></svg> <strong>Progressão dos Dias</strong>: Veja abaixo a evolução dia a dia do negócio e qual foi o dia que vendeu melhor.`;
         if (elBannerComp) elBannerComp.innerHTML = `Hoje: <strong>${dinheiro(fatHoje)}</strong> | Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
         if (elRotuloFat) elRotuloFat.textContent = "Total de Todas as Vendas";
         if (elSubFat) elSubFat.innerHTML = `Hoje: ${dinheiro(fatHoje)} | Ontem: ${dinheiro(fatOntem)}`;
     } else if (periodo === "agrupado") {
-        if (elBannerTexto) elBannerTexto.innerHTML = `📅 A visualizar vendas <strong>agrupadas por dia</strong> com divisores e subtotais diários para cada dia de trabalho.`;
+        if (elBannerTexto) elBannerTexto.innerHTML = `<svg class="ic"><use href="#ic-calendar"></use></svg> A visualizar vendas <strong>agrupadas por dia</strong> com divisores e subtotais diários para cada dia de trabalho.`;
         if (elBannerComp) elBannerComp.innerHTML = `Hoje: <strong>${dinheiro(fatHoje)}</strong> | Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
         if (elRotuloFat) elRotuloFat.textContent = "Total Faturado (Geral Agrupado)";
         if (elSubFat) elSubFat.innerHTML = `Hoje: ${dinheiro(fatHoje)} | Ontem: ${dinheiro(fatOntem)}`;
     } else if (periodo === "custom") {
         const txtData = dataEspecifica ? formatarDataExtensa(dataEspecifica) : "Data Selecionada";
-        if (elBannerTexto) elBannerTexto.innerHTML = `📅 A visualizar vendas do dia específico: <strong>${txtData}</strong>.`;
+        if (elBannerTexto) elBannerTexto.innerHTML = `<svg class="ic"><use href="#ic-calendar"></use></svg> A visualizar vendas do dia específico: <strong>${txtData}</strong>.`;
         if (elBannerComp) elBannerComp.innerHTML = `Hoje: <strong>${dinheiro(fatHoje)}</strong> | Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
         if (elRotuloFat) elRotuloFat.textContent = `Total Faturado (${dataEspecifica || 'Data'})`;
         if (elSubFat) elSubFat.innerHTML = `Hoje: ${dinheiro(fatHoje)}`;
     } else {
-        if (elBannerTexto) elBannerTexto.innerHTML = `🌐 A visualizar histórico geral de vendas registadas no estabelecimento.`;
+        if (elBannerTexto) elBannerTexto.innerHTML = `<svg class="ic"><use href="#ic-globe"></use></svg> A visualizar histórico geral de vendas registadas no estabelecimento.`;
         if (elBannerComp) elBannerComp.innerHTML = `Hoje: <strong>${dinheiro(fatHoje)}</strong> | Ontem: <strong>${dinheiro(fatOntem)}</strong>`;
         if (elRotuloFat) elRotuloFat.textContent = "Total Faturado no Histórico";
         if (elSubFat) elSubFat.innerHTML = `Hoje: ${dinheiro(fatHoje)} | Ontem: ${dinheiro(fatOntem)}`;
@@ -5862,9 +5862,9 @@ function renderVendas() {
     const elBadgeMelhor = document.getElementById("badge-melhor-dia");
     if (elBadgeMelhor) {
         if (melhorDiaReg && melhorDiaReg.total > 0) {
-            elBadgeMelhor.innerHTML = `🏆 Recorde de Vendas: <strong>${formatarDataExtensa(melhorDiaReg.dia)}</strong> (${dinheiro(melhorDiaReg.total)})`;
+            elBadgeMelhor.innerHTML = `<svg class="ic"><use href="#ic-target"></use></svg> Recorde de Vendas: <strong>${formatarDataExtensa(melhorDiaReg.dia)}</strong> (${dinheiro(melhorDiaReg.total)})`;
         } else {
-            elBadgeMelhor.textContent = "⭐ Sem registos suficientes para apurar o melhor dia";
+            elBadgeMelhor.textContent = "<svg class="ic"><use href="#ic-star"></use></svg> Sem registos suficientes para apurar o melhor dia";
         }
     }
 
@@ -5882,13 +5882,13 @@ function renderVendas() {
                 let tagClassif = `<span class="badge badge-gray" style="font-weight:600;">Histórico</span>`;
                 let linhaBg = "";
                 if (ehMelhor) {
-                    tagClassif = `<span class="badge" style="background:#fef3c7;color:#92400e;font-weight:800;border:1px solid #f59e0b;">🏆 MELHOR DIA</span>`;
+                    tagClassif = `<span class="badge" style="background:#fef3c7;color:#92400e;font-weight:800;border:1px solid #f59e0b;"><svg class="ic"><use href="#ic-target"></use></svg> MELHOR DIA</span>`;
                     linhaBg = "background:#fffbeb;";
                 } else if (ehHoje) {
-                    tagClassif = `<span class="badge badge-green" style="font-weight:700;">🟢 Dia Atual (Em curso)</span>`;
+                    tagClassif = `<span class="badge badge-green" style="font-weight:700;"><span class="dot dot-green"></span> Dia Atual (Em curso)</span>`;
                     linhaBg = "background:#f0fdf4;";
                 } else if (ehOntem) {
-                    tagClassif = `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;">🗓️ Ontem</span>`;
+                    tagClassif = `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;"><svg class="ic"><use href="#ic-calendar"></use></svg> Ontem</span>`;
                     linhaBg = "background:#f8fafc;";
                 }
 
@@ -5903,7 +5903,7 @@ function renderVendas() {
                     <td style="text-align:right;font-weight:600;">${dinheiro(ticketDia)}</td>
                     <td style="text-align:center;">
                         <button type="button" class="btn btn-small btn-light" onclick="filtrarDiaEspecifico(${jsArg(item.dia)})" style="padding:4px 10px;font-size:11px;font-weight:700;border:1px solid #cbd5e1;background:#fff;" title="Ver detalhes das vendas deste dia">
-                            👁️ Ver Vendas
+                            <svg class="ic"><use href="#ic-eye"></use></svg> Ver Vendas
                         </button>
                     </td>
                 </tr>`;
@@ -5981,11 +5981,11 @@ function renderVendas() {
     if (listaFiltrada.length === 0) {
         let msgVazia = "Nenhuma operação de venda localizada nos critérios definidos.";
         if (periodo === "hoje") {
-            msgVazia = `🟢 Nenhuma venda registada hoje (${formatarDataExtensa(hojeStr)}) até ao momento.<br><span style="font-size:12px;color:#94a3b8;">O caixa deste novo dia está limpo. As vendas de ontem permanecem salvas na aba <strong>🗓️ Ontem</strong>.</span>`;
+            msgVazia = `<span class="dot dot-green"></span> Nenhuma venda registada hoje (${formatarDataExtensa(hojeStr)}) até ao momento.<br><span style="font-size:12px;color:#94a3b8;">O caixa deste novo dia está limpo. As vendas de ontem permanecem salvas na aba <strong><svg class="ic"><use href="#ic-calendar"></use></svg> Ontem</strong>.</span>`;
         } else if (periodo === "ontem") {
-            msgVazia = `🗓️ Nenhuma venda registada no dia de ontem (${formatarDataExtensa(ontemStr)}).`;
+            msgVazia = `<svg class="ic"><use href="#ic-calendar"></use></svg> Nenhuma venda registada no dia de ontem (${formatarDataExtensa(ontemStr)}).`;
         } else if (periodo === "custom") {
-            msgVazia = `📅 Nenhuma venda localizada para o dia ${escapeHTML(dataEspecifica || '')}.`;
+            msgVazia = `<svg class="ic"><use href="#ic-calendar"></use></svg> Nenhuma venda localizada para o dia ${escapeHTML(dataEspecifica || '')}.`;
         }
         tabelaCorpo.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#64748b;padding:24px;line-height:1.6;">${msgVazia}</td></tr>`;
         return;
@@ -6037,7 +6037,7 @@ function renderVendas() {
                         </div>
                         <div style="font-size:13px;font-weight:700;color:#0f172a;">
                             Total do Dia: <span style="color:#047857;font-size:15px;font-weight:900;">${dinheiro(subtotalDia)}</span>
-                            <span style="margin-left:10px;font-size:12px;color:#475569;">(💵 Gaveta: ${dinheiro(dinDia)} | 📱 Digital: ${dinheiro(digDia)})</span>
+                            <span style="margin-left:10px;font-size:12px;color:#475569;">(<svg class="ic"><use href="#ic-cash"></use></svg> Gaveta: ${dinheiro(dinDia)} | <svg class="ic"><use href="#ic-phone"></use></svg> Digital: ${dinheiro(digDia)})</span>
                         </div>
                     </div>
                 </td>
@@ -6125,11 +6125,11 @@ function renderLinhaVendaHTML(v) {
             <div style="font-weight:700;color:#0f172a;">${dataTexto(v.data || v.date)}</div>
             <div style="font-size:11px;color:#64748b;">${formatarDataExtensa(dataDoRegisto(v))}</div>
             ${ehFalhada ? `
-                <div style="margin-top:4px;"><span class="badge badge-red" style="font-size:11px;">⚠️ Falhada / Cancelada</span></div>
+                <div style="margin-top:4px;"><span class="badge badge-red" style="font-size:11px;"><svg class="ic"><use href="#ic-warning"></use></svg> Falhada / Cancelada</span></div>
                 <div style="font-size:11px;color:#b91c1c;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || v.motivoFalha || 'Venda anulada')}</div>
             ` : ""}
             ${ehCorrigida ? `
-                <div style="margin-top:4px;"><span class="badge" style="background:#0284c7;color:#fff;font-size:11px;">✏️ Preço Corrigido (Antes: ${dinheiro(v.precoOriginal)})</span></div>
+                <div style="margin-top:4px;"><span class="badge" style="background:#0284c7;color:#fff;font-size:11px;"><svg class="ic"><use href="#ic-edit"></use></svg> Preço Corrigido (Antes: ${dinheiro(v.precoOriginal)})</span></div>
                 <div style="font-size:11px;color:#1d4ed8;margin-top:2px;"><strong>Justificativa ao Gerente:</strong> ${escapeHTML(v.justificativaGerente || 'Ajuste de preço')}</div>
             ` : ""}
         </td>
@@ -6142,16 +6142,16 @@ function renderLinhaVendaHTML(v) {
         <td>
             <details class="pasta-acoes-venda" style="display:inline-block;position:relative;">
                 <summary class="btn btn-small" style="cursor:pointer;list-style:none;background:#f8fafc;border:1.5px solid #cbd5e1;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;color:#1e293b;display:inline-flex;align-items:center;gap:6px;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,0.05);white-space:nowrap;">
-                    📁 Opções ▾
+                    <svg class="ic"><use href="#ic-folder"></use></svg> Opções ▾
                 </summary>
                 <div style="position:absolute;right:0;top:calc(100% + 4px);z-index:90;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);min-width:190px;padding:6px;display:flex;flex-direction:column;gap:5px;">
-                    <button class="btn btn-light btn-small" onclick="this.closest('details').removeAttribute('open'); imprimirReciboVenda(${jsArg(v.id)})" type="button" style="text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;" title="Imprimir Recibo Térmico ou A4">🖨️ Imprimir Recibo</button>
-                    <button class="btn btn-success btn-small" onclick="this.closest('details').removeAttribute('open'); enviarReciboWhatsApp(${jsArg(v.id)})" type="button" style="background-color:#25d366;color:#fff;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;border:none;" title="Enviar Recibo pelo WhatsApp">📱 Enviar WhatsApp</button>
-                    <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); compartilharReciboImagem(${jsArg(v.id)})" type="button" style="background-color:#0ea5e9;color:#fff;">🖼️ Recibo em imagem</button>
+                    <button class="btn btn-light btn-small" onclick="this.closest('details').removeAttribute('open'); imprimirReciboVenda(${jsArg(v.id)})" type="button" style="text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;" title="Imprimir Recibo Térmico ou A4"><svg class="ic"><use href="#ic-printer"></use></svg> Imprimir Recibo</button>
+                    <button class="btn btn-success btn-small" onclick="this.closest('details').removeAttribute('open'); enviarReciboWhatsApp(${jsArg(v.id)})" type="button" style="background-color:#25d366;color:#fff;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;font-weight:600;border-radius:6px;border:none;" title="Enviar Recibo pelo WhatsApp"><svg class="ic"><use href="#ic-phone"></use></svg> Enviar WhatsApp</button>
+                    <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); compartilharReciboImagem(${jsArg(v.id)})" type="button" style="background-color:#0ea5e9;color:#fff;"><svg class="ic"><use href="#ic-camera"></use></svg> Recibo em imagem</button>
                     ${podeOperarVendasEDespesas() ? `
-                    <button class="btn btn-primary btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalEditarVenda(${jsArg(v.id)})" type="button" style="background:#2563eb;color:#fff;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;border:none;" title="Editar valor, forma de pagamento ou cliente">✏️ Editar Venda</button>
+                    <button class="btn btn-primary btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalEditarVenda(${jsArg(v.id)})" type="button" style="background:#2563eb;color:#fff;font-weight:700;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;border-radius:6px;border:none;" title="Editar valor, forma de pagamento ou cliente"><svg class="ic"><use href="#ic-edit"></use></svg> Editar Venda</button>
                     ${!ehFalhada ? `
-                        <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalVendaFalhada(${jsArg(v.id)})" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:12px;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;border-radius:6px;" title="Registar falha ou relatar ao Gerente">⚠️ Justificar ao Gerente</button>
+                        <button class="btn btn-small" onclick="this.closest('details').removeAttribute('open'); abrirModalVendaFalhada(${jsArg(v.id)})" type="button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74;font-size:12px;text-align:left;width:100%;display:flex;align-items:center;gap:8px;padding:7px 10px;font-weight:600;border-radius:6px;" title="Registar falha ou relatar ao Gerente"><svg class="ic"><use href="#ic-warning"></use></svg> Justificar ao Gerente</button>
                     ` : ""}
                     ` : ""}
                 </div>
@@ -6366,22 +6366,22 @@ window.enviarReciboWhatsApp = function(vendaId) {
     }).join("\n");
 
     const mensagem = encodeURIComponent(
-        `🧾 *${nomeEmpresa.toUpperCase()}*\n` +
-        `📍 ${emp.endereco || "Moçambique"} | Tel: ${telEmpresa}\n` +
+        `<svg class="ic"><use href="#ic-receipt"></use></svg> *${nomeEmpresa.toUpperCase()}*\n` +
+        `<svg class="ic"><use href="#ic-pin"></use></svg> ${emp.endereco || "Moçambique"} | Tel: ${telEmpresa}\n` +
         `🆔 NUIT da Empresa: *${nuitEmpresa}*\n` +
         `----------------------------------------\n` +
-        `📄 *RECIBO DE VENDA:* #${v.id}\n` +
-        `📅 *Data:* ${dataTexto(v.data)}\n` +
-        `👤 *Cliente:* ${v.cliente || "Consumidor Final"}\n` +
+        `<svg class="ic"><use href="#ic-clipboard"></use></svg> *RECIBO DE VENDA:* #${v.id}\n` +
+        `<svg class="ic"><use href="#ic-calendar"></use></svg> *Data:* ${dataTexto(v.data)}\n` +
+        `<svg class="ic"><use href="#ic-user"></use></svg> *Cliente:* ${v.cliente || "Consumidor Final"}\n` +
         `🆔 *NUIT Cliente:* ${v.nuitCliente || "Consumidor Final"}\n` +
-        `👨‍💼 *Operador:* ${v.operadorNome || "Balcão"}\n` +
+        `<svg class="ic"><use href="#ic-user"></use></svg>‍<svg class="ic"><use href="#ic-tie"></use></svg> *Operador:* ${v.operadorNome || "Balcão"}\n` +
         `----------------------------------------\n` +
         `*ARTIGOS:*\n${textoItens}\n` +
         `----------------------------------------\n` +
-        `💰 *TOTAL PAGO:* ${dinheiro(v.total)}\n` +
-        `💳 *Método de Pagamento:* ${v.pagamento || "Dinheiro"}\n` +
+        `<svg class="ic"><use href="#ic-wallet"></use></svg> *TOTAL PAGO:* ${dinheiro(v.total)}\n` +
+        `<svg class="ic"><use href="#ic-card"></use></svg> *Método de Pagamento:* ${v.pagamento || "Dinheiro"}\n` +
         `----------------------------------------\n` +
-        `✨ _${emp.rodapeRecibo || "Obrigado pela preferência! Volte sempre."}_\n` +
+        `<svg class="ic"><use href="#ic-star"></use></svg> _${emp.rodapeRecibo || "Obrigado pela preferência! Volte sempre."}_\n` +
         `_Emitido via FABEF Gestão ERP PRO_`
     );
     window.open(`https://wa.me/${telefoneDoClienteDaVenda(v)}?text=${mensagem}`, "_blank");
@@ -6527,10 +6527,10 @@ function renderFornecedores() {
         <td>${compras.length}</td>
         <td>
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button class="btn btn-light btn-small" type="button" onclick="verComprasFornecedor(${jsArg(f.nome)})">📦 Compras</button>
-                <button class="btn btn-light btn-small" type="button" onclick="amortizarDividaFornecedorPrompt(${jsArg(f.id)},${jsArg(f.nome)})" ${divida > 0 ? '' : 'disabled'}>💳 Pagar</button>
+                <button class="btn btn-light btn-small" type="button" onclick="verComprasFornecedor(${jsArg(f.nome)})"><svg class="ic"><use href="#ic-box"></use></svg> Compras</button>
+                <button class="btn btn-light btn-small" type="button" onclick="amortizarDividaFornecedorPrompt(${jsArg(f.id)},${jsArg(f.nome)})" ${divida > 0 ? '' : 'disabled'}><svg class="ic"><use href="#ic-card"></use></svg> Pagar</button>
                 ${ehGerente ? `
-                    <button class="btn btn-light btn-small" type="button" style="color:#ef4444;" onclick="apagarFornecedor(${jsArg(f.id)},${jsArg(f.nome)})">🗑️ Apagar</button>
+                    <button class="btn btn-light btn-small" type="button" style="color:#ef4444;" onclick="apagarFornecedor(${jsArg(f.id)},${jsArg(f.nome)})"><svg class="ic"><use href="#ic-trash"></use></svg> Apagar</button>
                 ` : ''}
             </div>
         </td>
@@ -6616,7 +6616,7 @@ async function adicionarCliente() {
     }
 
     if (perfilAtual === "gerente") {
-        alert("🔒 Acesso Restrito:\n\nO Gerente não tem permissão para registar clientes. Esta missão é exclusiva dos Funcionários no atendimento.");
+        alert("Acesso Restrito:\n\nO Gerente não tem permissão para registar clientes. Esta missão é exclusiva dos Funcionários no atendimento.");
         return;
     }
 
@@ -6688,7 +6688,7 @@ async function adicionarCliente() {
     renderClientes();
 
     await gravarAuditoria("Adicionou o cliente ao cadastro: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
-    alert("✅ Cliente guardado com sucesso!");
+    alert("Cliente guardado com sucesso!");
 }
 
 window.abrirModalEditarCliente = function(id) {
@@ -6739,7 +6739,7 @@ async function salvarEdicaoCliente() {
     renderClientes();
     fecharModal("modal-editar-cliente");
     await gravarAuditoria("Editou dados do cliente: " + nome + (idCustom ? " (ID: " + idCustom + ")" : ""), "INFO");
-    alert("✅ Dados do cliente atualizados com sucesso.");
+    alert("Dados do cliente atualizados com sucesso.");
 }
 
 document.getElementById("btn-salvar-edicao-cliente")?.addEventListener("click", salvarEdicaoCliente);
@@ -6762,8 +6762,8 @@ function renderClientes() {
         <td style="color:${saldo > 0 ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(saldo)}</td>
         <td>
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button class="btn btn-light btn-small" type="button" onclick="verDetalheCliente(${jsArg(c.id)})">👁️ Detalhes</button>
-                <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarCliente(${jsArg(c.id)})">✏️ Editar</button>
+                <button class="btn btn-light btn-small" type="button" onclick="verDetalheCliente(${jsArg(c.id)})"><svg class="ic"><use href="#ic-eye"></use></svg> Detalhes</button>
+                <button class="btn btn-light btn-small" type="button" onclick="abrirModalEditarCliente(${jsArg(c.id)})"><svg class="ic"><use href="#ic-edit"></use></svg> Editar</button>
             </div>
         </td>
     </tr>
@@ -6892,7 +6892,7 @@ async function registarDivida() {
     }
 
     if (perfilAtual === "gerente") {
-        alert("🔒 Acesso Restrito:\n\nO Gerente não tem permissão para registar dívidas (fiado). Esta missão é exclusiva dos Funcionários no atendimento.");
+        alert("Acesso Restrito:\n\nO Gerente não tem permissão para registar dívidas (fiado). Esta missão é exclusiva dos Funcionários no atendimento.");
         return;
     }
 
@@ -6943,12 +6943,12 @@ async function registarDivida() {
             await gravarAuditoria("Registou uma nova dívida / fiado no valor de " + dinheiro(valor) + " para o cliente: " + cliente, "INFO");
         } catch (e) {}
 
-        alert("✅ Dívida registada e conta corrente atualizada com sucesso.");
+        alert("Dívida registada e conta corrente atualizada com sucesso.");
 
     } catch (error) {
         console.error("Erro ao processar conta corrente de fiado:", error);
         if (error.message && error.message.includes("limite de crédito")) {
-            alert("⚠️ " + error.message);
+            alert("" + error.message);
         } else {
             alert("Não foi possível registar o fiado:\n" + (error.message || error));
         }
@@ -6964,8 +6964,8 @@ function renderDividas() {
     tabelaCorpo.innerHTML = FABEF.dividas.map(d => {
         const possuiDivida = numero(d.saldo) > 0;
         const botaoCobrar = possuiDivida
-            ? `<button class="btn btn-success btn-small" onclick="enviarLembreteDivida(${jsArg(d.id)})" type="button" style="background-color:#25d366;">📱 Cobrar</button>`
-            : `<button class="btn btn-secondary btn-small" type="button" disabled style="opacity:.4;">📱 Pago</button>`;
+            ? `<button class="btn btn-success btn-small" onclick="enviarLembreteDivida(${jsArg(d.id)})" type="button" style="background-color:#25d366;"><svg class="ic"><use href="#ic-phone"></use></svg> Cobrar</button>`
+            : `<button class="btn btn-secondary btn-small" type="button" disabled style="opacity:.4;"><svg class="ic"><use href="#ic-phone"></use></svg> Pago</button>`;
         return `<tr><td><strong>${escapeHTML(d.cliente)}</strong></td><td>${escapeHTML(d.telefone || "—")}</td><td style="color:${possuiDivida ? '#ef4444' : '#10b981'};font-weight:700;">${dinheiro(d.saldo)}</td><td>${dinheiro(d.limite)}</td><td><div style="display:flex;gap:5px;"><button class="btn btn-light btn-small" onclick="amortizarDividaPrompt(${jsArg(d.id)},${jsArg(d.cliente)})" type="button" ${possuiDivida ? '' : 'disabled'}>Amortizar</button>${botaoCobrar}</div></td></tr>`;
     }).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Nenhum registo de fiado ativo localizado.</td></tr>`;
 }
@@ -6976,7 +6976,7 @@ window.enviarLembreteDivida = function(id) {
     // Sem telefone registado, abre o WhatsApp para escolher o contacto.
     const telefoneFormatado = telefoneWhatsApp(d.telefone);
     const nomeEmpresa = FABEF.empresa?.nome || "Nosso Estabelecimento";
-    const mensagem = encodeURIComponent(`Olá *${d.cliente}*,\n\nEsperamos que esteja bem. Passamos por aqui para lembrar gentilmente que possui um saldo em aberto no valor de *${dinheiro(d.saldo)}* referente às suas compras a fiado em *${nomeEmpresa}*.\n\nO seu limite de crédito atual é de ${dinheiro(d.limite)}.\n\nAgradecemos se puder passar pelo estabelecimento para regularizar o valor assim que possível. Obrigado pela compreensão! 🙏`);
+    const mensagem = encodeURIComponent(`Olá *${d.cliente}*,\n\nEsperamos que esteja bem. Passamos por aqui para lembrar gentilmente que possui um saldo em aberto no valor de *${dinheiro(d.saldo)}* referente às suas compras a fiado em *${nomeEmpresa}*.\n\nO seu limite de crédito atual é de ${dinheiro(d.limite)}.\n\nAgradecemos se puder passar pelo estabelecimento para regularizar o valor assim que possível. Obrigado pela compreensão! `);
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
 };
 
@@ -7015,7 +7015,7 @@ window.amortizarDividaPrompt = async function(id, cliente) {
         renderDividas();
         
         await gravarAuditoria("Amortizou o valor de " + dinheiro(quantia) + " na conta de: " + cliente, "INFO");
-        alert("✅ Amortização de " + dinheiro(quantia) + " registada com sucesso.");
+        alert("Amortização de " + dinheiro(quantia) + " registada com sucesso.");
     } catch (error) {
         console.error(error);
         alert("Erro ao abater a dívida:\n" + error.message);
@@ -7127,18 +7127,18 @@ function renderEncomendas() {
 
         let botoesAcao = "";
         if (e.estado === "PENDENTE") {
-            botoesAcao = `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'EM_PREPARACAO')" type="button">🛠️ Em preparação</button>`;
+            botoesAcao = `<button class="btn btn-light btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'EM_PREPARACAO')" type="button"><svg class="ic"><use href="#ic-gear"></use></svg> Em preparação</button>`;
         } else if (e.estado === "EM_PREPARACAO") {
-            botoesAcao = `<button class="btn btn-success btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'PRONTA')" type="button">✔️ Marcar pronta</button>`;
+            botoesAcao = `<button class="btn btn-success btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'PRONTA')" type="button"><svg class="ic"><use href="#ic-check"></use></svg> Marcar pronta</button>`;
         } else if (e.estado === "PRONTA") {
-            botoesAcao = `<button class="btn btn-danger btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'ENTREGUE')" type="button">📦 Entregar</button>`;
+            botoesAcao = `<button class="btn btn-danger btn-small" onclick="mudarEstadoEncomenda(${jsArg(e.id)},'ENTREGUE')" type="button"><svg class="ic"><use href="#ic-box"></use></svg> Entregar</button>`;
         } else {
             botoesAcao = `<span style="color:#64748b;font-size:12px;font-weight:600;">${e.estado === "CANCELADA" ? "Cancelada" : "Concluída"}</span>`;
         }
 
         if (e.estado !== "ENTREGUE" && e.estado !== "CANCELADA") {
-            botoesAcao += `<button class="btn btn-success btn-small" onclick="enviarAvisoEncomenda(${jsArg(e.id)})" type="button" style="background-color:#25d366;">📱 Lembrete</button>`;
-            botoesAcao += `<button class="btn btn-small" onclick="abrirModalEncomendaFalhada(${jsArg(e.id)})" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:600;" title="Cancelar encomenda com justificativa obrigatória ao Gerente">⚠️ Falhou / Cancelar</button>`;
+            botoesAcao += `<button class="btn btn-success btn-small" onclick="enviarAvisoEncomenda(${jsArg(e.id)})" type="button" style="background-color:#25d366;"><svg class="ic"><use href="#ic-phone"></use></svg> Lembrete</button>`;
+            botoesAcao += `<button class="btn btn-small" onclick="abrirModalEncomendaFalhada(${jsArg(e.id)})" type="button" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:600;" title="Cancelar encomenda com justificativa obrigatória ao Gerente"><svg class="ic"><use href="#ic-warning"></use></svg> Falhou / Cancelar</button>`;
         }
 
         return `<tr>
@@ -7195,7 +7195,7 @@ window.enviarAvisoEncomenda = function(id) {
         corpoMensagem += `\n\nValor pendente para esta encomenda: *${dinheiro(valorRestante)}*.`;
     }
 
-    const mensagem = encodeURIComponent(`Olá *${e.cliente}*,\n\n${corpoMensagem}\n\nEstamos à sua espera! Muito obrigado. 🛍️`);
+    const mensagem = encodeURIComponent(`Olá *${e.cliente}*,\n\n${corpoMensagem}\n\nEstamos à sua espera! Muito obrigado. <svg class="ic"><use href="#ic-cart"></use></svg>`);
     window.open(`https://wa.me/${telefoneFormatado}?text=${mensagem}`, "_blank");
 };
 
@@ -7203,7 +7203,7 @@ window.enviarAvisoEncomenda = function(id) {
    MÓDULO LÓGICO: CONTROLO FINANCEIRO DE CAIXA / TURNOS
 ===================================================== */
 
-// false = o caixa só abre quando o GERENTE o abre (Caixa → Abrir caixa) e só fecha quando
+// false = o caixa só abre quando o GERENTE o abre (Caixa <svg class="ic"><use href="#ic-arrow"></use></svg> Abrir caixa) e só fecha quando
 // o gerente o fecha. true = comportamento antigo (abre sozinho na 1.ª venda do dia).
 const CAIXA_ABRE_SOZINHO_NA_VENDA = false;
 
@@ -7338,7 +7338,7 @@ async function abrirCaixa() {
     if (FABEF.turnoId) {
         const dataAberturaTurno = FABEF.turno?.dataAbertura ? dataDoRegisto({ data: FABEF.turno.dataAbertura }) : (FABEF.turno?.diaOperacional || "");
         if (dataAberturaTurno && dataAberturaTurno !== hojeStr) {
-            const querFechar = confirm(`⚠️ O caixa anterior foi aberto no dia ${dataAberturaTurno} e não foi encerrado ontem.\n\nPara iniciar as vendas do novo dia (${hojeStr}) com registos totalmente separados (sem misturar ontem com hoje), o caixa anterior precisa de ser encerrado.\n\nDeseja encerrar o caixa anterior agora para abrir o novo dia de trabalho?`);
+            const querFechar = confirm(`O caixa anterior foi aberto no dia ${dataAberturaTurno} e não foi encerrado ontem.\n\nPara iniciar as vendas do novo dia (${hojeStr}) com registos totalmente separados (sem misturar ontem com hoje), o caixa anterior precisa de ser encerrado.\n\nDeseja encerrar o caixa anterior agora para abrir o novo dia de trabalho?`);
             if (querFechar) {
                 await encerrarTurnoAnteriorAutomatico(FABEF.turnoId, dataAberturaTurno);
             } else {
@@ -7397,7 +7397,7 @@ async function abrirCaixa() {
         atualizarTelaCaixa();
         renderTudo();
         await gravarAuditoria("Realizou a abertura de novo turno de caixa para o dia " + hojeStr + " com fundo inicial de " + dinheiro(valor), "INFO");
-        alert(`✅ Caixa do Novo Dia (${hojeStr}) aberto com sucesso!\n\nFundo de faturamento inicial: ${dinheiro(valor)}.\nTodas as vendas de ontem e dias anteriores foram preservadas no histórico.`);
+        alert(`Caixa do Novo Dia (${hojeStr}) aberto com sucesso!\n\nFundo de faturamento inicial: ${dinheiro(valor)}.\nTodas as vendas de ontem e dias anteriores foram preservadas no histórico.`);
     } catch (error) {
         console.error(error);
         alert("Erro ao realizar abertura de caixa:\n" + mensagemFirebase(error));
@@ -7482,7 +7482,7 @@ window.toggleRevelarSaldoGerente = function() {
 
 window.abrirModalFecharCaixaCego = function() {
     if (!ehUsuarioGerente()) {
-        alert("🔒 Apenas o gerente pode fechar o caixa.\n\nPeça ao gerente para fazer o fecho do turno.");
+        alert("Apenas o gerente pode fechar o caixa.\n\nPeça ao gerente para fazer o fecho do turno.");
         return;
     }
     if (!FABEF.turnoId) {
@@ -7507,7 +7507,7 @@ window.abrirModalFecharCaixaCego = function() {
 
 window.confirmarFechoCaixaCego = async function() {
     if (!ehUsuarioGerente()) {
-        alert("🔒 Apenas o gerente pode fechar o caixa.");
+        alert("Apenas o gerente pode fechar o caixa.");
         return;
     }
     if (!FABEF.turnoId) {
@@ -7580,10 +7580,10 @@ window.confirmarFechoCaixaCego = async function() {
         let msgAuditoria = `Fechou o caixa. Esperado: ${dinheiro(esperado)} | Contado: ${dinheiro(contado)} | Diferença: ${dinheiro(diferenca)}`;
         if (houveDesfalque) {
             tipoAuditoria = "ALERTA";
-            msgAuditoria = `🚨 DESFALQUE DETECTADO NO FECHAMENTO DE CAIXA: Falta de ${dinheiro(Math.abs(diferenca))} (Esperado: ${dinheiro(esperado)}, Contado: ${dinheiro(contado)}). Fechado por ${operadorNome}`;
+            msgAuditoria = `<svg class="ic"><use href="#ic-warning"></use></svg> DESFALQUE DETECTADO NO FECHAMENTO DE CAIXA: Falta de ${dinheiro(Math.abs(diferenca))} (Esperado: ${dinheiro(esperado)}, Contado: ${dinheiro(contado)}). Fechado por ${operadorNome}`;
         } else if (houveSobra) {
             tipoAuditoria = "INFO";
-            msgAuditoria = `💰 SOBRA DETECTADA NO CAIXA: Sobra de ${dinheiro(diferenca)} (Esperado: ${dinheiro(esperado)}, Contado: ${dinheiro(contado)}). Fechado por ${operadorNome}`;
+            msgAuditoria = `<svg class="ic"><use href="#ic-wallet"></use></svg> SOBRA DETECTADA NO CAIXA: Sobra de ${dinheiro(diferenca)} (Esperado: ${dinheiro(esperado)}, Contado: ${dinheiro(contado)}). Fechado por ${operadorNome}`;
         }
         await gravarAuditoria(msgAuditoria, tipoAuditoria);
 
@@ -7610,7 +7610,7 @@ window.confirmarFechoCaixaCego = async function() {
     } finally {
         if (btnConfirmar) {
             btnConfirmar.disabled = false;
-            btnConfirmar.innerText = "🔒 Confirmar e Revelar Apuramento";
+            btnConfirmar.innerText = "<svg class="ic"><use href="#ic-lock"></use></svg> Confirmar e Revelar Apuramento";
         }
     }
 };
@@ -7626,7 +7626,7 @@ function preencherModalResultadoFecho(d) {
             banner.style.background = "#fef2f2";
             banner.style.border = "2px solid #ef4444";
             banner.style.color = "#991b1b";
-            rotulo.textContent = "⚠️ DESFALQUE / FALTA DETETADA NO CAIXA";
+            rotulo.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> DESFALQUE / FALTA DETETADA NO CAIXA";
             rotulo.style.color = "#b91c1c";
             valorDif.textContent = "− " + dinheiro(Math.abs(d.diferenca));
             valorDif.style.color = "#dc2626";
@@ -7636,7 +7636,7 @@ function preencherModalResultadoFecho(d) {
             banner.style.background = "#fffbeb";
             banner.style.border = "2px solid #f59e0b";
             banner.style.color = "#92400e";
-            rotulo.textContent = "ℹ️ SOBRA DE CAIXA DETETADA";
+            rotulo.textContent = "ℹ SOBRA DE CAIXA DETETADA";
             rotulo.style.color = "#b45309";
             valorDif.textContent = "+ " + dinheiro(d.diferenca);
             valorDif.style.color = "#d97706";
@@ -7646,7 +7646,7 @@ function preencherModalResultadoFecho(d) {
             banner.style.background = "#f0fdf4";
             banner.style.border = "2px solid #22c55e";
             banner.style.color = "#166534";
-            rotulo.textContent = "✅ CAIXA 100% CORRETO E EXATO";
+            rotulo.textContent = "<svg class="ic"><use href="#ic-check"></use></svg> CAIXA 100% CORRETO E EXATO";
             rotulo.style.color = "#15803d";
             valorDif.textContent = "Diferença: MT 0,00";
             valorDif.style.color = "#15803d";
@@ -7785,10 +7785,10 @@ function atualizarTelaCaixa() {
     const saldoCegaTexto = document.getElementById("caixa-saldo-cega-texto");
     if (saldoCegaTexto) {
         if (window.FABEF_SALDO_REVELADO_GERENTE) {
-            saldoCegaTexto.textContent = "👁️ " + dinheiro(saldoEsperadoNum) + " (Modo Supervisão)";
+            saldoCegaTexto.textContent = "<svg class="ic"><use href="#ic-eye"></use></svg> " + dinheiro(saldoEsperadoNum) + " (Modo Supervisão)";
             saldoCegaTexto.style.color = "#047857";
         } else {
-            saldoCegaTexto.textContent = "🔒 [ Oculto para Evitar Viciação de Contagem ]";
+            saldoCegaTexto.textContent = "<svg class="ic"><use href="#ic-lock"></use></svg> [ Oculto para Evitar Viciação de Contagem ]";
             saldoCegaTexto.style.color = "#1e3a8a";
         }
     }
@@ -7855,7 +7855,7 @@ async function registarDespesa() {
 
     const descricao = (inpDesc?.value || "").trim();
     const valor = numero(inpValor?.value);
-    const categoria = selCat?.value || "⚡ Energia Elétrica (Credelec / Luz)";
+    const categoria = selCat?.value || "<svg class="ic"><use href="#ic-bolt"></use></svg> Energia Elétrica (Credelec / Luz)";
     const ramo = selRamo?.value || FABEF.ramo || "Geral";
     const sairDoCaixa = Boolean(chkCaixa?.checked);
 
@@ -7942,9 +7942,9 @@ async function registarDespesa() {
 
     renderDespesas();
     if (typeof emitirBeepSucesso === "function") emitirBeepSucesso();
-    await gravarAuditoria(`⚡ REGISTO DE DESPESA: "${descricao}" (${categoria}) no valor de ${dinheiro(valor)} para ${ramo}. ` + (sairDoCaixa ? "[Retirado do Caixa]" : "[Fundo Geral]"), "INFO");
+    await gravarAuditoria(`<svg class="ic"><use href="#ic-bolt"></use></svg> REGISTO DE DESPESA: "${descricao}" (${categoria}) no valor de ${dinheiro(valor)} para ${ramo}. ` + (sairDoCaixa ? "[Retirado do Caixa]" : "[Fundo Geral]"), "INFO");
 
-    if (confirm(`✅ Despesa registada com sucesso!\n• Descrição: ${descricao}\n• Valor: ${dinheiro(valor)}\n• Ramo: ${ramo}${sairDoCaixa ? "\n• Retirado do Caixa de hoje" : ""}\n\nDeseja imprimir o Comprovativo de Saída / Despesa agora?`)) {
+    if (confirm(`Despesa registada com sucesso!\n• Descrição: ${descricao}\n• Valor: ${dinheiro(valor)}\n• Ramo: ${ramo}${sairDoCaixa ? "\n• Retirado do Caixa de hoje" : ""}\n\nDeseja imprimir o Comprovativo de Saída / Despesa agora?`)) {
         imprimirComprovativoDespesa(docId);
     }
 }
@@ -8032,12 +8032,12 @@ function renderDespesas() {
         </td>
         <td><span class="badge badge-blue">${escapeHTML(d.ramo || FABEF.ramo || "Geral")}</span></td>
         <td style="color:#dc2626; font-weight:800; font-size:14px; white-space:nowrap;">${dinheiro(d.valor)}</td>
-        <td>${d.sairDoCaixa ? '<span class="badge badge-yellow" style="font-size:11px;">💸 Caixa</span>' : '<span class="badge badge-gray" style="font-size:11px;">💳 Fundo Fixo</span>'}</td>
+        <td>${d.sairDoCaixa ? '<span class="badge badge-yellow" style="font-size:11px;"><svg class="ic"><use href="#ic-cash"></use></svg> Caixa</span>' : '<span class="badge badge-gray" style="font-size:11px;"><svg class="ic"><use href="#ic-card"></use></svg> Fundo Fixo</span>'}</td>
         <td style="font-size:12px;color:#475569;">${escapeHTML(d.utilizadorNome || "—")}</td>
         <td>
             <div style="display:flex;gap:4px;align-items:center;">
-                <button type="button" class="btn btn-light btn-small" onclick="imprimirComprovativoDespesa(${jsArg(d.id)})" style="padding:4px 8px;font-size:11px;font-weight:700;" title="Imprimir Comprovativo / Recibo de Despesa">🖨️ Recibo</button>
-                <button type="button" class="btn btn-small" onclick="eliminarDespesa(${jsArg(d.id)})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;font-size:11px;font-weight:700;" title="Eliminar despesa">🗑️</button>
+                <button type="button" class="btn btn-light btn-small" onclick="imprimirComprovativoDespesa(${jsArg(d.id)})" style="padding:4px 8px;font-size:11px;font-weight:700;" title="Imprimir Comprovativo / Recibo de Despesa"><svg class="ic"><use href="#ic-printer"></use></svg> Recibo</button>
+                <button type="button" class="btn btn-small" onclick="eliminarDespesa(${jsArg(d.id)})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;font-size:11px;font-weight:700;" title="Eliminar despesa"><svg class="ic"><use href="#ic-trash"></use></svg></button>
             </div>
         </td>
     </tr>
@@ -8090,7 +8090,7 @@ window.imprimirComprovativoDespesa = function(id) {
             <div class="titulo">${escapeHTML(nomeEmp)}</div>
             <div class="subtitulo">NUIT: ${escapeHTML(nuitEmp)} | Telefone: ${escapeHTML(telEmp)} | ${escapeHTML(endEmp)}</div>
             <div style="margin-top: 6px; font-weight: 800; font-size: 14px; color: #b91c1c;">
-                🧾 COMPROVATIVO DE SAÍDA DE CAIXA / DESPESA OPERACIONAL
+                <svg class="ic"><use href="#ic-receipt"></use></svg> COMPROVATIVO DE SAÍDA DE CAIXA / DESPESA OPERACIONAL
             </div>
         </div>
 
@@ -8113,7 +8113,7 @@ window.imprimirComprovativoDespesa = function(id) {
             </div>
             <div class="linha">
                 <span class="rotulo">Origem dos Fundos:</span>
-                <span class="valor">${d.sairDoCaixa ? "💸 Retirado do Caixa / Turno (Sangria)" : "💳 Fundo de Caixa Geral / Externo"}</span>
+                <span class="valor">${d.sairDoCaixa ? "<svg class="ic"><use href="#ic-cash"></use></svg> Retirado do Caixa / Turno (Sangria)" : "<svg class="ic"><use href="#ic-card"></use></svg> Fundo de Caixa Geral / Externo"}</span>
             </div>
             <div class="linha" style="border-bottom:none; margin-top:10px;">
                 <span class="rotulo" style="font-size:16px;">VALOR PAGO:</span>
@@ -8182,7 +8182,7 @@ window.eliminarDespesa = async function(id) {
             }
         } catch(e) {}
 
-        await gravarAuditoria(`🗑️ DESPESA ELIMINADA: "${d.descricao}" (${dinheiro(d.valor)}) por ${FABEF.userData?.nome || 'Utilizador'}.`, "ALERTA");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-trash"></use></svg> DESPESA ELIMINADA: "${d.descricao}" (${dinheiro(d.valor)}) por ${FABEF.userData?.nome || 'Utilizador'}.`, "ALERTA");
         renderDespesas();
         alert("Despesa eliminada com sucesso.");
     } catch(err) {
@@ -8267,7 +8267,7 @@ window.renderSecaoLucro = function() {
     const selRamo = document.getElementById("lucro-filtro-ramo");
     if (selRamo && selRamo.options.length === 0) {
         const ramos = typeof obterConfigRamos === "function" ? obterConfigRamos() : [];
-        let opts = `<option value="TODOS">🏢 Todos os Ramos / Filiais</option>`;
+        let opts = `<option value="TODOS"><svg class="ic"><use href="#ic-store"></use></svg> Todos os Ramos / Filiais</option>`;
         ramos.forEach(r => {
             opts += `<option value="${escapeHTML(r.nome)}">${escapeHTML(r.nome)}</option>`;
         });
@@ -8461,7 +8461,7 @@ window.renderSecaoLucro = function() {
         if (lucroLiquido > 0.01) {
             banner.style.background = "#ecfdf5";
             banner.style.border = "2.5px solid #10b981";
-            rotulo.textContent = "🏆 RESULTADO LÍQUIDO: LUCRO POSITIVO NO PERÍODO";
+            rotulo.textContent = "<svg class="ic"><use href="#ic-target"></use></svg> RESULTADO LÍQUIDO: LUCRO POSITIVO NO PERÍODO";
             rotulo.style.color = "#047857";
             valor.textContent = "+ " + dinheiro(lucroLiquido);
             valor.style.color = "#065f46";
@@ -8472,7 +8472,7 @@ window.renderSecaoLucro = function() {
         } else if (lucroLiquido < -0.01) {
             banner.style.background = "#fef2f2";
             banner.style.border = "2.5px solid #ef4444";
-            rotulo.textContent = "⚠️ RESULTADO LÍQUIDO: PREJUÍZO OPERACIONAL NO PERÍODO";
+            rotulo.textContent = "<svg class="ic"><use href="#ic-warning"></use></svg> RESULTADO LÍQUIDO: PREJUÍZO OPERACIONAL NO PERÍODO";
             rotulo.style.color = "#b91c1c";
             valor.textContent = "− " + dinheiro(Math.abs(lucroLiquido));
             valor.style.color = "#dc2626";
@@ -8483,7 +8483,7 @@ window.renderSecaoLucro = function() {
         } else {
             banner.style.background = "#f8fafc";
             banner.style.border = "2px solid #cbd5e1";
-            rotulo.textContent = "⚖️ PONTO DE EQUILÍBRIO (BREAK-EVEN)";
+            rotulo.textContent = "PONTO DE EQUILÍBRIO (BREAK-EVEN)";
             rotulo.style.color = "#334155";
             valor.textContent = "MT 0,00";
             valor.style.color = "#0f172a";
@@ -8530,7 +8530,7 @@ window.renderSecaoLucro = function() {
     if (categoriasDespesas.energia > 0) {
         linhasHtml += `
         <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
-            <td style="padding:6px 10px 6px 36px;color:#64748b;">• ⚡ Energia Elétrica (Credelec / Luz)</td>
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• <svg class="ic"><use href="#ic-bolt"></use></svg> Energia Elétrica (Credelec / Luz)</td>
             <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
             <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.energia)}</td>
             <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.energia)}</td>
@@ -8539,7 +8539,7 @@ window.renderSecaoLucro = function() {
     if (categoriasDespesas.agua > 0) {
         linhasHtml += `
         <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
-            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 💧 Água (FIPAG / Abastecimento)</td>
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• Água (FIPAG / Abastecimento)</td>
             <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
             <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.agua)}</td>
             <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.agua)}</td>
@@ -8548,7 +8548,7 @@ window.renderSecaoLucro = function() {
     if (categoriasDespesas.renda > 0) {
         linhasHtml += `
         <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
-            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 🏠 Renda / Aluguer da Banca ou Loja</td>
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• <svg class="ic"><use href="#ic-home"></use></svg> Renda / Aluguer da Banca ou Loja</td>
             <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
             <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.renda)}</td>
             <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.renda)}</td>
@@ -8557,7 +8557,7 @@ window.renderSecaoLucro = function() {
     if (categoriasDespesas.sacos > 0) {
         linhasHtml += `
         <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
-            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 🛍️ Sacos Plásticos, Embalagens & Limpeza</td>
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• <svg class="ic"><use href="#ic-cart"></use></svg> Sacos Plásticos, Embalagens & Limpeza</td>
             <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
             <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.sacos)}</td>
             <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.sacos)}</td>
@@ -8566,7 +8566,7 @@ window.renderSecaoLucro = function() {
     if (categoriasDespesas.transporte > 0) {
         linhasHtml += `
         <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
-            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 🚗 Fretes e Transporte de Mercadoria</td>
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• <svg class="ic"><use href="#ic-truck"></use></svg> Fretes e Transporte de Mercadoria</td>
             <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
             <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.transporte)}</td>
             <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.transporte)}</td>
@@ -8575,7 +8575,7 @@ window.renderSecaoLucro = function() {
     if (categoriasDespesas.manutencao > 0) {
         linhasHtml += `
         <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
-            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 🛠️ Manutenção (Frio, Congeladores, Equipamentos)</td>
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• <svg class="ic"><use href="#ic-gear"></use></svg> Manutenção (Frio, Congeladores, Equipamentos)</td>
             <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
             <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.manutencao)}</td>
             <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.manutencao)}</td>
@@ -8584,7 +8584,7 @@ window.renderSecaoLucro = function() {
     if (categoriasDespesas.outras > 0 || categoriasDespesas.alimentacao > 0) {
         linhasHtml += `
         <tr style="border-bottom:1px dashed #e2e8f0;font-size:12px;">
-            <td style="padding:6px 10px 6px 36px;color:#64748b;">• 📦 Outros Custos Operacionais & Alimentação</td>
+            <td style="padding:6px 10px 6px 36px;color:#64748b;">• <svg class="ic"><use href="#ic-box"></use></svg> Outros Custos Operacionais & Alimentação</td>
             <td style="padding:6px 10px;text-align:center;color:#94a3b8;">Gasto</td>
             <td style="padding:6px 10px;text-align:right;color:#dc2626;">− ${dinheiro(categoriasDespesas.outras + categoriasDespesas.alimentacao)}</td>
             <td style="padding:6px 10px;text-align:right;color:#94a3b8;">${pct(categoriasDespesas.outras + categoriasDespesas.alimentacao)}</td>
@@ -8804,18 +8804,18 @@ window.enviarDREWhatsApp = function() {
     }
 
     const ehLucro = dre.lucroLiquido >= 0;
-    const msg = `📊 *BALANÇO DE LUCRO REAL & DRE*
-🏢 *${FABEF.empresa?.nome || "FABEF ERP"}*
-📅 *Período:* ${dre.periodoTexto}
-🏷️ *Ramo:* ${dre.ramo}
+    const msg = `<svg class="ic"><use href="#ic-chart"></use></svg> *BALANÇO DE LUCRO REAL & DRE*
+<svg class="ic"><use href="#ic-store"></use></svg> *${FABEF.empresa?.nome || "FABEF ERP"}*
+<svg class="ic"><use href="#ic-calendar"></use></svg> *Período:* ${dre.periodoTexto}
+<svg class="ic"><use href="#ic-tag"></use></svg> *Ramo:* ${dre.ramo}
 
-💵 *(+) Vendas Totais:* ${dinheiro(dre.totalVendas)}
-🚚 *(−) Compras de Stock:* ${dinheiro(dre.custoMercadorias)}
-⚡ *(−) Despesas (Luz, Água, Rendas):* ${dinheiro(dre.totalDespesas)}
-🧑‍💼 *(−) Folha Salarial:* ${dinheiro(dre.custoSalarios)}
+<svg class="ic"><use href="#ic-cash"></use></svg> *(+) Vendas Totais:* ${dinheiro(dre.totalVendas)}
+<svg class="ic"><use href="#ic-truck"></use></svg> *(−) Compras de Stock:* ${dinheiro(dre.custoMercadorias)}
+<svg class="ic"><use href="#ic-bolt"></use></svg> *(−) Despesas (Luz, Água, Rendas):* ${dinheiro(dre.totalDespesas)}
+<svg class="ic"><use href="#ic-user"></use></svg>‍<svg class="ic"><use href="#ic-tie"></use></svg> *(−) Folha Salarial:* ${dinheiro(dre.custoSalarios)}
 ━━━━━━━━━━━━━━━━━━━━
-${ehLucro ? '🟢 *LUCRO LÍQUIDO REAL:*' : '🔴 *PREJUÍZO OPERACIONAL:*'} *${dinheiro(Math.abs(dre.lucroLiquido))}*
-📈 *Margem Líquida:* ${dre.margemLiquida}%
+${ehLucro ? '<span class="dot dot-green"></span> *LUCRO LÍQUIDO REAL:*' : '<span class="dot dot-red"></span> *PREJUÍZO OPERACIONAL:*'} *${dinheiro(Math.abs(dre.lucroLiquido))}*
+<svg class="ic"><use href="#ic-trend"></use></svg> *Margem Líquida:* ${dre.margemLiquida}%
 
 _Relatório financeiro emitido via FABEF Gestão ERP PRO._`;
 
@@ -8892,7 +8892,7 @@ function renderRelatorios() {
     const planoRelatorios = obterPlanoAtual();
     const avisoAvancado = document.getElementById("aviso-relatorios-avancados");
     if (planoRelatorios === "GRATIS") {
-        if (avisoAvancado) avisoAvancado.innerHTML = `<div class="alert alert-warning">🔒 A Curva ABC e a Análise Inteligente são funcionalidades do Plano Pago. <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')">⭐ Atualizar por 250 MT</button></div>`;
+        if (avisoAvancado) avisoAvancado.innerHTML = `<div class="alert alert-warning"><svg class="ic"><use href="#ic-lock"></use></svg> A Curva ABC e a Análise Inteligente são funcionalidades do Plano Pago. <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')"><svg class="ic"><use href="#ic-star"></use></svg> Atualizar por 250 MT</button></div>`;
         document.getElementById("tabela-abc").innerHTML = `<tr><td colspan="5" style="text-align:center;color:#64748b;">Disponível no Plano Pago.</td></tr>`;
         document.getElementById("analise-inteligente").innerHTML = "";
     } else {
@@ -8911,7 +8911,7 @@ function textoResumoRelatorio() {
     if (!FABEF_RELATORIO_ATUAL) return "";
     const r = FABEF_RELATORIO_ATUAL;
     const nomeEmpresa = FABEF.empresa?.nome || "FABEF ERP";
-    let texto = `📊 Relatório — ${nomeEmpresa} (${escapeHTML(FABEF.ramo)})\n`;
+    let texto = `<svg class="ic"><use href="#ic-chart"></use></svg> Relatório — ${nomeEmpresa} (${escapeHTML(FABEF.ramo)})\n`;
     texto += `Período: ${r.periodo}\n\n`;
     texto += `Faturamento: ${dinheiro(r.faturamento)}\n`;
     texto += `Despesas: ${dinheiro(r.totalDespesas)}\n`;
@@ -9206,7 +9206,7 @@ function renderConfiguracoes() {
             const isOperacionalAtivo = r.nome === FABEF.ramo;
             const cfg = (FABEF.empresa?.ramos_configuracoes || {})[r.nome] || {};
             const nomeExibicao = cfg.nome || r.nome;
-            const icone = escapeHTML(r.icone || "🏬");
+            const icone = escapeHTML(r.icone || "<svg class="ic"><use href="#ic-store"></use></svg>");
 
             return `
             <button 
@@ -9247,7 +9247,7 @@ function renderConfiguracoes() {
     const badgeRamoAtivo = document.getElementById("config-badge-ramo-ativo");
     if (badgeRamoAtivo) {
         const ehAtivo = (ramoSendoConfigurado === FABEF.ramo);
-        badgeRamoAtivo.textContent = ehAtivo ? "✅ Ramo Ativo Agora" : "📁 Outro Negócio da Pasta";
+        badgeRamoAtivo.textContent = ehAtivo ? "<svg class="ic"><use href="#ic-check"></use></svg> Ramo Ativo Agora" : "<svg class="ic"><use href="#ic-folder"></use></svg> Outro Negócio da Pasta";
         badgeRamoAtivo.className = ehAtivo ? "badge badge-green" : "badge badge-yellow";
     }
 
@@ -9284,10 +9284,10 @@ function renderConfiguracoes() {
         const uid = FABEF.user?.uid;
         const temPin = uid && localStorage.getItem(chavePinLocal(uid));
         if (temPin) {
-            badgePin.textContent = "🟢 PIN ATIVO E PROTEGIDO";
+            badgePin.textContent = "<span class="dot dot-green"></span> PIN ATIVO E PROTEGIDO";
             badgePin.style.color = "#16a34a";
         } else {
-            badgePin.textContent = "🟠 PIN AINDA NÃO DEFINIDO";
+            badgePin.textContent = "<span class="dot dot-yellow"></span> PIN AINDA NÃO DEFINIDO";
             badgePin.style.color = "#ea580c";
         }
     }
@@ -9303,7 +9303,7 @@ document.getElementById("btn-ativar-este-ramo")?.addEventListener("click", () =>
     if (ramo) {
         mudarRamo(ramo);
         renderConfiguracoes();
-        alert(`🚀 O negócio ativo foi alterado para "${ramo}"!\nTodas as telas, vendas, produtos e recibos agora pertencem a este negócio.`);
+        alert(`O negócio ativo foi alterado para "${ramo}"!\nTodas as telas, vendas, produtos e recibos agora pertencem a este negócio.`);
     }
 });
 
@@ -9318,7 +9318,7 @@ document.getElementById("btn-copiar-dados-empresa")?.addEventListener("click", (
     if (emp.telefone) document.getElementById("config-telefone").value = emp.telefone;
     if (emp.endereco) document.getElementById("config-endereco").value = emp.endereco;
     if (emp.cidade) document.getElementById("config-cidade").value = emp.cidade;
-    alert("📋 Dados gerais preenchidos. Ajuste o nome e os campos necessários deste ramo e clique em 'Guardar'.");
+    alert("Dados gerais preenchidos. Ajuste o nome e os campos necessários deste ramo e clique em 'Guardar'.");
 });
 
 document.getElementById("btn-guardar-config").addEventListener("click", guardarConfiguracoes);
@@ -9384,7 +9384,7 @@ async function guardarConfiguracoes() {
     renderConfiguracoes();
 
     if (window.FABEF?.isDemoMode) {
-        alert(`✅ Configurações do ramo "${ramo}" guardadas com sucesso!`);
+        alert(`Configurações do ramo "${ramo}" guardadas com sucesso!`);
         return;
     }
 
@@ -9406,10 +9406,10 @@ async function guardarConfiguracoes() {
         });
 
         await gravarAuditoria(`Actualizou as configurações específicas do ramo "${ramo}" (${nome}).`, "INFO");
-        alert(`✅ Configurações do ramo "${ramo}" guardadas com sucesso na nuvem e no dispositivo.`);
+        alert(`Configurações do ramo "${ramo}" guardadas com sucesso na nuvem e no dispositivo.`);
     } catch (error) {
         console.warn("Aviso ao guardar na nuvem:", error);
-        alert(`✅ Configurações do ramo "${ramo}" guardadas no dispositivo com sucesso.\n(Nota: Dados gravados com segurança localmente).`);
+        alert(`Configurações do ramo "${ramo}" guardadas no dispositivo com sucesso.\n(Nota: Dados gravados com segurança localmente).`);
     }
 }
 
@@ -9530,8 +9530,8 @@ function renderFuncionarios(){
 
     const acoesGerente = souGerente ? `
         <div style="display:flex;gap:5px;flex-wrap:wrap;">
-            <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial(${jsArg(gerenteId)})" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale) do Gerente">💸 Vale</button>
-            <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario(${jsArg(gerenteId)})" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales do Gerente">➕ Gasto</button>
+            <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial(${jsArg(gerenteId)})" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale) do Gerente"><svg class="ic"><use href="#ic-cash"></use></svg> Vale</button>
+            <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario(${jsArg(gerenteId)})" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales do Gerente"><svg class="ic"><use href="#ic-plus"></use></svg> Gasto</button>
         </div>` : "—";
 
     const gerente = `
@@ -9560,10 +9560,10 @@ function renderFuncionarios(){
 
         const acoes = souGerente ? `
             <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial(${jsArg(f.id)})" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale)">💸 Vale</button>
-                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario(${jsArg(f.id)})" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales na conta">➕ Gasto</button>
-                <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario(${jsArg(f.id)})">✏️ Editar</button>
-                <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario(${jsArg(f.id)})">${ativo ? '🚫 Desativar' : '✅ Reativar'}</button>
+                <button class="btn btn-small" type="button" onclick="abrirModalAdiantamentoSalarial(${jsArg(f.id)})" style="background:#059669;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Registar adiantamento salarial (vale)"><svg class="ic"><use href="#ic-cash"></use></svg> Vale</button>
+                <button class="btn btn-warning btn-small" type="button" onclick="abrirModalGastoFuncionario(${jsArg(f.id)})" style="background:#f59e0b;color:#fff;font-weight:700;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;" title="Adicionar outros gastos ou vales na conta"><svg class="ic"><use href="#ic-plus"></use></svg> Gasto</button>
+                <button class="btn btn-light btn-small" type="button" onclick="abrirEdicaoFuncionario(${jsArg(f.id)})"><svg class="ic"><use href="#ic-edit"></use></svg> Editar</button>
+                <button class="btn ${ativo ? 'btn-danger' : 'btn-success'} btn-small" type="button" onclick="alternarEstadoFuncionario(${jsArg(f.id)})">${ativo ? '<svg class="ic"><use href="#ic-close"></use></svg> Desativar' : '<svg class="ic"><use href="#ic-check"></use></svg> Reativar'}</button>
             </div>` : "—";
 
         return `
@@ -9738,12 +9738,12 @@ function renderDispensas() {
 
     tabela.innerHTML = listaFiltrada.map(d => {
         const est = d.estado || "PENDENTE";
-        let badgeEstado = '<span class="badge badge-yellow">🟡 PENDENTE</span>';
-        if (est === "APROVADA") badgeEstado = '<span class="badge badge-green">🟢 APROVADA</span>';
-        if (est === "RECUSADA") badgeEstado = '<span class="badge badge-red">🔴 RECUSADA</span>';
+        let badgeEstado = '<span class="badge badge-yellow"><span class="dot dot-yellow"></span> PENDENTE</span>';
+        if (est === "APROVADA") badgeEstado = '<span class="badge badge-green"><span class="dot dot-green"></span> APROVADA</span>';
+        if (est === "RECUSADA") badgeEstado = '<span class="badge badge-red"><span class="dot dot-red"></span> RECUSADA</span>';
 
         const periodoFormatado = `${dataTexto(d.dataInicio)} até ${dataTexto(d.dataFim)}`;
-        const remuneraTxt = d.remunerada ? '<span style="color:#16a34a;font-weight:700;">🟢 Remunerada</span>' : '<span style="color:#64748b;">⚪ Sem Vencimento</span>';
+        const remuneraTxt = d.remunerada ? '<span style="color:#16a34a;font-weight:700;"><span class="dot dot-green"></span> Remunerada</span>' : '<span style="color:#64748b;"><span class="dot dot-grey"></span> Sem Vencimento</span>';
 
         return `
         <tr>
@@ -9767,12 +9767,12 @@ function renderDispensas() {
             <td>
                 <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
                     ${(ehGerente && est === "PENDENTE") ? `
-                        <button class="btn btn-success btn-small" type="button" onclick="aprovarDispensa(${jsArg(d.id)})" style="background:#10b981;color:#fff;font-weight:700;padding:4px 8px;" title="Aprovar formalmente esta dispensa">✅ Aprovar</button>
-                        <button class="btn btn-danger btn-small" type="button" onclick="recusarDispensa(${jsArg(d.id)})" style="background:#ef4444;color:#fff;font-weight:700;padding:4px 8px;" title="Recusar pedido de dispensa">❌ Recusar</button>
+                        <button class="btn btn-success btn-small" type="button" onclick="aprovarDispensa(${jsArg(d.id)})" style="background:#10b981;color:#fff;font-weight:700;padding:4px 8px;" title="Aprovar formalmente esta dispensa"><svg class="ic"><use href="#ic-check"></use></svg> Aprovar</button>
+                        <button class="btn btn-danger btn-small" type="button" onclick="recusarDispensa(${jsArg(d.id)})" style="background:#ef4444;color:#fff;font-weight:700;padding:4px 8px;" title="Recusar pedido de dispensa"><svg class="ic"><use href="#ic-close"></use></svg> Recusar</button>
                     ` : ""}
-                    <button class="btn btn-light btn-small" type="button" onclick="imprimirGuiaDispensa(${jsArg(d.id)})" style="padding:4px 8px;" title="Imprimir Guia de Dispensa / Comprovativo">🖨️ Guia</button>
+                    <button class="btn btn-light btn-small" type="button" onclick="imprimirGuiaDispensa(${jsArg(d.id)})" style="padding:4px 8px;" title="Imprimir Guia de Dispensa / Comprovativo"><svg class="ic"><use href="#ic-printer"></use></svg> Guia</button>
                     ${ehGerente ? `
-                        <button class="btn btn-small" type="button" onclick="apagarDispensa(${jsArg(d.id)})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;" title="Eliminar registo de dispensa">🗑️</button>
+                        <button class="btn btn-small" type="button" onclick="apagarDispensa(${jsArg(d.id)})" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:4px 8px;" title="Eliminar registo de dispensa"><svg class="ic"><use href="#ic-trash"></use></svg></button>
                     ` : ""}
                 </div>
             </td>
@@ -9781,7 +9781,7 @@ function renderDispensas() {
     }).join("") || `
     <tr>
         <td colspan="10" style="text-align:center;color:#64748b;padding:24px;">
-            Nenhum registo de dispensa ou licença encontrado. Clique em "➕ Solicitar / Registar Dispensa" acima.
+            Nenhum registo de dispensa ou licença encontrado. Clique em "<svg class="ic"><use href="#ic-plus"></use></svg> Solicitar / Registar Dispensa" acima.
         </td>
     </tr>
     `;
@@ -9812,7 +9812,7 @@ window.abrirModalNovaDispensa = function() {
         const funcs = FABEF.funcionarios || [];
         let html = "";
         if (ehUsuarioGerente()) {
-            html += `<option value="GERENTE:${escapeHTML(FABEF.empresa?.donoNome || 'Gerente / Proprietário')}">👑 ${escapeHTML(FABEF.empresa?.donoNome || 'Gerente / Proprietário')} (Gerência)</option>`;
+            html += `<option value="GERENTE:${escapeHTML(FABEF.empresa?.donoNome || 'Gerente / Proprietário')}"><svg class="ic"><use href="#ic-star"></use></svg> ${escapeHTML(FABEF.empresa?.donoNome || 'Gerente / Proprietário')} (Gerência)</option>`;
         }
         funcs.forEach(f => {
             html += `<option value="${f.id}:${escapeHTML(f.nome || 'Funcionário')}">${escapeHTML(f.nome || 'Funcionário')} (${escapeHTML(f.ramo || 'Geral')})</option>`;
@@ -9933,12 +9933,12 @@ window.salvarDispensa = async function() {
             incluirSemDuplicar(FABEF.dispensas, { id: novoId, ...payload }, true);
         }
 
-        await gravarAuditoria(`🏖️ DISPENSA REGISTADA (${payload.funcionarioNome} - ${payload.tipo} - ${payload.dias} dias) por ${usuarioAtual}. Estado: ${payload.estado}.`, "INFO");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-beach"></use></svg> DISPENSA REGISTADA (${payload.funcionarioNome} - ${payload.tipo} - ${payload.dias} dias) por ${usuarioAtual}. Estado: ${payload.estado}.`, "INFO");
 
         fecharModal("modal-dispensa-funcionario");
         renderDispensas();
 
-        alert(`✅ Dispensa registada com sucesso!\n• Funcionário: ${payload.funcionarioNome}\n• Duração: ${payload.dias} dias (${dataTexto(payload.dataInicio)} a ${dataTexto(payload.dataFim)})\n• Estado: ${payload.estado}`);
+        alert(`Dispensa registada com sucesso!\n• Funcionário: ${payload.funcionarioNome}\n• Duração: ${payload.dias} dias (${dataTexto(payload.dataInicio)} a ${dataTexto(payload.dataFim)})\n• Estado: ${payload.estado}`);
     } catch (err) {
         console.error("Erro ao salvar dispensa:", err);
         alert("Erro ao gravar dispensa:\n" + (err.message || err));
@@ -9969,10 +9969,10 @@ window.aprovarDispensa = async function(id) {
         }
 
         Object.assign(d, updateData);
-        await gravarAuditoria(`✅ DISPENSA APROVADA: ${d.funcionarioNome} (${d.dias} dias - ${d.tipo}) pelo Gerente ${usuarioAtual}.`, "INFO");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-check"></use></svg> DISPENSA APROVADA: ${d.funcionarioNome} (${d.dias} dias - ${d.tipo}) pelo Gerente ${usuarioAtual}.`, "INFO");
 
         renderDispensas();
-        alert(`✅ Dispensa de "${d.funcionarioNome}" foi APROVADA com sucesso!`);
+        alert(`Dispensa de "${d.funcionarioNome}" foi APROVADA com sucesso!`);
     } catch (err) {
         console.error("Erro ao aprovar dispensa:", err);
         alert("Erro ao aprovar dispensa:\n" + (err.message || err));
@@ -10009,7 +10009,7 @@ window.recusarDispensa = async function(id) {
         }
 
         Object.assign(d, updateData);
-        await gravarAuditoria(`🔴 DISPENSA RECUSADA: ${d.funcionarioNome} (${d.tipo}) pelo Gerente ${usuarioAtual}. Motivo: "${motivoRecusa}"`, "ALERTA");
+        await gravarAuditoria(`<span class="dot dot-red"></span> DISPENSA RECUSADA: ${d.funcionarioNome} (${d.tipo}) pelo Gerente ${usuarioAtual}. Motivo: "${motivoRecusa}"`, "ALERTA");
 
         renderDispensas();
         alert(`Dispensa de "${d.funcionarioNome}" foi recusada.`);
@@ -10034,7 +10034,7 @@ window.apagarDispensa = async function(id) {
             await deleteDoc(doc(db, "empresas", FABEF.empresaId, "dispensas", id));
         }
         FABEF.dispensas = (FABEF.dispensas || []).filter(x => x.id !== id);
-        await gravarAuditoria(`🗑️ Eliminação de registo de dispensa de ${d.funcionarioNome}.`, "INFO");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-trash"></use></svg> Eliminação de registo de dispensa de ${d.funcionarioNome}.`, "INFO");
 
         renderDispensas();
         alert("Registo de dispensa eliminado com sucesso.");
@@ -10083,7 +10083,7 @@ window.imprimirGuiaDispensa = function(id) {
             <div class="titulo">${escapeHTML(nomeEmp)}</div>
             <div class="subtitulo">NUIT: ${escapeHTML(nuitEmp)} | Telefone: ${escapeHTML(telEmp)} | ${escapeHTML(endEmp)}</div>
             <div style="margin-top: 8px; font-weight: 800; font-size: 16px; color: #0f172a;">
-                📋 GUIA OFICIAL DE DISPENSA / AUTORIZAÇÃO DE AUSÊNCIA
+                <svg class="ic"><use href="#ic-clipboard"></use></svg> GUIA OFICIAL DE DISPENSA / AUTORIZAÇÃO DE AUSÊNCIA
             </div>
         </div>
 
@@ -10110,7 +10110,7 @@ window.imprimirGuiaDispensa = function(id) {
             </div>
             <div class="linha">
                 <span class="rotulo">Remuneração:</span>
-                <span class="valor">${d.remunerada ? "🟢 Remunerada (Sem Desconto Salarial)" : "⚪ Não Remunerada"}</span>
+                <span class="valor">${d.remunerada ? "<span class="dot dot-green"></span> Remunerada (Sem Desconto Salarial)" : "<span class="dot dot-grey"></span> Não Remunerada"}</span>
             </div>
             <div class="linha">
                 <span class="rotulo">Estado da Solicitação:</span>
@@ -10316,7 +10316,7 @@ function renderAvisoPlano() {
             <strong>🆓 Plano Grátis</strong> — Vendas hoje: ${vendasHoje}/${LIMITES_PLANO_GRATIS.vendasDiarias} ·
             Encomendas hoje: ${encomendasHoje}/${LIMITES_PLANO_GRATIS.encomendasDiarias} ·
             Funcionários: ${LIMITES_PLANO_GRATIS.funcionarios} máx.
-            <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')" style="margin-left:8px;">⭐ Passar a Premium (250 MT)</button>
+            <button class="btn btn-success btn-small" type="button" onclick="mostrarSecao('subscricao')" style="margin-left:8px;"><svg class="ic"><use href="#ic-star"></use></svg> Passar a Premium (250 MT)</button>
         </div>
     `;
 }
@@ -10327,15 +10327,15 @@ function rotuloPlanoRamo(ramo, emp) {
     const plano = obterPlanoAtual(ramo, e);
     const lic = obterLicencaRamo(ramo, e);
     const dt = lic.validade_subscricao ? new Date(lic.validade_subscricao).toLocaleDateString("pt-MZ") : "";
-    if (plano === "PAGO") return { plano, cls: "alert-success", txt: `✅ Pago${dt ? " até " + dt : ""}` };
+    if (plano === "PAGO") return { plano, cls: "alert-success", txt: `<svg class="ic"><use href="#ic-check"></use></svg> Pago${dt ? " até " + dt : ""}` };
     if (plano === "TRIAL") {
         const origem = lic.data_registo;
         const d = origem && typeof origem.toDate === "function" ? origem.toDate() : new Date(origem || Date.now());
         const fim = new Date(d); fim.setDate(fim.getDate() + 7);
         const dias = Math.max(0, Math.ceil((fim - Date.now()) / 86400000));
-        return { plano, cls: "alert-warning", txt: `🧪 Período de teste (restam ~${dias} dia(s))` };
+        return { plano, cls: "alert-warning", txt: `<svg class="ic"><use href="#ic-box"></use></svg> Período de teste (restam ~${dias} dia(s))` };
     }
-    if (plano === "BLOQUEADO") return { plano, cls: "alert-danger", txt: "🔒 Por pagar — escondido (outro ramo já está pago)" };
+    if (plano === "BLOQUEADO") return { plano, cls: "alert-danger", txt: "<svg class="ic"><use href="#ic-lock"></use></svg> Por pagar — escondido (outro ramo já está pago)" };
     return { plano, cls: "alert-warning", txt: "🆓 Plano Grátis (com limites)" };
 }
 
@@ -10385,7 +10385,7 @@ function verificarSubscricao(){
             const caixa = bloqueio.querySelector(".license-box");
             if (caixa) {
                 caixa.innerHTML = `
-                    <h2 style="color:#ef4444;">🔒 Ramo por pagar</h2>
+                    <h2 style="color:#ef4444;"><svg class="ic"><use href="#ic-lock"></use></svg> Ramo por pagar</h2>
                     <p style="margin:15px 0;color:#475569;">A subscrição do ramo <strong>${escapeHTML(ramo)}</strong> ainda não foi paga.${ehGer ? "" : " Peça ao gerente para regularizar."}</p>
                     ${ehGer ? `<button type="button" class="btn btn-entrar" onclick="document.getElementById('bloqueio-licenca').classList.remove('show'); mostrarSecao('subscricao');">Ir para Subscrição</button>` : ""}
                     <button type="button" class="btn btn-light" style="margin-top:8px;" onclick="document.getElementById('btn-logout')?.click(); document.getElementById('bloqueio-licenca').classList.remove('show');">Sair da conta</button>`;
@@ -10534,7 +10534,7 @@ function renderContaAdmin() {
             <div style="word-break:break-all;"><strong>O seu UID:</strong> <code id="admin-uid-texto">${escapeHTML(u.uid)}</code></div>
             <div style="font-size:12px;color:#64748b;margin-top:2px;">Esta conta é identificada como administradora pelo UID (nas regras do Firestore e na aplicação).</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-                <button type="button" class="btn btn-light btn-small" style="width:auto;padding:5px 10px;" onclick="window.adminCopiarUid()">📋 Copiar UID</button>
+                <button type="button" class="btn btn-light btn-small" style="width:auto;padding:5px 10px;" onclick="window.adminCopiarUid()"><svg class="ic"><use href="#ic-clipboard"></use></svg> Copiar UID</button>
             </div>
         </div>`;
 }
@@ -10579,7 +10579,7 @@ async function carregarPainelAdmin() {
     if (aviso) {
         if (erros.length) {
             aviso.className = "alert alert-danger";
-            aviso.innerHTML = `🔴 Sem permissão para ler: <strong>${erros.join(" e ")}</strong>. Confirme que publicou o <code>firestore.rules</code> mais recente e que o UID nas regras é o mesmo que está escrito acima.`;
+            aviso.innerHTML = `<span class="dot dot-red"></span> Sem permissão para ler: <strong>${erros.join(" e ")}</strong>. Confirme que publicou o <code>firestore.rules</code> mais recente e que o UID nas regras é o mesmo que está escrito acima.`;
         } else {
             aviso.className = "";
             aviso.innerHTML = "";
@@ -10622,7 +10622,7 @@ function renderPainelAdmin() {
     setTxt("admin-kpi-pendentes", pendentes.length);
 
     const btnMenu = document.getElementById("btn-sidebar-admin");
-    if (btnMenu) btnMenu.textContent = "🛡️ Ativar Contas" + (pendentes.length ? ` (${pendentes.length})` : "");
+    if (btnMenu) btnMenu.textContent = "<svg class="ic"><use href="#ic-shield"></use></svg> Ativar Contas" + (pendentes.length ? ` (${pendentes.length})` : "");
 
     corpoPed.innerHTML = pendentes.map(p => {
         const emp = FABEF_ADMIN.empresas.find(e => e.id === p.empresaId);
@@ -10632,12 +10632,12 @@ function renderPainelAdmin() {
         return `
         <tr>
             <td>${dataTexto(p.data)}</td>
-            <td><strong>${escapeHTML(nome)}</strong><br><span style="font-size:12px;color:#1e3a8a;font-weight:700;">Ramo: ${escapeHTML(ramoNome)}</span><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.gerenteEmail || "")}${p.telefone ? " · " + escapeHTML(p.telefone) : ""}</span>${emp?.indicadoPorCodigo && !emp?.indicacaoPremiada ? `<br><span style="font-size:11px;font-weight:700;color:#b45309;">🎁 Indicado pelo código ${escapeHTML(emp.indicadoPorCodigo)}</span>` : ""}</td>
+            <td><strong>${escapeHTML(nome)}</strong><br><span style="font-size:12px;color:#1e3a8a;font-weight:700;">Ramo: ${escapeHTML(ramoNome)}</span><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.gerenteEmail || "")}${p.telefone ? " · " + escapeHTML(p.telefone) : ""}</span>${emp?.indicadoPorCodigo && !emp?.indicacaoPremiada ? `<br><span style="font-size:11px;font-weight:700;color:#b45309;"><svg class="ic"><use href="#ic-gift"></use></svg> Indicado pelo código ${escapeHTML(emp.indicadoPorCodigo)}</span>` : ""}</td>
             <td><code>${escapeHTML(p.referencia || "—")}</code><br><span style="font-size:11px;color:#64748b;">${escapeHTML(p.tipo === "CHAVE" ? "Chave de licença" : "Código SMS")}</span></td>
             <td>${dinheiro(numero(p.valor) || 250)}</td>
             <td style="white-space:nowrap;">
-                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa(${jsArg(p.empresaId)}, 30, ${jsArg(p.id)}, ${jsArg(chave)})" style="width:auto;padding:5px 10px;font-size:12px;">✅ Ativar este ramo (30 d)</button>
-                <button type="button" class="btn btn-small btn-danger" onclick="window.adminRejeitarPedido(${jsArg(p.id)})" style="width:auto;padding:5px 10px;font-size:12px;">❌ Rejeitar</button>
+                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa(${jsArg(p.empresaId)}, 30, ${jsArg(p.id)}, ${jsArg(chave)})" style="width:auto;padding:5px 10px;font-size:12px;"><svg class="ic"><use href="#ic-check"></use></svg> Ativar este ramo (30 d)</button>
+                <button type="button" class="btn btn-small btn-danger" onclick="window.adminRejeitarPedido(${jsArg(p.id)})" style="width:auto;padding:5px 10px;font-size:12px;"><svg class="ic"><use href="#ic-close"></use></svg> Rejeitar</button>
             </td>
         </tr>`;
     }).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Nenhum pedido de ativação pendente.</td></tr>`;
@@ -10660,8 +10660,8 @@ function renderPainelAdmin() {
             <td>${dataTexto(e.data_registo || e.criadoEm)}</td>
             <td style="color:${st.cor};font-weight:700;">${escapeHTML(st.rotulo)}</td>
             <td style="white-space:nowrap;">
-                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa(${jsArg(e.id)}, 30, '', ${jsArg(ch)})" style="width:auto;padding:5px 10px;font-size:12px;">✅ Ativar +30 d</button>
-                <button type="button" class="btn btn-small btn-light" onclick="window.adminDesativarEmpresa(${jsArg(e.id)}, ${jsArg(ch)})" style="width:auto;padding:5px 10px;font-size:12px;">⛔ Desativar</button>
+                <button type="button" class="btn btn-small btn-entrar" onclick="window.adminAtivarEmpresa(${jsArg(e.id)}, 30, '', ${jsArg(ch)})" style="width:auto;padding:5px 10px;font-size:12px;"><svg class="ic"><use href="#ic-check"></use></svg> Ativar +30 d</button>
+                <button type="button" class="btn btn-small btn-light" onclick="window.adminDesativarEmpresa(${jsArg(e.id)}, ${jsArg(ch)})" style="width:auto;padding:5px 10px;font-size:12px;"><svg class="ic"><use href="#ic-close"></use></svg> Desativar</button>
             </td>
         </tr>`);
         });
@@ -10777,7 +10777,7 @@ window.adminAtivarEmpresa = async function (empresaId, dias, pedidoId, chaveRamo
         renderPainelAdmin();
         try { await gravarAuditoria(`Administrador ativou o ramo "${ramoNome}" da conta "${nome}" até ${nova.toLocaleDateString("pt-MZ")}.`, "INFO"); } catch (_) {}
         const premio = await premiarIndicacaoSeAplicavel(emp);
-        alert(`✅ Ramo "${ramoNome}" (${nome}) ativado até ${nova.toLocaleDateString("pt-MZ")}.` + (premio ? "\n\n" + premio : ""));
+        alert(`Ramo "${ramoNome}" (${nome}) ativado até ${nova.toLocaleDateString("pt-MZ")}.` + (premio ? "\n\n" + premio : ""));
     } catch (error) {
         console.error("Erro ao ativar ramo:", error);
         alert("Não foi possível ativar o ramo:\n" + mensagemFirebase(error));
@@ -10893,7 +10893,7 @@ window.submeterComprovativoPagamento = async function () {
     const ramoPedido = document.getElementById("subscricao-ramo")?.value || FABEF.ramo;
     if (await enviarPedidoAtivacao("SMS", ref, ramoPedido)) {
         if (inp) inp.value = "";
-        alert("✅ Pedido enviado!\n\nO administrador vai confirmar o pagamento e ativar a sua conta. Para ser mais rápido, envie também o comprovativo por WhatsApp.");
+        alert("Pedido enviado!\n\nO administrador vai confirmar o pagamento e ativar a sua conta. Para ser mais rápido, envie também o comprovativo por WhatsApp.");
     }
 };
 
@@ -10908,7 +10908,7 @@ window.ativarLicencaPorChave = async function () {
     const ramoPedidoChave = document.getElementById("subscricao-ramo")?.value || FABEF.ramo;
     if (await enviarPedidoAtivacao("CHAVE", chave, ramoPedidoChave)) {
         if (inp) inp.value = "";
-        alert("✅ Chave enviada ao administrador para validação. A conta será ativada assim que for confirmada.");
+        alert("Chave enviada ao administrador para validação. A conta será ativada assim que for confirmada.");
     }
 };
 
@@ -11107,7 +11107,7 @@ function renderPastaRamos() {
             <div class="card card-ramo-pasta" style="border: 2px solid ${ehAtivo ? '#10b981' : '#cbd5e1'}; background:${ehAtivo ? '#f0fdf4' : '#ffffff'}; padding:16px; border-radius:12px; position:relative; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06); color:#0f172a !important;">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
                     <div style="display:flex;align-items:center;gap:10px;">
-                        <span style="font-size:32px;">📁</span>
+                        <span style="font-size:32px;"><svg class="ic"><use href="#ic-folder"></use></svg></span>
                         <div>
                             <h4 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">${escapeHTML(r.nome)}</h4>
                             <small style="color:#64748b;font-weight:600;">${escapeHTML(r.tipo || r.nome)}</small>
@@ -11115,7 +11115,7 @@ function renderPastaRamos() {
                     </div>
                     <div>
                         ${ehAtivo 
-                            ? `<span class="badge badge-green" style="font-size:11px;padding:3px 8px;font-weight:700;">✅ Ativo</span>` 
+                            ? `<span class="badge badge-green" style="font-size:11px;padding:3px 8px;font-weight:700;"><svg class="ic"><use href="#ic-check"></use></svg> Ativo</span>` 
                             : `<span class="badge badge-yellow" style="font-size:11px;padding:3px 7px;font-weight:700;">Alternativo</span>`
                         }
                     </div>
@@ -11123,17 +11123,17 @@ function renderPastaRamos() {
 
                 <div style="background:${ehAtivo ? '#e6f7ec' : '#f8fafc'};padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border:1px solid ${ehAtivo ? '#bbf7d0' : '#e2e8f0'};color:#0f172a;">
                     <div>
-                        <span style="color:#475569;display:block;font-size:11px;font-weight:700;">📦 Artigos:</span>
+                        <span style="color:#475569;display:block;font-size:11px;font-weight:700;"><svg class="ic"><use href="#ic-box"></use></svg> Artigos:</span>
                         <strong style="color:#0f172a;font-size:14px;display:block;margin-top:2px;">${totalProds} no stock</strong>
                     </div>
                     <div>
-                        <span style="color:#475569;display:block;font-size:11px;font-weight:700;">💰 Vendas Hoje:</span>
+                        <span style="color:#475569;display:block;font-size:11px;font-weight:700;"><svg class="ic"><use href="#ic-wallet"></use></svg> Vendas Hoje:</span>
                         <strong style="color:${totalHojeRamo > 0 ? '#059669' : '#0f172a'};font-size:14px;display:block;margin-top:2px;">${dinheiro(totalHojeRamo)}</strong>
                     </div>
                     <div style="grid-column:1/-1;border-top:1px dashed #cbd5e1;padding-top:8px;margin-top:2px;font-size:12px;">
                         ${temSenha 
-                            ? `<span style="color:#b45309;font-weight:700;display:inline-flex;align-items:center;gap:4px;">🔒 Protegido com Senha</span>` 
-                            : `<span style="color:#059669;font-weight:700;display:inline-flex;align-items:center;gap:4px;">🔓 Acesso Livre</span>`
+                            ? `<span style="color:#b45309;font-weight:700;display:inline-flex;align-items:center;gap:4px;"><svg class="ic"><use href="#ic-lock"></use></svg> Protegido com Senha</span>` 
+                            : `<span style="color:#059669;font-weight:700;display:inline-flex;align-items:center;gap:4px;"><svg class="ic"><use href="#ic-unlock"></use></svg> Acesso Livre</span>`
                         }
                     </div>
                 </div>
@@ -11141,27 +11141,27 @@ function renderPastaRamos() {
                 <div style="display:flex;gap:8px;flex-direction:column;">
                     ${ehAtivo ? `
                         <button class="btn btn-success btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#10b981;color:#fff;border:none;border-radius:8px;" disabled>
-                            ✔ Ramo Selecionado Agora
+                            <svg class="ic"><use href="#ic-check"></use></svg> Ramo Selecionado Agora
                         </button>
                     ` : (!ramoDisponivel(r.nome) ? `
                         <button class="btn btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:8px;cursor:pointer;" onclick="mudarRamo(${jsArg(r.nome)})">
-                            🔒 Por pagar — ativar este ramo (250 MT)
+                            <svg class="ic"><use href="#ic-lock"></use></svg> Por pagar — ativar este ramo (250 MT)
                         </button>
                     ` : `
                         <button class="btn btn-primary btn-small" type="button" style="width:100%;font-weight:700;padding:10px;font-size:13px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;" onclick="alternarRamoPasta(${jsArg(r.nome)})">
-                            📂 Alternar para este Ramo
+                            <svg class="ic"><use href="#ic-folder"></use></svg> Alternar para este Ramo
                         </button>
                     `)}
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
                         <button class="btn btn-light btn-small" type="button" style="flex:1;min-width:120px;font-size:12px;font-weight:700;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;padding:8px 10px;border-radius:6px;cursor:pointer;" onclick="abrirConfiguracoesRamo(${jsArg(r.nome)})">
-                            ⚙️ Configurar Ramo
+                            <svg class="ic"><use href="#ic-gear"></use></svg> Configurar Ramo
                         </button>
                         <button class="btn btn-light btn-small" type="button" style="font-size:12px;font-weight:600;padding:8px 10px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b;border-radius:6px;cursor:pointer;" onclick="alterarPinRamo(${jsArg(r.nome)})">
-                            🔑 ${temSenha ? 'Alterar PIN' : 'Definir PIN'}
+                            <svg class="ic"><use href="#ic-key"></use></svg> ${temSenha ? 'Alterar PIN' : 'Definir PIN'}
                         </button>
                         ${!ehAtivo ? `
                         <button class="btn btn-light btn-small" type="button" style="color:#ef4444;font-size:13px;font-weight:600;padding:8px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:6px;cursor:pointer;" onclick="removerRamoPasta(${jsArg(r.nome)})" title="Remover este ramo da pasta">
-                            🗑️
+                            <svg class="ic"><use href="#ic-trash"></use></svg>
                         </button>
                         ` : ''}
                     </div>
@@ -11187,10 +11187,10 @@ window.alternarRamoPasta = async function(nomeRamo) {
     }
 
     if (ramoAlvo.senha && ramoAlvo.senha.trim()) {
-        const pinDigitado = prompt(`🔒 Segurança de Filial / Ramo:\n\nO ramo "${nomeRamo}" está protegido por PIN.\nPor favor, introduza o PIN ou Senha de acesso configurada pelo Gerente:`);
+        const pinDigitado = prompt(`<svg class="ic"><use href="#ic-lock"></use></svg> Segurança de Filial / Ramo:\n\nO ramo "${nomeRamo}" está protegido por PIN.\nPor favor, introduza o PIN ou Senha de acesso configurada pelo Gerente:`);
         if (pinDigitado === null) return;
         if (pinDigitado.trim() !== ramoAlvo.senha.trim()) {
-            alert("❌ Senha ou PIN incorreto! Acesso não autorizado para o ramo " + nomeRamo);
+            alert("Senha ou PIN incorreto! Acesso não autorizado para o ramo " + nomeRamo);
             return;
         }
     }
@@ -11214,15 +11214,15 @@ window.alterarPinRamo = async function(nomeRamo) {
     const ramo = ramos[index];
 
     if (ramo.senha && ramo.senha.trim()) {
-        const pinAtual = prompt(`🔒 Segurança de Ramo:\n\nO ramo "${nomeRamo}" possui um PIN atual.\nIntroduza o PIN atual para autorizar a alteração:`);
+        const pinAtual = prompt(`<svg class="ic"><use href="#ic-lock"></use></svg> Segurança de Ramo:\n\nO ramo "${nomeRamo}" possui um PIN atual.\nIntroduza o PIN atual para autorizar a alteração:`);
         if (pinAtual === null) return;
         if (pinAtual.trim() !== ramo.senha.trim()) {
-            alert("❌ PIN atual incorreto! Não foi possível autorizar.");
+            alert("PIN atual incorreto! Não foi possível autorizar.");
             return;
         }
     }
 
-    const novoPin = prompt(`🔑 Definir PIN para o ramo "${nomeRamo}":\n\nIntroduza o novo PIN (ex: 1234) para proteger este ramo.\n(Deixe em branco e clique em OK se desejar remover o PIN e deixar com acesso livre):`);
+    const novoPin = prompt(`<svg class="ic"><use href="#ic-key"></use></svg> Definir PIN para o ramo "${nomeRamo}":\n\nIntroduza o novo PIN (ex: 1234) para proteger este ramo.\n(Deixe em branco e clique em OK se desejar remover o PIN e deixar com acesso livre):`);
     if (novoPin === null) return;
 
     try {
@@ -11237,7 +11237,7 @@ window.alterarPinRamo = async function(nomeRamo) {
         FABEF.empresa.ramos_config = ramos;
 
         await gravarAuditoria(`Gerente configurou/alterou o PIN de proteção do ramo "${nomeRamo}".`, "INFO");
-        alert(`✅ Segurança do ramo "${nomeRamo}" atualizada com sucesso!`);
+        alert(`Segurança do ramo "${nomeRamo}" atualizada com sucesso!`);
         renderPastaRamos();
     } catch (e) {
         console.error(e);
@@ -11252,20 +11252,20 @@ window.removerRamoPasta = async function(nomeRamo) {
     }
 
     if (nomeRamo === FABEF.ramo) {
-        alert("⚠️ Não é possível remover o ramo que está atualmente em uso. Alterne primeiro para outro ramo antes de remover este.");
+        alert("Não é possível remover o ramo que está atualmente em uso. Alterne primeiro para outro ramo antes de remover este.");
         return;
     }
 
-    const confirmou = confirm(`⚠️ Confirmação:\n\nDeseja remover o ramo "${nomeRamo}" da pasta de ramos da empresa?\n\nOs artigos deste ramo permanecerão seguros na base de dados caso adicione novamente o ramo mais tarde.`);
+    const confirmou = confirm(`Confirmação:\n\nDeseja remover o ramo "${nomeRamo}" da pasta de ramos da empresa?\n\nOs artigos deste ramo permanecerão seguros na base de dados caso adicione novamente o ramo mais tarde.`);
     if (!confirmou) return;
 
     const ramos = obterConfigRamos();
     const ramoAlvo = ramos.find(r => r.nome === nomeRamo);
     if (ramoAlvo && ramoAlvo.senha && ramoAlvo.senha.trim()) {
-        const pinDigitado = prompt(`🔒 Introduza o PIN do ramo "${nomeRamo}" para autorizar a remoção:`);
+        const pinDigitado = prompt(`<svg class="ic"><use href="#ic-lock"></use></svg> Introduza o PIN do ramo "${nomeRamo}" para autorizar a remoção:`);
         if (pinDigitado === null) return;
         if (pinDigitado.trim() !== ramoAlvo.senha.trim()) {
-            alert("❌ PIN incorreto!");
+            alert("PIN incorreto!");
             return;
         }
     }
@@ -11292,7 +11292,7 @@ window.removerRamoPasta = async function(nomeRamo) {
         await gravarAuditoria(`Gerente removeu o ramo "${nomeRamo}" da pasta de ramos.`, "INFO");
         renderRamos();
         renderPastaRamos();
-        alert(`🗑️ Ramo "${nomeRamo}" removido da pasta com sucesso.`);
+        alert(`Ramo "${nomeRamo}" removido da pasta com sucesso.`);
     } catch (e) {
         console.error(e);
         alert("Erro ao remover ramo:\n" + mensagemFirebase(e));
@@ -11456,7 +11456,7 @@ document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click"
     const reporStock = Boolean(document.getElementById("falha-venda-repor-stock")?.checked);
 
     if (!justificativa || justificativa.trim().length < 3) {
-        alert("⚠️ Justificativa Obrigatória:\nPor favor, escreva a justificativa detalhada para o Gerente explicando o motivo da alteração ou anulação desta venda.");
+        alert("Justificativa Obrigatória:\nPor favor, escreva a justificativa detalhada para o Gerente explicando o motivo da alteração ou anulação desta venda.");
         document.getElementById("falha-venda-justificativa")?.focus();
         return;
     }
@@ -11504,13 +11504,13 @@ document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click"
             await updateDoc(doc(db, "empresas", FABEF.empresaId, "vendas", vendaId), payloadAtualizacao);
             Object.assign(v, payloadAtualizacao);
 
-            await gravarAuditoria(`✏️ PREÇO DE VENDA CORRIGIDO (#${v.id.slice(0, 8)}) por ${usuarioNome}: de ${dinheiro(precoAntigo)} para ${dinheiro(novoPreco)}. Justificativa ao Gerente: "${justificativa}"`, "ALERTA");
+            await gravarAuditoria(`<svg class="ic"><use href="#ic-edit"></use></svg> PREÇO DE VENDA CORRIGIDO (#${v.id.slice(0, 8)}) por ${usuarioNome}: de ${dinheiro(precoAntigo)} para ${dinheiro(novoPreco)}. Justificativa ao Gerente: "${justificativa}"`, "ALERTA");
 
             fecharModal("modal-venda-falhada");
             renderVendas();
             renderDashboard();
 
-            alert(`✅ Preço da venda corrigido para ${dinheiro(novoPreco)} com sucesso!\nA justificativa foi enviada e arquivada nos registos de auditoria do Gerente.`);
+            alert(`Preço da venda corrigido para ${dinheiro(novoPreco)} com sucesso!\nA justificativa foi enviada e arquivada nos registos de auditoria do Gerente.`);
             return;
         }
 
@@ -11540,7 +11540,7 @@ document.getElementById("btn-confirmar-venda-falhada")?.addEventListener("click"
         await updateDoc(doc(db, "empresas", FABEF.empresaId, "vendas", vendaId), payloadAtualizacao);
         Object.assign(v, payloadAtualizacao);
 
-        await gravarAuditoria(`⚠️ VENDA ANULADA / FALHADA (#${v.id.slice(0, 8)} - ${dinheiro(v.total)}) registada por ${usuarioNome}. Motivo ao Gerente: "${justificativa}"`, "ALERTA");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-warning"></use></svg> VENDA ANULADA / FALHADA (#${v.id.slice(0, 8)} - ${dinheiro(v.total)}) registada por ${usuarioNome}. Motivo ao Gerente: "${justificativa}"`, "ALERTA");
 
         fecharModal("modal-venda-falhada");
         renderVendas();
@@ -11626,7 +11626,7 @@ window.salvarEdicaoVenda = async function() {
     }
 
     if (!justificativa || justificativa.trim().length < 3) {
-        alert("⚠️ Justificativa Obrigatória:\nPor favor, informe a justificativa da alteração para o histórico do Gerente.");
+        alert("Justificativa Obrigatória:\nPor favor, informe a justificativa da alteração para o histórico do Gerente.");
         document.getElementById("edit-venda-justificativa")?.focus();
         return;
     }
@@ -11680,13 +11680,13 @@ window.salvarEdicaoVenda = async function() {
 
         Object.assign(v, updateData, { historicoEdicoes: [...(v.historicoEdicoes || []), registoEdicao] });
 
-        await gravarAuditoria(`✏️ VENDA EDITADA (#${v.id.slice(0, 8)}) por ${usuarioNome}. Novo total: ${dinheiro(novoTotal)} (Antes: ${dinheiro(totalAntigo)}). Motivo: "${justificativa}"`, "ALERTA");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-edit"></use></svg> VENDA EDITADA (#${v.id.slice(0, 8)}) por ${usuarioNome}. Novo total: ${dinheiro(novoTotal)} (Antes: ${dinheiro(totalAntigo)}). Motivo: "${justificativa}"`, "ALERTA");
 
         fecharModal("modal-editar-venda");
         renderVendas();
         renderDashboard();
 
-        alert(`✅ Venda atualizada com sucesso!\nO novo valor de ${dinheiro(novoTotal)} e as alterações foram gravadas.`);
+        alert(`Venda atualizada com sucesso!\nO novo valor de ${dinheiro(novoTotal)} e as alterações foram gravadas.`);
     } catch (err) {
         console.error("Erro ao salvar edição da venda:", err);
         alert("Erro ao salvar alterações da venda:\n" + (err.message || err));
@@ -11697,7 +11697,7 @@ document.getElementById("btn-guardar-edicao-venda")?.addEventListener("click", w
 
 window.apagarVenda = async function(vendaId) {
     if (!window.FABEF?.isDemoMode) {
-        alert("🔒 As vendas não se apagam, para manter o histórico. Use 'Editar' (com justificação) ou marque como falhada.");
+        alert("As vendas não se apagam, para manter o histórico. Use 'Editar' (com justificação) ou marque como falhada.");
         return;
     }
     if (!podeOperarVendasEDespesas()) { avisoSoFuncionario("Apagar vendas"); return; }
@@ -11709,7 +11709,7 @@ window.apagarVenda = async function(vendaId) {
 
     const valorVenda = dinheiro(v.total || 0);
     const dataVenda = dataTexto(v.data || v.date);
-    const confirmMsg = `⚠️ ATENÇÃO: Deseja APAGAR definitivamente esta venda errada?\n\n` +
+    const confirmMsg = `<svg class="ic"><use href="#ic-warning"></use></svg> ATENÇÃO: Deseja APAGAR definitivamente esta venda errada?\n\n` +
         `• Referência: #${v.id.slice(0, 8)}\n` +
         `• Valor: ${valorVenda}\n` +
         `• Data: ${dataVenda}\n` +
@@ -11770,7 +11770,7 @@ window.apagarVenda = async function(vendaId) {
         }
 
         // 5. Auditoria
-        await gravarAuditoria(`🗑️ VENDA APAGADA (#${v.id.slice(0, 8)} - ${valorVenda}) por ${usuarioNome}. O stock dos artigos foi reposto.`, "ALERTA");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-trash"></use></svg> VENDA APAGADA (#${v.id.slice(0, 8)} - ${valorVenda}) por ${usuarioNome}. O stock dos artigos foi reposto.`, "ALERTA");
 
         // 6. Fechar modal se aberto e atualizar ecrãs
         fecharModal("modal-editar-venda");
@@ -11779,7 +11779,7 @@ window.apagarVenda = async function(vendaId) {
         renderInventario();
         renderDashboard();
 
-        alert(`✅ Venda apagada com sucesso!\nO valor de ${valorVenda} foi removido e o stock dos produtos foi reposto.`);
+        alert(`Venda apagada com sucesso!\nO valor de ${valorVenda} foi removido e o stock dos produtos foi reposto.`);
     } catch (err) {
         console.error("Erro ao apagar venda:", err);
         alert("Erro ao apagar venda:\n" + (err.message || err));
@@ -11808,7 +11808,7 @@ document.getElementById("btn-confirmar-encomenda-falhada")?.addEventListener("cl
     const justificativa = (document.getElementById("falha-encomenda-justificativa")?.value || "").trim();
 
     if (!justificativa || justificativa.trim().length < 3) {
-        alert("⚠️ Campo Obrigatório:\nPor favor, escreva a justificativa para o Gerente explicando porque a encomenda falhou ou foi cancelada.");
+        alert("Campo Obrigatório:\nPor favor, escreva a justificativa para o Gerente explicando porque a encomenda falhou ou foi cancelada.");
         document.getElementById("falha-encomenda-justificativa")?.focus();
         return;
     }
@@ -11828,7 +11828,7 @@ document.getElementById("btn-confirmar-encomenda-falhada")?.addEventListener("cl
         await updateDoc(doc(db, "empresas", FABEF.empresaId, "encomendas", encomendaId), payload);
         Object.assign(e, payload);
 
-        await gravarAuditoria(`⚠️ ENCOMENDA CANCELADA (${e.cliente} - ${dinheiro(e.valorTotal)}) por ${usuarioNome}. Motivo ao Gerente: "${justificativa}"`, "ALERTA");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-warning"></use></svg> ENCOMENDA CANCELADA (${e.cliente} - ${dinheiro(e.valorTotal)}) por ${usuarioNome}. Motivo ao Gerente: "${justificativa}"`, "ALERTA");
 
         fecharModal("modal-encomenda-falhada");
         renderEncomendas();
@@ -11842,10 +11842,10 @@ document.getElementById("btn-confirmar-encomenda-falhada")?.addEventListener("cl
 document.getElementById("btn-toggle-dark")?.addEventListener("click",()=>{
     const corpoApp=document.body; corpoApp.classList.toggle("dark-mode");
     const escuro=corpoApp.classList.contains("dark-mode");
-    document.getElementById("btn-toggle-dark").textContent=escuro?"☀️ Modo Claro":"🌙 Modo Escuro";
+    document.getElementById("btn-toggle-dark").textContent=escuro?"<svg class="ic"><use href="#ic-sun"></use></svg> Modo Claro":"<svg class="ic"><use href="#ic-moon"></use></svg> Modo Escuro";
     try{localStorage.setItem("FABEF_dark_mode",escuro?"1":"0");}catch(e){}
 });
-try{if(localStorage.getItem("FABEF_dark_mode")==="1"){document.body.classList.add("dark-mode");const b=document.getElementById("btn-toggle-dark");if(b)b.textContent="☀️ Modo Claro";}}catch(e){}
+try{if(localStorage.getItem("FABEF_dark_mode")==="1"){document.body.classList.add("dark-mode");const b=document.getElementById("btn-toggle-dark");if(b)b.textContent="<svg class="ic"><use href="#ic-sun"></use></svg> Modo Claro";}}catch(e){}
 
 /* =====================================================
    MÓDULO LÓGICO: RECONCILIAÇão DE STOCK (CONFLITOS OFFLINE)
@@ -11866,7 +11866,7 @@ function verificarReconciliacaoStock() {
             // Só grava o alerta de auditoria uma vez por produto/ocorrência,
             // para não encher o histórico com o mesmo aviso repetido.
             gravarAuditoria(
-                `⚠️ Reconciliação necessária: o produto "${p.nome}" ficou com stock negativo (${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + p.unidade : ""}). Isto normalmente acontece quando dois dispositivos venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar.`,
+                `<svg class="ic"><use href="#ic-warning"></use></svg> Reconciliação necessária: o produto "${p.nome}" ficou com stock negativo (${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + p.unidade : ""}). Isto normalmente acontece quando dois dispositivos venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar.`,
                 "ALERTA"
             );
         }
@@ -11898,11 +11898,11 @@ function renderAvisoReconciliacao() {
 
     container.innerHTML = `
         <div class="alert alert-warn">
-            <strong>⚠️ Reconciliação de stock necessária (${negativos.length})</strong>
+            <strong><svg class="ic"><use href="#ic-warning"></use></svg> Reconciliação de stock necessária (${negativos.length})</strong>
             <p style="margin:6px 0;font-size:13px;">
                 Estes produtos ficaram com stock negativo — normalmente porque dois dispositivos
                 venderam offline o mesmo produto ao mesmo tempo, antes de sincronizar. Confirme a
-                quantidade real na loja e corrija em Inventário → "⚙️ Ajustar".
+                quantidade real na loja e corrija em Inventário <svg class="ic"><use href="#ic-arrow"></use></svg> "<svg class="ic"><use href="#ic-gear"></use></svg> Ajustar".
             </p>
             <ul style="margin:6px 0 0 18px;font-size:13px;">
                 ${negativos.map(p => `<li><strong>${escapeHTML(p.nome)}</strong>: stock atual ${numero(p.stock)}${p.unidade && p.unidade !== "unidade" ? " " + escapeHTML(p.unidade) : ""}</li>`).join("")}
@@ -11917,7 +11917,7 @@ function renderAvisoReconciliacao() {
 ===================================================== */
 function saudacaoDoDia() {
     const hr = new Date().getHours();
-    return hr < 12 ? "☀️ Bom dia" : (hr < 18 ? "🌤️ Boa tarde" : "🌙 Boa noite");
+    return hr < 12 ? "<svg class="ic"><use href="#ic-sun"></use></svg> Bom dia" : (hr < 18 ? "<svg class="ic"><use href="#ic-sun"></use></svg> Boa tarde" : "<svg class="ic"><use href="#ic-moon"></use></svg> Boa noite");
 }
 
 function dadosResumoDia() {
@@ -11960,12 +11960,12 @@ function renderResumoDia() {
         <div style="margin:6px 0 2px;font-size:18px;font-weight:800;color:#0f172a;">${saudacaoDoDia()}${primeiroNome ? ", " + escapeHTML(primeiroNome) : ""}!</div>
         <div style="font-size:13px;color:#64748b;margin-bottom:8px;text-transform:capitalize;">${escapeHTML(dataBonita)} · ${escapeHTML(FABEF.ramo || "")}</div>
         <div class="resumo-grid">
-            ${cartao("#10b981", "💰 Vendas de hoje", dinheiro(d.totalHoje), `${d.nVendas} venda(s)`, "vendas")}
-            ${cartao(aberto ? "#16a34a" : "#dc2626", "🧾 Caixa", aberto ? "Aberto" : "Fechado",
+            ${cartao("#10b981", "<svg class="ic"><use href="#ic-wallet"></use></svg> Vendas de hoje", dinheiro(d.totalHoje), `${d.nVendas} venda(s)`, "vendas")}
+            ${cartao(aberto ? "#16a34a" : "#dc2626", "<svg class="ic"><use href="#ic-receipt"></use></svg> Caixa", aberto ? "Aberto" : "Fechado",
                 aberto ? "A vender" + hora : (ger ? "Toque para abrir o caixa" : "Peça ao gerente para abrir"), ger ? "caixa" : "")}
-            ${cartao(d.baixos ? "#f59e0b" : "#10b981", "📦 Stock baixo", String(d.baixos),
+            ${cartao(d.baixos ? "#f59e0b" : "#10b981", "<svg class="ic"><use href="#ic-box"></use></svg> Stock baixo", String(d.baixos),
                 d.baixos ? "produto(s) a repor" : "tudo em ordem", ger ? "compras" : "inventario")}
-            ${cartao(d.fiado ? "#f97316" : "#10b981", "📒 Fiado por receber", dinheiro(d.fiado),
+            ${cartao(d.fiado ? "#f97316" : "#10b981", "<svg class="ic"><use href="#ic-book"></use></svg> Fiado por receber", dinheiro(d.fiado),
                 d.nDevedores ? `${d.nDevedores} cliente(s)` : "ninguém deve", "dividas")}
         </div>`;
     el.querySelectorAll("[data-ir]").forEach(b => b.addEventListener("click", () => mostrarSecao(b.dataset.ir)));
@@ -12009,7 +12009,7 @@ function renderDashboard() {
     
     const painelVendas = document.getElementById("inicio-vendas");
     if (painelVendas) {
-        painelVendas.innerHTML = `<div>${dinheiro(totalHoje)}</div><div style="font-size:12px;font-weight:600;color:#64748b;margin-top:4px;">🗓️ Ontem: <strong style="color:#0f172a;">${dinheiro(totalOntem)}</strong> (${vendasOntem.length} vendas)</div>`;
+        painelVendas.innerHTML = `<div>${dinheiro(totalHoje)}</div><div style="font-size:12px;font-weight:600;color:#64748b;margin-top:4px;"><svg class="ic"><use href="#ic-calendar"></use></svg> Ontem: <strong style="color:#0f172a;">${dinheiro(totalOntem)}</strong> (${vendasOntem.length} vendas)</div>`;
     }
 
     // Soma quantos KGs (e litros) foram vendidos hoje, além do valor em MT
@@ -12222,11 +12222,11 @@ function renderDesempenho() {
 
         const seletorAvaliacao = souGerente ? `
             <select style="font-size:12px;padding:4px 8px;border-radius:6px;border:1.5px solid #cbd5e1;font-weight:700;background:#fff;" onchange="salvarAvaliacaoFuncionario(${jsArg(func.id)}, this.value)">
-                <option value="🌟 Excelente" ${avaliacaoAtual.includes('Excelente') ? 'selected' : ''}>🌟 Excelente</option>
-                <option value="👍 Muito Bom" ${avaliacaoAtual.includes('Muito Bom') ? 'selected' : ''}>👍 Muito Bom</option>
+                <option value="<svg class="ic"><use href="#ic-star"></use></svg> Excelente" ${avaliacaoAtual.includes('Excelente') ? 'selected' : ''}><svg class="ic"><use href="#ic-star"></use></svg> Excelente</option>
+                <option value="<svg class="ic"><use href="#ic-check"></use></svg> Muito Bom" ${avaliacaoAtual.includes('Muito Bom') ? 'selected' : ''}><svg class="ic"><use href="#ic-check"></use></svg> Muito Bom</option>
                 <option value="🆗 Bom / Satisfatório" ${avaliacaoAtual.includes('Satisfatório') || avaliacaoAtual === 'Bom' ? 'selected' : ''}>🆗 Bom / Satisfatório</option>
-                <option value="⚠️ Precisa Melhorar" ${avaliacaoAtual.includes('Melhorar') ? 'selected' : ''}>⚠️ Precisa Melhorar</option>
-                <option value="🚨 Fraco / Alerta" ${avaliacaoAtual.includes('Fraco') ? 'selected' : ''}>🚨 Fraco / Alerta</option>
+                <option value="<svg class="ic"><use href="#ic-warning"></use></svg> Precisa Melhorar" ${avaliacaoAtual.includes('Melhorar') ? 'selected' : ''}><svg class="ic"><use href="#ic-warning"></use></svg> Precisa Melhorar</option>
+                <option value="<svg class="ic"><use href="#ic-warning"></use></svg> Fraco / Alerta" ${avaliacaoAtual.includes('Fraco') ? 'selected' : ''}><svg class="ic"><use href="#ic-warning"></use></svg> Fraco / Alerta</option>
             </select>
         ` : `<span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;">${escapeHTML(avaliacaoAtual)}</span>`;
 
@@ -12240,7 +12240,7 @@ function renderDesempenho() {
             <td><strong style="color:#059669;">${dinheiro(valorVendido)}</strong></td>
             <td>
                 <span style="color:#b45309;font-weight:800;">${dinheiro(totalGastos)}</span>
-                ${gastosFunc.length > 0 ? `<button type="button" class="btn btn-small btn-light" onclick="mostrarSecao('funcionarios')" style="padding:1px 6px;font-size:11px;margin-left:4px;" title="Ver detalhes de gastos">👁️</button>` : ''}
+                ${gastosFunc.length > 0 ? `<button type="button" class="btn btn-small btn-light" onclick="mostrarSecao('funcionarios')" style="padding:1px 6px;font-size:11px;margin-left:4px;" title="Ver detalhes de gastos"><svg class="ic"><use href="#ic-eye"></use></svg></button>` : ''}
             </td>
             <td>${descontos > 0 ? dinheiro(descontos) : 'MT 0,00'}</td>
             <td>${encomendasFunc}</td>
@@ -12297,7 +12297,7 @@ function popularSelectFuncionariosGasto(funcionarioId) {
         const telTxt = f.telefone || f.email || 'Colaborador';
         options.push({
             id: f.id,
-            nome: `🧑‍💼 ${f.nome}${ramoTxt} (${telTxt})`,
+            nome: `<svg class="ic"><use href="#ic-user"></use></svg>‍<svg class="ic"><use href="#ic-tie"></use></svg> ${f.nome}${ramoTxt} (${telTxt})`,
             selected: funcionarioId === f.id
         });
     });
@@ -12310,7 +12310,7 @@ function popularSelectFuncionariosGasto(funcionarioId) {
             nomesExistentes.add(nomeG.toLowerCase());
             options.push({
                 id: g.funcionarioId || ("func_manual_" + encodeURIComponent(nomeG)),
-                nome: `🧑‍💼 ${nomeG} (Equipa)`,
+                nome: `<svg class="ic"><use href="#ic-user"></use></svg>‍<svg class="ic"><use href="#ic-tie"></use></svg> ${nomeG} (Equipa)`,
                 selected: funcionarioId === g.funcionarioId
             });
         }
@@ -12319,7 +12319,7 @@ function popularSelectFuncionariosGasto(funcionarioId) {
     // 3. Opção direta para introduzir novo trabalhador
     options.push({
         id: "__novo__",
-        nome: "➕ Digitar Nome de Novo / Outro Funcionário...",
+        nome: "<svg class="ic"><use href="#ic-plus"></use></svg> Digitar Nome de Novo / Outro Funcionário...",
         selected: (!funcionarioId && options.length === 0) || funcionarioId === "__novo__"
     });
 
@@ -12328,7 +12328,7 @@ function popularSelectFuncionariosGasto(funcionarioId) {
     const gerenteNome = FABEF.userData?.nome || "Gerente Principal";
     options.push({
         id: gerenteId,
-        nome: `👑 ${gerenteNome} (Gerente Principal)`,
+        nome: `<svg class="ic"><use href="#ic-star"></use></svg> ${gerenteNome} (Gerente Principal)`,
         selected: funcionarioId === gerenteId
     });
 
@@ -12519,14 +12519,14 @@ document.getElementById("btn-salvar-gasto-funcionario")?.addEventListener("click
             atualizarTelaCaixa();
         }
 
-        await gravarAuditoria(`💳 VALE/ADIANTAMENTO: Registado ${dinheiro(valor)} para ${funcionarioNome} (${tipoGasto} - "${descricao}") por ${quemRegistou}.`, "INFO");
+        await gravarAuditoria(`<svg class="ic"><use href="#ic-card"></use></svg> VALE/ADIANTAMENTO: Registado ${dinheiro(valor)} para ${funcionarioNome} (${tipoGasto} - "${descricao}") por ${quemRegistou}.`, "INFO");
 
         fecharModal("modal-gasto-funcionario");
         renderGastosFuncionarios();
         renderFuncionarios();
         if (typeof renderDesempenho === "function") renderDesempenho();
 
-        alert(`✅ Vale registado com sucesso para ${funcionarioNome}!\n\nTipo: ${tipoGasto}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado da gaveta do Caixa de hoje)" : ""}`);
+        alert(`Vale registado com sucesso para ${funcionarioNome}!\n\nTipo: ${tipoGasto}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado da gaveta do Caixa de hoje)" : ""}`);
     } catch(err) {
         console.error("Erro ao guardar gasto do funcionário:", err);
         alert("Erro ao guardar gasto:\n" + (err.message || err));
@@ -12551,7 +12551,7 @@ function renderGastosFuncionarios() {
             <td>${escapeHTML(g.descricao || "—")}</td>
             <td>${escapeHTML(g.registadoPor || "—")}</td>
             <td>${souGerente ? `
-                <button class="btn btn-danger btn-small" type="button" onclick="eliminarGastoFuncionario(${jsArg(g.id)})" title="Eliminar registo de vale">🗑️</button>
+                <button class="btn btn-danger btn-small" type="button" onclick="eliminarGastoFuncionario(${jsArg(g.id)})" title="Eliminar registo de vale"><svg class="ic"><use href="#ic-trash"></use></svg></button>
             ` : "—"}</td>
         </tr>
     `).join("") || `<tr><td colspan="7" style="text-align:center;color:#64748b;padding:14px;">Ainda não há vales ou adiantamentos registados na conta dos funcionários.</td></tr>`;
@@ -12658,7 +12658,7 @@ async function registarDespesaLoja() {
     if (!podeOperarVendasEDespesas()) { avisoSoFuncionario("Registar despesas"); return; }
     const descricao = document.getElementById("despesa-loja-descricao")?.value.trim();
     const valor = numero(document.getElementById("despesa-loja-valor")?.value);
-    const categoria = document.getElementById("despesa-loja-categoria")?.value || "⚡ Energia Elétrica (Credelec / Luz)";
+    const categoria = document.getElementById("despesa-loja-categoria")?.value || "<svg class="ic"><use href="#ic-bolt"></use></svg> Energia Elétrica (Credelec / Luz)";
     const sairDoCaixa = Boolean(document.getElementById("despesa-loja-sair-caixa")?.checked);
 
     if (!descricao || valor <= 0) {
@@ -12729,7 +12729,7 @@ async function registarDespesaLoja() {
     renderDespesasLojaFunc();
 
     await gravarAuditoria(`Registou despesa/custo operacional (${payload.ramo}): ${descricao} [${categoria}] no valor de ${dinheiro(valor)}`, "INFO");
-    alert(`✅ Gasto registado com sucesso!\n\n${categoria}: ${descricao}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado do Caixa de hoje)" : ""}`);
+    alert(`Gasto registado com sucesso!\n\n${categoria}: ${descricao}\nValor: ${dinheiro(valor)}${sairDoCaixa ? "\n(Retirado do Caixa de hoje)" : ""}`);
 }
 window.registarDespesaLoja = registarDespesaLoja;
 
@@ -12758,7 +12758,7 @@ document.getElementById("btn-salvar-pos-rapido-cliente")?.addEventListener("clic
     }
 
     if (perfilAtual === "gerente") {
-        alert("🔒 Acesso Restrito:\n\nO Gerente não tem permissão para registar clientes. Esta missão é exclusiva dos Funcionários no atendimento.");
+        alert("Acesso Restrito:\n\nO Gerente não tem permissão para registar clientes. Esta missão é exclusiva dos Funcionários no atendimento.");
         return;
     }
 
@@ -12800,7 +12800,7 @@ document.getElementById("btn-salvar-pos-rapido-cliente")?.addEventListener("clic
         fecharModal("modal-pos-rapido-cliente");
         renderClientes();
         await gravarAuditoria(`Cadastrou novo cliente "${nome}" via balcão do POS.`, "INFO");
-        alert(`✅ Cliente "${nome}" registado com sucesso!`);
+        alert(`Cliente "${nome}" registado com sucesso!`);
     } catch(err) {
         console.error("Erro ao criar cliente:", err);
         alert("Erro ao criar cliente:\n" + mensagemFirebase(err));
@@ -12853,8 +12853,8 @@ function renderSugestoes() {
             <td>${escapeHTML(s.texto)}</td>
             <td><span class="badge ${s.estado === 'ADICIONADA' ? 'badge-green' : (s.estado === 'REJEITADA' ? 'badge-red' : 'badge-yellow')}">${escapeHTML(s.estado || "NOVA")}</span></td>
             <td>${souGerente && s.estado === "NOVA" ? `
-                <button class="btn btn-success btn-small" type="button" onclick="marcarSugestao(${jsArg(s.id)},'ADICIONADA')">✔️ Adicionar ao catálogo</button>
-                <button class="btn btn-light btn-small" type="button" onclick="marcarSugestao(${jsArg(s.id)},'REJEITADA')">✖️ Rejeitar</button>
+                <button class="btn btn-success btn-small" type="button" onclick="marcarSugestao(${jsArg(s.id)},'ADICIONADA')"><svg class="ic"><use href="#ic-check"></use></svg> Adicionar ao catálogo</button>
+                <button class="btn btn-light btn-small" type="button" onclick="marcarSugestao(${jsArg(s.id)},'REJEITADA')"><svg class="ic"><use href="#ic-close"></use></svg> Rejeitar</button>
             ` : "—"}</td>
         </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;color:#64748b;">Ainda não há sugestões enviadas.</td></tr>`;
 }
@@ -13228,7 +13228,7 @@ async function entrarModoDemo() {
     
     aplicarRestricoesDeAcessoPorPapel();
     renderTudo();
-    toast("🚀 Modo Demonstração ativado! Teste o POS, Venda de Carne por Kg/g, Stock e Recibos.");
+    toast("<svg class="ic"><use href="#ic-trend"></use></svg> Modo Demonstração ativado! Teste o POS, Venda de Carne por Kg/g, Stock e Recibos.");
 }
 
 /* =====================================================
@@ -13247,7 +13247,7 @@ window.alternarPerfilDemo = function(novoPerfil) {
     if (headerUser) headerUser.textContent = window.FABEF.userData.nome;
     aplicarRestricoesDeAcessoPorPapel();
     renderTudo();
-    alert(`✅ Perfil alternado para: ${perfil.toUpperCase()}.\n\n${perfil === 'funcionario' ? 'Ramos, compras, relatórios e configurações estão ocultos. O funcionário vai diretamente para Vendas / POS.' : 'Acesso total de Gerente restaurado com gestão de ramos, inventário e relatórios.'}`);
+    alert(`Perfil alternado para: ${perfil.toUpperCase()}.\n\n${perfil === 'funcionario' ? 'Ramos, compras, relatórios e configurações estão ocultos. O funcionário vai diretamente para Vendas / POS.' : 'Acesso total de Gerente restaurado com gestão de ramos, inventário e relatórios.'}`);
 };
 
 // Binds
@@ -13296,8 +13296,8 @@ window.acionarInstalacaoPWA = async function() {
         deferredPromptInstalacao.prompt();
         const { outcome } = await deferredPromptInstalacao.userChoice;
         if (outcome === "accepted") {
-            if (typeof toast === "function") toast("✅ Aplicativo adicionado ao seu ecrã!");
-            else alert("✅ Aplicativo instalado com sucesso no seu dispositivo!");
+            if (typeof toast === "function") toast("<svg class="ic"><use href="#ic-check"></use></svg> Aplicativo adicionado ao seu ecrã!");
+            else alert("Aplicativo instalado com sucesso no seu dispositivo!");
         }
         deferredPromptInstalacao = null;
     } else {
@@ -13306,11 +13306,11 @@ window.acionarInstalacaoPWA = async function() {
             modalPWA.classList.add("show");
         } else {
             alert(
-                "📱 Como colocar o FABEF ERP no ecrã do seu celular:\n\n" +
+                "<svg class="ic"><use href="#ic-phone"></use></svg> Como colocar o FABEF ERP no ecrã do seu celular:\n\n" +
                 "• No Android (Chrome):\n" +
                 "Toque no menu ⋮ (3 pontos) no canto superior direito e selecione 'Instalar aplicativo' ou 'Adicionar ao ecrã principal'.\n\n" +
                 "• No iPhone / iPad (Safari):\n" +
-                "Toque no botão Partilhar 📤 na barra inferior e toque em 'Adicionar ao Ecrã Principal ➕'."
+                "Toque no botão Partilhar <svg class="ic"><use href="#ic-upload"></use></svg> na barra inferior e toque em 'Adicionar ao Ecrã Principal <svg class="ic"><use href="#ic-plus"></use></svg>'."
             );
         }
     }
@@ -13674,11 +13674,11 @@ window.atualizarDiagnosticoEmpresa = function() {
 
     if (elRecomendacao) {
         if (baixos > 0) {
-            elRecomendacao.innerHTML = `⚠️ <strong>Atenção ao Stock:</strong> Tem <strong>${baixos}</strong> artigo(s) com stock crítico ou esgotado. Faça compras com fornecedores para não perder vendas!`;
+            elRecomendacao.innerHTML = `<svg class="ic"><use href="#ic-warning"></use></svg> <strong>Atenção ao Stock:</strong> Tem <strong>${baixos}</strong> artigo(s) com stock crítico ou esgotado. Faça compras com fornecedores para não perder vendas!`;
         } else if (ticketMedio > 0) {
-            elRecomendacao.innerHTML = `✅ <strong>Negócio Saudável:</strong> O seu ticket médio é de <strong>${dinheiro(ticketMedio)}</strong>. Ofereça combos ou produtos de conveniência no balcão para subir o valor por cliente.`;
+            elRecomendacao.innerHTML = `<svg class="ic"><use href="#ic-check"></use></svg> <strong>Negócio Saudável:</strong> O seu ticket médio é de <strong>${dinheiro(ticketMedio)}</strong>. Ofereça combos ou produtos de conveniência no balcão para subir o valor por cliente.`;
         } else {
-            elRecomendacao.innerHTML = `💡 <strong>Primeiros Passos:</strong> Registe produtos e comece a faturar no POS para gerar indicadores preditivos de lucro.`;
+            elRecomendacao.innerHTML = `<svg class="ic"><use href="#ic-bulb"></use></svg> <strong>Primeiros Passos:</strong> Registe produtos e comece a faturar no POS para gerar indicadores preditivos de lucro.`;
         }
     }
 };
